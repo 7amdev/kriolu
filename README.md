@@ -130,12 +130,12 @@ dadus media = (19 + 45) / 2;
 Statements are commands to be performed when the program is run. By definition, it doesn't produce and value, only an effect.
 
 ```
-print "Oi, mundo!";
+imprimi "Oi, mundo!";
 "expression";
 {
-    print "Santiago";
-    print "Fogo";
-    print "Mindelo";
+    imprimi "Santiago";
+    imprimi "Fogo";
+    imprimi "Mindelo";
 }
 ```
 
@@ -147,7 +147,7 @@ Given a condition, an `if` statement executes only the portion of code that pass
 
 ```
 dados ano = 1945;
-si (ano == 2000) {
+si (ano == 1945) {
     imprimi "sim";
 } sinau {
     imprimi "nao";
