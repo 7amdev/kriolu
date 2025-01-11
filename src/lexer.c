@@ -1,0 +1,187 @@
+#include "kriolu.h"
+
+// TODO
+// [] Scan digits
+// [] Scan plus sign
+// [] Scan minus sign
+// [] Test
+
+static char lexer_advance(lexer_t *lexer);
+static char lexer_peek(lexer_t *lexer);
+static bool lexer_match(lexer_t *lexer, char expected);
+static bool lexer_is_eof(char c);
+static bool lexer_is_digit(char c);
+static bool lexer_is_letter_or_underscore(char c);
+static bool lexer_is_whitespace(char c);
+static bool lexer_is_comment(lexer_t *lexer);
+static bool lexer_is_new_line(char c);
+// TODO: static bool lexer_is_uppercase_letter(char c);
+// TODO: static bool lexer_is_lowercase_letter(char c);
+static token_kind_t lexer_keyword_check(
+    const char *start,
+    int identifier_length,
+    char const *check_text,
+    int check_start_position,
+    token_kind_t return_value);
+static token_t lexer_error(lexer_t *lexer, const char *message);
+
+void lexer_init(lexer_t *lexer, const char *source_code)
+{
+    lexer->current = source_code;
+    lexer->line_number = 1;
+}
+
+token_t lexer_scan(lexer_t *lexer)
+{
+    while (lexer_is_whitespace(*lexer->current))
+    {
+        if (lexer_is_new_line(*lexer->current))
+        {
+            lexer->line_number += 1;
+        }
+        else if (lexer_is_comment(lexer))
+        {
+            while (!lexer_is_new_line(*lexer->current) && !lexer_is_eof(*lexer->current))
+            {
+                lexer_advance(lexer);
+            }
+
+            continue;
+        }
+
+        lexer_advance(lexer);
+    }
+
+    // todo: move if (lexer_is_comment) code to this location
+
+    if (lexer_is_eof(*lexer->current))
+    {
+        return (token_t){
+            .kind = TOKEN_EOF,
+            .start = lexer->current,
+            .line_number = lexer->line_number,
+            .length = 1};
+    }
+
+    if (lexer_is_digit(*lexer->current))
+    {
+        token_t token;
+        lexer->start = lexer->current;
+
+        while (lexer_is_digit(*lexer->current))
+            lexer_advance(lexer);
+
+        if (*lexer->current == '.' && lexer_is_digit(lexer->current[1]))
+        {
+            lexer_advance(lexer);
+
+            while (lexer_is_digit(*lexer->current))
+                lexer_advance(lexer);
+        }
+
+        return (token_t){
+            .kind = TOKEN_NUMBER,
+            .start = lexer->start,
+            .length = (int)(lexer->current - lexer->start),
+            .line_number = lexer->line_number};
+    }
+
+    return lexer_error(lexer, "Unexpected Caracter.");
+}
+
+void lexer_print(lexer_t *lexer)
+{
+    token_t token;
+    for (;;)
+    {
+        token = lexer_scan(lexer);
+
+        if (token.kind == TOKEN_ERROR)
+        {
+            fprintf(stdout, "Error: %s\n", token.start);
+            break;
+        }
+
+        if (token.kind == TOKEN_EOF)
+        {
+            fprintf(stdout, "%s\n", "<EOF>");
+            break;
+        }
+
+        switch (token.kind)
+        {
+        case TOKEN_PLUS:
+        {
+            fprintf(stdout, "%s\n", "<PLUS>");
+            break;
+        }
+        case TOKEN_NUMBER:
+        {
+            fprintf(stdout, "<NUMBER value=%.*s line=%d>\n", token.length, token.start, token.line_number);
+            break;
+        }
+        }
+    }
+}
+
+static char lexer_advance(lexer_t *lexer)
+{
+    lexer->current += 1;
+    return lexer->current[-1];
+}
+
+static char lexer_peek(lexer_t *lexer)
+{
+    return lexer->current[0];
+}
+
+static bool lexer_match(lexer_t *lexer, char expected)
+{
+    if (lexer_is_eof(*lexer->current))
+        return false;
+
+    if (lexer->current[0] != expected)
+        return false;
+
+    lexer_advance(lexer);
+    return true;
+}
+
+static bool lexer_is_eof(char c)
+{
+    return c == '\0';
+}
+
+static bool lexer_is_whitespace(char c)
+{
+    return (c == ' ') ||
+           (c == '\t') ||
+           (c == '\n') ||
+           (c == '\r') ||
+           (c == '/');
+}
+
+static bool lexer_is_comment(lexer_t *lexer)
+{
+    return lexer->current[0] == '/' &&
+           lexer->current[1] == '/';
+}
+
+static bool lexer_is_new_line(char c)
+{
+    return c == '\n';
+}
+
+static bool lexer_is_digit(char c)
+{
+    return c >= '0' && c <= '9';
+}
+
+static token_t lexer_error(lexer_t *lexer, const char *message)
+{
+    return (token_t){
+        .kind = TOKEN_ERROR,
+        .start = message,
+        .length = (int)strlen(message),
+        .line_number = lexer->line_number};
+}

@@ -1,7 +1,6 @@
-#include <stdio.h>
 #include <stdlib.h>
-#include <stdbool.h>
-#include <string.h>
+
+#include "kriolu.h"
 
 #define RETURN_DEFER(value) \
     do                      \
@@ -16,7 +15,8 @@ bool filename_ends_with(const char *filename, const char *extension);
 
 int main(int argc, const char *argv[])
 {
-    char *source_code;
+    const char *source_code;
+    lexer_t lexer;
 
     if (argc < 2)
     {
@@ -45,6 +45,9 @@ int main(int argc, const char *argv[])
         }
     }
 
+    lexer_init(&lexer, source_code);
+    lexer_print(&lexer);
+
     return 0;
 }
 
@@ -62,6 +65,12 @@ int file_read(const char *file_path, char **buffer_out)
     fseek(file, 0L, SEEK_END);
     size_t file_size = ftell(file);
     rewind(file);
+
+    if (file_size == 0)
+    {
+        fprintf(stderr, "Error: File is empty.\n");
+        RETURN_DEFER(file_size);
+    }
 
     *buffer_out = malloc(file_size + 1);
     if (*buffer_out == NULL)
