@@ -39,20 +39,36 @@ token_t lexer_scan(lexer_t *lexer)
         {
             lexer->line_number += 1;
         }
-        else if (lexer_is_comment(lexer))
-        {
-            while (!lexer_is_new_line(*lexer->current) && !lexer_is_eof(*lexer->current))
-            {
-                lexer_advance(lexer);
-            }
-
-            continue;
-        }
 
         lexer_advance(lexer);
     }
 
-    // todo: move if (lexer_is_comment) code to this location
+    if (lexer_is_comment(lexer))
+    {
+        int length;
+        lexer->start = lexer->current;
+
+        while (!lexer_is_new_line(*lexer->current) && !lexer_is_eof(*lexer->current))
+        {
+            lexer_advance(lexer);
+        }
+
+        if (lexer->current[-1] == '\r')
+        {
+            // length = (int)((lexer->current - 1) - (lexer->start + 2));
+            length = (int)((lexer->current - 1) - (lexer->start));
+        }
+        else
+        {
+            length = (int)(lexer->current - lexer->start);
+        }
+
+        return (token_t){
+            .kind = TOKEN_COMMENT,
+            .start = lexer->start,
+            .length = length,
+            .line_number = lexer->line_number};
+    }
 
     if (lexer_is_eof(*lexer->current))
     {
@@ -65,7 +81,6 @@ token_t lexer_scan(lexer_t *lexer)
 
     if (lexer_is_digit(*lexer->current))
     {
-        token_t token;
         lexer->start = lexer->current;
 
         while (lexer_is_digit(*lexer->current))
@@ -120,6 +135,11 @@ void lexer_print(lexer_t *lexer)
             fprintf(stdout, "<NUMBER value=%.*s line=%d>\n", token.length, token.start, token.line_number);
             break;
         }
+        case TOKEN_COMMENT:
+        {
+            fprintf(stdout, "<COMMENT value=%.*s line=%d>\n", token.length, token.start, token.line_number);
+            break;
+        }
         }
     }
 }
@@ -157,8 +177,8 @@ static bool lexer_is_whitespace(char c)
     return (c == ' ') ||
            (c == '\t') ||
            (c == '\n') ||
-           (c == '\r') ||
-           (c == '/');
+           (c == '\r');
+    //    || (c == '/');
 }
 
 static bool lexer_is_comment(lexer_t *lexer)
