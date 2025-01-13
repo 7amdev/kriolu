@@ -11,14 +11,13 @@
 
 typedef enum
 {
+    TOKEN_STRING,
     TOKEN_NUMBER,
     TOKEN_PLUS,
     TOKEN_COMMENT,
     TOKEN_ERROR,
     TOKEN_EOF
 } token_kind_t;
-
-const char *token_kind_to_string(token_kind_t kind);
 
 //
 // Token

@@ -4,7 +4,7 @@
 // [] Scan digits
 // [] Scan plus sign
 // [] Scan minus sign
-// [] Test
+// [] Make comment, digit, string test files
 
 static char lexer_advance(lexer_t *lexer);
 static char lexer_peek(lexer_t *lexer);
@@ -15,6 +15,7 @@ static bool lexer_is_letter_or_underscore(char c);
 static bool lexer_is_whitespace(char c);
 static bool lexer_is_comment(lexer_t *lexer);
 static bool lexer_is_new_line(char c);
+static bool lexer_is_string(char c);
 // TODO: static bool lexer_is_uppercase_letter(char c);
 // TODO: static bool lexer_is_lowercase_letter(char c);
 static token_kind_t lexer_keyword_check(
@@ -46,6 +47,7 @@ token_t lexer_scan(lexer_t *lexer)
     if (lexer_is_comment(lexer))
     {
         int length;
+
         lexer->start = lexer->current;
 
         while (!lexer_is_new_line(*lexer->current) && !lexer_is_eof(*lexer->current))
@@ -101,6 +103,33 @@ token_t lexer_scan(lexer_t *lexer)
             .line_number = lexer->line_number};
     }
 
+    if (lexer_is_string(*lexer->current))
+    {
+        lexer->start = lexer->current;
+
+        lexer_advance(lexer);
+        while (*lexer->current != '"' && !lexer_is_eof(*lexer->current))
+        {
+            if (lexer_is_new_line(*lexer->current))
+                lexer->line_number += 1;
+
+            lexer_advance(lexer);
+        }
+
+        if (lexer_is_eof(*lexer->current))
+        {
+            return lexer_error(lexer, "Expeected '\"' character, instead found EOF.");
+        }
+
+        lexer_advance(lexer);
+
+        return (token_t){
+            .kind = TOKEN_STRING,
+            .start = lexer->start,
+            .length = (int)(lexer->current - lexer->start),
+            .line_number = lexer->line_number};
+    }
+
     return lexer_error(lexer, "Unexpected Caracter.");
 }
 
@@ -138,6 +167,11 @@ void lexer_print(lexer_t *lexer)
         case TOKEN_COMMENT:
         {
             fprintf(stdout, "<COMMENT value=%.*s line=%d>\n", token.length, token.start, token.line_number);
+            break;
+        }
+        case TOKEN_STRING:
+        {
+            fprintf(stdout, "<STRING value=%.*s line=%d>\n", token.length, token.start, token.line_number);
             break;
         }
         }
@@ -195,6 +229,11 @@ static bool lexer_is_new_line(char c)
 static bool lexer_is_digit(char c)
 {
     return c >= '0' && c <= '9';
+}
+
+static bool lexer_is_string(char c)
+{
+    return c == '"';
 }
 
 static token_t lexer_error(lexer_t *lexer, const char *message)
