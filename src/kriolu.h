@@ -11,9 +11,50 @@
 
 typedef enum
 {
+    TOKEN_LEFT_PARENTHESIS,  // (
+    TOKEN_RIGHT_PARENTHESIS, // )
+    TOKEN_LEFT_BRACE,        // {
+    TOKEN_RIGHT_BRACE,       // }
+    TOKEN_COMMA,
+    TOKEN_DOT,
+    TOKEN_MINUS,
+    TOKEN_PLUS,
+    TOKEN_SEMICOLON,
+    TOKEN_SLASH,
+    TOKEN_ASTERISK,
+
+    TOKEN_BANG,       // !
+    TOKEN_BANG_EQUAL, // !=
+    TOKEN_EQUAL,
+    TOKEN_EQUAL_EQUAL,
+    TOKEN_GREATER,
+    TOKEN_GREATER_EQUAL,
+    TOKEN_LESS,
+    TOKEN_LESS_EQUAL,
+
+    TOKEN_IDENTIFIER,
     TOKEN_STRING,
     TOKEN_NUMBER,
-    TOKEN_PLUS,
+
+    TOKEN_E,
+    TOKEN_OU,
+    TOKEN_KLASSI,
+    TOKEN_SI,
+    TOKEN_SINOU,
+    TOKEN_FALSU,
+    TOKEN_VERDADI,
+    TOKEN_DI,
+    TOKEN_FUNSON,
+    TOKEN_NULO,
+    TOKEN_IMPRIMI,
+    TOKEN_DIVOLVI,
+    TOKEN_SUPER,
+    TOKEN_THIS,
+    TOKEN_DADUS,
+    TOKEN_TIMENTI,
+    TOKEN_KA,
+    TOKEN_KA_IGUAL,
+
     TOKEN_COMMENT,
     TOKEN_ERROR,
     TOKEN_EOF
@@ -23,6 +64,8 @@ typedef enum
 // Token
 //
 
+// TODO: use tagged unions data structure to support string
+//       line_number_begin and line_number_end
 typedef struct
 {
     token_kind_t kind;

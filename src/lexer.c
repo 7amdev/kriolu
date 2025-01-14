@@ -130,6 +130,127 @@ token_t lexer_scan(lexer_t *lexer)
             .line_number = lexer->line_number};
     }
 
+    if (*lexer->current == '(')
+    {
+        lexer->start = lexer->current;
+        lexer_advance(lexer);
+        return (token_t){
+            .kind = TOKEN_LEFT_PARENTHESIS,
+            .start = lexer->start,
+            .length = (int)(lexer->current - lexer->start),
+            .line_number = lexer->line_number};
+    }
+
+    if (*lexer->current == ')')
+    {
+        lexer->start = lexer->current;
+        lexer_advance(lexer);
+        return (token_t){
+            .kind = TOKEN_RIGHT_PARENTHESIS,
+            .start = lexer->start,
+            .length = (int)(lexer->current - lexer->start),
+            .line_number = lexer->line_number};
+    }
+
+    if (*lexer->current == '{')
+    {
+        lexer->start = lexer->current;
+        lexer_advance(lexer);
+        return (token_t){
+            .kind = TOKEN_LEFT_BRACE,
+            .start = lexer->start,
+            .length = (int)(lexer->current - lexer->start),
+            .line_number = lexer->line_number};
+    }
+
+    if (*lexer->current == '}')
+    {
+        lexer->start = lexer->current;
+        lexer_advance(lexer);
+        return (token_t){
+            .kind = TOKEN_RIGHT_BRACE,
+            .start = lexer->start,
+            .length = (int)(lexer->current - lexer->start),
+            .line_number = lexer->line_number};
+    }
+
+    if (*lexer->current == ',')
+    {
+        lexer->start = lexer->current;
+        lexer_advance(lexer);
+        return (token_t){
+            .kind = TOKEN_COMMA,
+            .start = lexer->start,
+            .length = (int)(lexer->current - lexer->start),
+            .line_number = lexer->line_number};
+    }
+
+    if (*lexer->current == '.')
+    {
+        lexer->start = lexer->current;
+        lexer_advance(lexer);
+        return (token_t){
+            .kind = TOKEN_DOT,
+            .start = lexer->start,
+            .length = (int)(lexer->current - lexer->start),
+            .line_number = lexer->line_number};
+    }
+
+    if (*lexer->current == '-')
+    {
+        lexer->start = lexer->current;
+        lexer_advance(lexer);
+        return (token_t){
+            .kind = TOKEN_MINUS,
+            .start = lexer->start,
+            .length = (int)(lexer->current - lexer->start),
+            .line_number = lexer->line_number};
+    }
+
+    if (*lexer->current == '+')
+    {
+        lexer->start = lexer->current;
+        lexer_advance(lexer);
+        return (token_t){
+            .kind = TOKEN_PLUS,
+            .start = lexer->start,
+            .length = (int)(lexer->current - lexer->start),
+            .line_number = lexer->line_number};
+    }
+
+    if (*lexer->current == '/')
+    {
+        lexer->start = lexer->current;
+        lexer_advance(lexer);
+        return (token_t){
+            .kind = TOKEN_SLASH,
+            .start = lexer->start,
+            .length = (int)(lexer->current - lexer->start),
+            .line_number = lexer->line_number};
+    }
+
+    if (*lexer->current == '*')
+    {
+        lexer->start = lexer->current;
+        lexer_advance(lexer);
+        return (token_t){
+            .kind = TOKEN_ASTERISK,
+            .start = lexer->start,
+            .length = (int)(lexer->current - lexer->start),
+            .line_number = lexer->line_number};
+    }
+
+    if (*lexer->current == ';')
+    {
+        lexer->start = lexer->current;
+        lexer_advance(lexer);
+        return (token_t){
+            .kind = TOKEN_SEMICOLON,
+            .start = lexer->start,
+            .length = (int)(lexer->current - lexer->start),
+            .line_number = lexer->line_number};
+    }
+
     return lexer_error(lexer, "Unexpected Caracter.");
 }
 
@@ -154,9 +275,59 @@ void lexer_print(lexer_t *lexer)
 
         switch (token.kind)
         {
+        case TOKEN_LEFT_PARENTHESIS:
+        {
+            fprintf(stdout, "%s\n", "<LEFT_PARENTHESIS: symbol=\'(\'>");
+            break;
+        }
+        case TOKEN_RIGHT_PARENTHESIS:
+        {
+            fprintf(stdout, "%s\n", "<RIGHT_PARENTHESIS symbol=\')\'>");
+            break;
+        }
+        case TOKEN_LEFT_BRACE:
+        {
+            fprintf(stdout, "%s\n", "<LEFT_BRACE symbol=\'{\'>");
+            break;
+        }
+        case TOKEN_RIGHT_BRACE:
+        {
+            fprintf(stdout, "%s\n", "<RIGHT_BRACE symbol=\'}\'>");
+            break;
+        }
+        case TOKEN_COMMA:
+        {
+            fprintf(stdout, "%s\n", "<COMMA symbol=\',\'>");
+            break;
+        }
+        case TOKEN_DOT:
+        {
+            fprintf(stdout, "%s\n", "<DOT symbol=\'.\'>");
+            break;
+        }
+        case TOKEN_MINUS:
+        {
+            fprintf(stdout, "%s\n", "<MINUS symbol=\'-\'>");
+            break;
+        }
         case TOKEN_PLUS:
         {
-            fprintf(stdout, "%s\n", "<PLUS>");
+            fprintf(stdout, "%s\n", "<PLUS symbol=\'+\'>");
+            break;
+        }
+        case TOKEN_SLASH:
+        {
+            fprintf(stdout, "%s\n", "<SLASH symbol=\'/\'>");
+            break;
+        }
+        case TOKEN_ASTERISK:
+        {
+            fprintf(stdout, "%s\n", "<ASTERISK symbol=\'*\'>");
+            break;
+        }
+        case TOKEN_SEMICOLON:
+        {
+            fprintf(stdout, "%s\n", "<SEMICOLON symbol=\';\'>");
             break;
         }
         case TOKEN_NUMBER:
