@@ -204,7 +204,7 @@ funson soma(a, b) {
 }
 
 funson identidade(a) {
-    divolvi al;
+    divolvi a;
 }
 
 imprimi identidade(soma)(2, 3);    // prints 6
