@@ -40,10 +40,10 @@ Kriolu is an interpreter written in C with syntax in the unofficial language of 
 To store and keep track of all the data in our program, we use variables to create names to which data can be assigned.
 
 ```
-dadus nome;
+mimoria nome;
 imprimi nome; // nil
 
-dadus cidade = "Praia";
+mimoria cidade = "Praia";
 imprimi cidade; // Praia
 ```
 
@@ -122,7 +122,7 @@ verdai ou falsu;    // verdadi
 You can change the operators precedence and associativity by using `()` to group particular operations in a expression.
 
 ```
-dadus media = (19 + 45) / 2;
+mimoria media = (19 + 45) / 2;
 ```
 
 ### Statements
@@ -146,7 +146,7 @@ Control flow gives you the ability to change program's execution order which is 
 Given a condition, an `if` statement executes only the portion of code that pass the condition.
 
 ```
-dados ano = 1945;
+mimoria ano = 1945;
 si (ano == 1945) {
     imprimi "sim";
 } sinau {
@@ -168,13 +168,13 @@ si (ano == 1900)
 A `timenti` and `di` loop executes som code more than once.
 
 ```
-dados a = 1;
+mimoria a = 1;
 timenti (a < 10) {
     imprimi a;
     a = a + 1;
 }
 
-di (dados i = 1; i < 10; i = i + 1) {
+di (mimoria i = 1; i < 10; i = i + 1) {
     imprimi i;
 }
 
@@ -211,7 +211,7 @@ imprimi identidade(soma)(2, 3);    // prints 6
 
 // example 2
 funson mensagem() {
-    dados texto = "5 di julho di 1945.";
+    mimoria texto = "5 di julho di 1945.";
 
     fn imprimiTexto() {
         imprimi texto;
@@ -220,7 +220,7 @@ funson mensagem() {
     divolvi imprimiMensagem;
 }
 
-dados texto = mensagem();
+mimoria texto = mensagem();
 texto();    // "5 di julho di 1945."
 ```
 
@@ -243,14 +243,14 @@ klasi Quadrilateru {
 _Classes in kriolu are first class_
 
 ```
-dadus temp = Quadrilateru;
+mimoria temp = Quadrilateru;
 qualquerFunson(Quadrilateru);
 ```
 
 _Instantiation_
 
 ```
-dadus quadrado = Quadrilateru();
+mimoria quadrado = Quadrilateru();
 imprimi quadrado;    // "Quadrilateru instance"
 
 quadrado.base = 10;
@@ -282,8 +282,8 @@ klasi Quadrilateru {
     }
 }
 
-dadus retangulo = new Quadrilateru(0, 0, 10, 20, "burmedjo");
-dadus quadradu = new Quadrilateru(0, 0, 10, 10, "berdi");
+mimoria retangulo = new Quadrilateru(0, 0, 10, 20, "burmedjo");
+mimoria quadradu = new Quadrilateru(0, 0, 10, 10, "berdi");
 
 imprimi retangulo.area();   // 200
 imprimi quadradu.area();    // 100
@@ -317,7 +317,7 @@ klasi Catxor : Animal  {
     }
 }
 
-dadus labrador = Catxor("bobi");
+mimoria labrador = Catxor("bobi");
 labrador.ladra();
 
 
