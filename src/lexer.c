@@ -251,6 +251,28 @@ token_t lexer_scan(lexer_t *lexer)
             .line_number = lexer->line_number};
     }
 
+    if (*lexer->current == '=')
+    {
+        lexer->start = lexer->current;
+        lexer_advance(lexer);
+
+        if (*lexer->current == '=')
+        {
+            lexer_advance(lexer);
+            return (token_t){
+                .kind = TOKEN_EQUAL_EQUAL,
+                .start = lexer->start,
+                .length = (int)(lexer->current - lexer->start),
+                .line_number = lexer->line_number};
+        }
+
+        return (token_t){
+            .kind = TOKEN_EQUAL,
+            .start = lexer->start,
+            .length = (int)(lexer->current - lexer->start),
+            .line_number = lexer->line_number};
+    }
+
     return lexer_error(lexer, "Unexpected Caracter.");
 }
 
@@ -269,7 +291,7 @@ void lexer_print(lexer_t *lexer)
 
         if (token.kind == TOKEN_EOF)
         {
-            fprintf(stdout, "%s\n", "<EOF>");
+            fprintf(stdout, "<EOF>");
             break;
         }
 
@@ -277,57 +299,57 @@ void lexer_print(lexer_t *lexer)
         {
         case TOKEN_LEFT_PARENTHESIS:
         {
-            fprintf(stdout, "%s\n", "<LEFT_PARENTHESIS: symbol=\'(\'>");
+            fprintf(stdout, "<LEFT_PARENTHESIS: symbol=\'(\' line=%d>\n", token.line_number);
             break;
         }
         case TOKEN_RIGHT_PARENTHESIS:
         {
-            fprintf(stdout, "%s\n", "<RIGHT_PARENTHESIS symbol=\')\'>");
+            fprintf(stdout, "<RIGHT_PARENTHESIS symbol=\')\' line=%d>\n", token.line_number);
             break;
         }
         case TOKEN_LEFT_BRACE:
         {
-            fprintf(stdout, "%s\n", "<LEFT_BRACE symbol=\'{\'>");
+            fprintf(stdout, "<LEFT_BRACE symbol=\'{\' line=%d>\n", token.line_number);
             break;
         }
         case TOKEN_RIGHT_BRACE:
         {
-            fprintf(stdout, "%s\n", "<RIGHT_BRACE symbol=\'}\'>");
+            fprintf(stdout, "<RIGHT_BRACE symbol=\'}\' line=%d>\n", token.line_number);
             break;
         }
         case TOKEN_COMMA:
         {
-            fprintf(stdout, "%s\n", "<COMMA symbol=\',\'>");
+            fprintf(stdout, "<COMMA symbol=\',\' line=%d>\n", token.line_number);
             break;
         }
         case TOKEN_DOT:
         {
-            fprintf(stdout, "%s\n", "<DOT symbol=\'.\'>");
+            fprintf(stdout, "<DOT symbol=\'.\' line=%d>\n", token.line_number);
             break;
         }
         case TOKEN_MINUS:
         {
-            fprintf(stdout, "%s\n", "<MINUS symbol=\'-\'>");
+            fprintf(stdout, "<MINUS symbol=\'-\' line=%d>\n", token.line_number);
             break;
         }
         case TOKEN_PLUS:
         {
-            fprintf(stdout, "%s\n", "<PLUS symbol=\'+\'>");
+            fprintf(stdout, "<PLUS symbol=\'+\' line=%d>\n", token.line_number);
             break;
         }
         case TOKEN_SLASH:
         {
-            fprintf(stdout, "%s\n", "<SLASH symbol=\'/\'>");
+            fprintf(stdout, "<SLASH symbol=\'/\' line=%d>\n", token.line_number);
             break;
         }
         case TOKEN_ASTERISK:
         {
-            fprintf(stdout, "%s\n", "<ASTERISK symbol=\'*\'>");
+            fprintf(stdout, "<ASTERISK symbol=\'*\' line=%d>\n", token.line_number);
             break;
         }
         case TOKEN_SEMICOLON:
         {
-            fprintf(stdout, "%s\n", "<SEMICOLON symbol=\';\'>");
+            fprintf(stdout, "<SEMICOLON symbol=\';\' line=%d>\n", token.line_number);
             break;
         }
         case TOKEN_NUMBER:
@@ -343,6 +365,16 @@ void lexer_print(lexer_t *lexer)
         case TOKEN_STRING:
         {
             fprintf(stdout, "<STRING value=%.*s line=%d>\n", token.length, token.start, token.line_number);
+            break;
+        }
+        case TOKEN_EQUAL:
+        {
+            fprintf(stdout, "<EQUAL symbol=\'=\' line=%d>\n", token.line_number);
+            break;
+        }
+        case TOKEN_EQUAL_EQUAL:
+        {
+            fprintf(stdout, "<EQUAL_EQUAL symbol=\'==\' line=%d>\n", token.line_number);
             break;
         }
         }
