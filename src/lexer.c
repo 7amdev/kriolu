@@ -81,55 +81,6 @@ token_t lexer_scan(lexer_t *lexer)
             .length = 1};
     }
 
-    if (lexer_is_digit(*lexer->current))
-    {
-        lexer->start = lexer->current;
-
-        while (lexer_is_digit(*lexer->current))
-            lexer_advance(lexer);
-
-        if (*lexer->current == '.' && lexer_is_digit(lexer->current[1]))
-        {
-            lexer_advance(lexer);
-
-            while (lexer_is_digit(*lexer->current))
-                lexer_advance(lexer);
-        }
-
-        return (token_t){
-            .kind = TOKEN_NUMBER,
-            .start = lexer->start,
-            .length = (int)(lexer->current - lexer->start),
-            .line_number = lexer->line_number};
-    }
-
-    if (lexer_is_string(*lexer->current))
-    {
-        lexer->start = lexer->current;
-
-        lexer_advance(lexer);
-        while (*lexer->current != '"' && !lexer_is_eof(*lexer->current))
-        {
-            if (lexer_is_new_line(*lexer->current))
-                lexer->line_number += 1;
-
-            lexer_advance(lexer);
-        }
-
-        if (lexer_is_eof(*lexer->current))
-        {
-            return lexer_error(lexer, "Expeected '\"' character, instead found EOF.");
-        }
-
-        lexer_advance(lexer);
-
-        return (token_t){
-            .kind = TOKEN_STRING,
-            .start = lexer->start,
-            .length = (int)(lexer->current - lexer->start),
-            .line_number = lexer->line_number};
-    }
-
     if (*lexer->current == '(')
     {
         lexer->start = lexer->current;
@@ -253,21 +204,108 @@ token_t lexer_scan(lexer_t *lexer)
 
     if (*lexer->current == '=')
     {
-        lexer->start = lexer->current;
+        token_t token;
+        token.kind = TOKEN_EQUAL;
+        token.start = lexer->current;
+        token.length = (int)(lexer->current - lexer->start);
+        token.line_number = lexer->line_number;
+
         lexer_advance(lexer);
 
         if (*lexer->current == '=')
         {
             lexer_advance(lexer);
-            return (token_t){
-                .kind = TOKEN_EQUAL_EQUAL,
-                .start = lexer->start,
-                .length = (int)(lexer->current - lexer->start),
-                .line_number = lexer->line_number};
+            token.kind = TOKEN_EQUAL_EQUAL;
+            token.length = (int)(lexer->current - lexer->start);
+        }
+
+        return token;
+    }
+
+    if (*lexer->current == '>')
+    {
+        token_t token;
+        token.kind = TOKEN_GREATER;
+        token.start = lexer->current;
+        token.length = (int)(lexer->current - lexer->start);
+        token.line_number = lexer->line_number;
+
+        lexer_advance(lexer);
+
+        if (*lexer->current == '=')
+        {
+            lexer_advance(lexer);
+            token.kind = TOKEN_GREATER_EQUAL;
+            token.length = (int)(lexer->current - lexer->start);
+        }
+
+        return token;
+    }
+
+    if (*lexer->current == '<')
+    {
+        token_t token;
+        token.kind = TOKEN_LESS;
+        token.start = lexer->current;
+        token.length = (int)(lexer->current - lexer->start);
+        token.line_number = lexer->line_number;
+
+        lexer_advance(lexer);
+
+        if (*lexer->current == '=')
+        {
+            lexer_advance(lexer);
+            token.kind = TOKEN_LESS_EQUAL;
+            token.length = (int)(lexer->current - lexer->start);
+        }
+
+        return token;
+    }
+
+    if (lexer_is_digit(*lexer->current))
+    {
+        lexer->start = lexer->current;
+
+        while (lexer_is_digit(*lexer->current))
+            lexer_advance(lexer);
+
+        if (*lexer->current == '.' && lexer_is_digit(lexer->current[1]))
+        {
+            lexer_advance(lexer);
+
+            while (lexer_is_digit(*lexer->current))
+                lexer_advance(lexer);
         }
 
         return (token_t){
-            .kind = TOKEN_EQUAL,
+            .kind = TOKEN_NUMBER,
+            .start = lexer->start,
+            .length = (int)(lexer->current - lexer->start),
+            .line_number = lexer->line_number};
+    }
+
+    if (lexer_is_string(*lexer->current))
+    {
+        lexer->start = lexer->current;
+
+        lexer_advance(lexer);
+        while (*lexer->current != '"' && !lexer_is_eof(*lexer->current))
+        {
+            if (lexer_is_new_line(*lexer->current))
+                lexer->line_number += 1;
+
+            lexer_advance(lexer);
+        }
+
+        if (lexer_is_eof(*lexer->current))
+        {
+            return lexer_error(lexer, "Expeected '\"' character, instead found EOF.");
+        }
+
+        lexer_advance(lexer);
+
+        return (token_t){
+            .kind = TOKEN_STRING,
             .start = lexer->start,
             .length = (int)(lexer->current - lexer->start),
             .line_number = lexer->line_number};
@@ -377,6 +415,16 @@ void lexer_print(lexer_t *lexer)
             fprintf(stdout, "<EQUAL_EQUAL symbol=\'==\' line=%d>\n", token.line_number);
             break;
         }
+        case TOKEN_GREATER:
+        {
+            fprintf(stdout, "<GREATER symbol=\'>\' line=%d>\n", token.line_number);
+            break;
+        }
+        case TOKEN_GREATER_EQUAL:
+        {
+            fprintf(stdout, "<GREATER_EQUAL symbol=\'>=\' line=%d>\n", token.line_number);
+            break;
+        }
         }
     }
 }
@@ -426,6 +474,15 @@ static bool lexer_is_comment(lexer_t *lexer)
 
 static bool lexer_is_new_line(char c)
 {
+    // TODO:
+    // #if _windows_
+    //    return lexer->curent[0] == '\r' && lexer->current[1] == '\n';
+    // #elif _unix_
+    //    return lexer->current[0] == '\n';
+    // #elif _mac_
+    //    return lexer->current[0] == '\n';
+    // #endif
+
     return c == '\n';
 }
 
