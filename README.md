@@ -9,13 +9,15 @@ Kriolu is an interpreter written in C with syntax in the unofficial language of 
 
 ## Build Project
 
+TBD
+
 ## Kriolu Programming Language
 
 ### Data Types
 
 - **Booleans.** You can't code without logic and you can't logic without Boolean.
 
-  ```javacript
+  ```
   verdadi
   falsu;
   ```
@@ -83,10 +85,10 @@ Comparing 2(two) values yields a logical value `verdadi` or `falsu`;
 ```
 // Magnitude
 
-19 < 45;    // 19 minor que 45 -> verdadi
-19 <= 45;   // 19 minor que ou igual a 45 -> verdadi
-5 > 7;      // 5 maior que 7 -> falsu
-5 >= 7;     // 5 maior que ou igual a 7 -> falsu
+19 < 45;    // 19 minor ki 45 -> verdadi
+19 <= 45;   // 19 minor ki ou igual a 45 -> verdadi
+5 > 7;      // 5 maior ki 7 -> falsu
+5 >= 7;     // 5 maior ki ou igual a 7 -> falsu
 
 // Equality
 
@@ -136,6 +138,7 @@ imprimi "Oi, mundo!";
     imprimi "Santiago";
     imprimi "Fogo";
     imprimi "Mindelo";
+    imprimi "Brava";
 }
 ```
 
@@ -217,7 +220,7 @@ funson mensagem() {
         imprimi texto;
     }
 
-    divolvi imprimiMensagem;
+    divolvi imprimiTexto;
 }
 
 mimoria texto = mensagem();
@@ -231,11 +234,11 @@ _Class declaration_
 ```
 klasi Quadrilateru {
     area() {
-        divolvi this.base * this.altura;
+        divolvi keli.base * keli.altura;
     }
 
     perimetru() {
-        divolvi 2 * (this.base + this.altura);
+        divolvi 2 * (keli.base + keli.altura);
     }
 }
 ```
@@ -266,19 +269,19 @@ Ensures the object is in a valid state upon creation. By declaring a method name
 ```
 klasi Quadrilateru {
     init(x, y, base, altura, cor) {
-        this.x = x;
-        this.y = y;
-        this.base = base;
-        this.altura = altura;
-        this.cor = cor;
+        keli.x = x;
+        keli.y = y;
+        keli.base = base;
+        keli.altura = altura;
+        keli.cor = cor;
     }
 
     area() {
-        divolvi this.base * this.altura;
+        divolvi keli.base * keli.altura;
     }
 
     perimetru() {
-        divolvi 2 * (this.base + this.altura);
+        divolvi 2 * (keli.base + keli.altura);
     }
 }
 
@@ -295,7 +298,7 @@ _Inheritance_
 ```
 klasi Animal {
     init(nomi) {
-        this.nomi = nomi;
+        keli.nomi = nomi;
     }
 
     cume() {
