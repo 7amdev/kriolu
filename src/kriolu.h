@@ -36,9 +36,9 @@ typedef enum
     TOKEN_STRING,
     TOKEN_NUMBER,
 
-    TOKEN_E,
+    TOKEN_E, // and
     TOKEN_OU,
-    TOKEN_KLASSI,
+    TOKEN_KLASI,
     TOKEN_SI,
     TOKEN_SINOU,
     TOKEN_FALSU,
@@ -49,11 +49,11 @@ typedef enum
     TOKEN_IMPRIMI,
     TOKEN_DIVOLVI,
     TOKEN_SUPER,
-    TOKEN_THIS,
-    TOKEN_DADUS,
+    TOKEN_KELI,    // this
+    TOKEN_MIMORIA, // variable
     TOKEN_TIMENTI,
     TOKEN_KA,
-    TOKEN_KA_IGUAL,
+    TOKEN_KA_IGUAL, // ka=
 
     TOKEN_COMMENT,
     TOKEN_ERROR,
@@ -66,6 +66,7 @@ typedef enum
 
 // TODO: use tagged unions data structure to support string
 //       line_number_begin and line_number_end
+//       link: https://blog.ryanmartin.me/tagged-unions
 typedef struct
 {
     token_kind_t kind;
@@ -73,6 +74,8 @@ typedef struct
     int length;
     int line_number;
 } token_t;
+
+token_t token_make(token_kind_t kind, const char *start, int length, int line_number);
 
 //
 // Lexer

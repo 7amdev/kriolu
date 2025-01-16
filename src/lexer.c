@@ -18,12 +18,7 @@ static bool lexer_is_new_line(char c);
 static bool lexer_is_string(char c);
 // TODO: static bool lexer_is_uppercase_letter(char c);
 // TODO: static bool lexer_is_lowercase_letter(char c);
-static token_kind_t lexer_keyword_check(
-    const char *start,
-    int identifier_length,
-    char const *check_text,
-    int check_start_position,
-    token_kind_t return_value);
+static token_kind_t lexer_keyword_kind(token_t token, char const *keyword, int check_start_position, token_kind_t return_kind);
 static token_t lexer_error(lexer_t *lexer, const char *message);
 
 void lexer_init(lexer_t *lexer, const char *source_code)
@@ -57,7 +52,6 @@ token_t lexer_scan(lexer_t *lexer)
 
         if (lexer->current[-1] == '\r')
         {
-            // length = (int)((lexer->current - 1) - (lexer->start + 2));
             length = (int)((lexer->current - 1) - (lexer->start));
         }
         else
@@ -65,37 +59,47 @@ token_t lexer_scan(lexer_t *lexer)
             length = (int)(lexer->current - lexer->start);
         }
 
-        return (token_t){
-            .kind = TOKEN_COMMENT,
-            .start = lexer->start,
-            .length = length,
-            .line_number = lexer->line_number};
+        return token_make(TOKEN_COMMENT, lexer->start, length, lexer->line_number);
+        // return (token_t){
+        //     .kind = TOKEN_COMMENT,
+        //     .start = lexer->start,
+        //     .length = length,
+        //     .line_number = lexer->line_number};
     }
 
     if (lexer_is_eof(*lexer->current))
     {
-        return (token_t){
-            .kind = TOKEN_EOF,
-            .start = lexer->current,
-            .line_number = lexer->line_number,
-            .length = 1};
+        return token_make(TOKEN_EOF, lexer->current, 1, lexer->line_number);
+        // return (token_t){
+        //     .kind = TOKEN_EOF,
+        //     .start = lexer->current,
+        //     .line_number = lexer->line_number,
+        //     .length = 1};
     }
 
     if (*lexer->current == '(')
     {
         lexer->start = lexer->current;
         lexer_advance(lexer);
-        return (token_t){
-            .kind = TOKEN_LEFT_PARENTHESIS,
-            .start = lexer->start,
-            .length = (int)(lexer->current - lexer->start),
-            .line_number = lexer->line_number};
+
+        return token_make(
+            TOKEN_LEFT_PARENTHESIS,
+            lexer->start,
+            (int)(lexer->current - lexer->start),
+            lexer->line_number);
+
+        // return (token_t){
+        //     .kind = TOKEN_LEFT_PARENTHESIS,
+        //     .start = lexer->start,
+        //     .length = (int)(lexer->current - lexer->start),
+        //     .line_number = lexer->line_number};
     }
 
     if (*lexer->current == ')')
     {
         lexer->start = lexer->current;
         lexer_advance(lexer);
+
         return (token_t){
             .kind = TOKEN_RIGHT_PARENTHESIS,
             .start = lexer->start,
@@ -107,6 +111,7 @@ token_t lexer_scan(lexer_t *lexer)
     {
         lexer->start = lexer->current;
         lexer_advance(lexer);
+
         return (token_t){
             .kind = TOKEN_LEFT_BRACE,
             .start = lexer->start,
@@ -118,6 +123,7 @@ token_t lexer_scan(lexer_t *lexer)
     {
         lexer->start = lexer->current;
         lexer_advance(lexer);
+
         return (token_t){
             .kind = TOKEN_RIGHT_BRACE,
             .start = lexer->start,
@@ -129,6 +135,7 @@ token_t lexer_scan(lexer_t *lexer)
     {
         lexer->start = lexer->current;
         lexer_advance(lexer);
+
         return (token_t){
             .kind = TOKEN_COMMA,
             .start = lexer->start,
@@ -311,6 +318,60 @@ token_t lexer_scan(lexer_t *lexer)
             .line_number = lexer->line_number};
     }
 
+    if (lexer_is_letter_or_underscore(*lexer->current))
+    {
+        token_t token;
+
+        lexer->start = lexer->current;
+
+        while (lexer_is_letter_or_underscore(*lexer->current) || lexer_is_digit(*lexer->current))
+        {
+            lexer_advance(lexer);
+        }
+
+        token.kind = TOKEN_IDENTIFIER;
+        token.start = lexer->start;
+        token.length = (int)(lexer->current - lexer->start);
+        token.line_number = lexer->line_number;
+
+        if (*lexer->start == 'e')
+        {
+            token.kind = lexer_keyword_kind(token, "e", 0, TOKEN_E);
+        }
+        else if (*lexer->start == 'o')
+        {
+            token.kind = lexer_keyword_kind(token, "ou", 1, TOKEN_OU);
+        }
+        else if (*lexer->start == 'k')
+        {
+            token.kind = lexer_keyword_kind(token, "klasi", 1, TOKEN_KLASI);
+        }
+        else if (*lexer->start == 's')
+        {
+            if (lexer->start[1] == 'i')
+            {
+                if (lexer->start[2] == 'n')
+                {
+                    token.kind = lexer_keyword_kind(token, "sinou", 2, TOKEN_SINOU);
+                }
+                else
+                {
+                    token.kind = lexer_keyword_kind(token, "si", 2, TOKEN_SI);
+                }
+            }
+            else if (lexer->start[1] == 'u')
+            {
+                token.kind = lexer_keyword_kind(token, "super", 2, TOKEN_SUPER);
+            }
+        }
+        else if (*lexer->start == 'm')
+        {
+            token.kind = lexer_keyword_kind(token, "mimoria", 1, TOKEN_MIMORIA);
+        }
+
+        return token;
+    }
+
     return lexer_error(lexer, "Unexpected Caracter.");
 }
 
@@ -425,6 +486,101 @@ void lexer_print(lexer_t *lexer)
             fprintf(stdout, "<GREATER_EQUAL symbol=\'>=\' line=%d>\n", token.line_number);
             break;
         }
+        case TOKEN_IDENTIFIER:
+        {
+            fprintf(stdout, "<IDENTIFIER value=\'%.*s\' line=%d>\n", token.length, token.start, token.line_number);
+            break;
+        }
+        case TOKEN_E:
+        {
+            fprintf(stdout, "<E value=\'%.*s\' line=%d>\n", token.length, token.start, token.line_number);
+            break;
+        }
+        case TOKEN_OU:
+        {
+            fprintf(stdout, "<OU value=\'%.*s\' line=%d>\n", token.length, token.start, token.line_number);
+            break;
+        }
+        case TOKEN_KLASI:
+        {
+            fprintf(stdout, "<KLASI value=\'%.*s\' line=%d>\n", token.length, token.start, token.line_number);
+            break;
+        }
+        case TOKEN_SI:
+        {
+            fprintf(stdout, "<SI value=\'%.*s\' line=%d>\n", token.length, token.start, token.line_number);
+            break;
+        }
+        case TOKEN_SINOU:
+        {
+            fprintf(stdout, "<SINOU value=\'%.*s\' line=%d>\n", token.length, token.start, token.line_number);
+            break;
+        }
+        case TOKEN_FALSU:
+        {
+            fprintf(stdout, "<FALSU value=\'%.*s\' line=%d>\n", token.length, token.start, token.line_number);
+            break;
+        }
+        case TOKEN_VERDADI:
+        {
+            fprintf(stdout, "<VERDADI value=\'%.*s\' line=%d>\n", token.length, token.start, token.line_number);
+            break;
+        }
+        case TOKEN_DI:
+        {
+            fprintf(stdout, "<DI value=\'%.*s\' line=%d>\n", token.length, token.start, token.line_number);
+            break;
+        }
+        case TOKEN_FUNSON:
+        {
+            fprintf(stdout, "<FUNSON value=\'%.*s\' line=%d>\n", token.length, token.start, token.line_number);
+            break;
+        }
+        case TOKEN_NULO:
+        {
+            fprintf(stdout, "<NULO value=\'%.*s\' line=%d>\n", token.length, token.start, token.line_number);
+            break;
+        }
+        case TOKEN_IMPRIMI:
+        {
+            fprintf(stdout, "<IMPRIMI value=\'%.*s\' line=%d>\n", token.length, token.start, token.line_number);
+            break;
+        }
+        case TOKEN_DIVOLVI:
+        {
+            fprintf(stdout, "<DIVOLVI value=\'%.*s\' line=%d>\n", token.length, token.start, token.line_number);
+            break;
+        }
+        case TOKEN_SUPER:
+        {
+            fprintf(stdout, "<SUPER value=\'%.*s\' line=%d>\n", token.length, token.start, token.line_number);
+            break;
+        }
+        case TOKEN_KELI:
+        {
+            fprintf(stdout, "<KELI value=\'%.*s\' line=%d>\n", token.length, token.start, token.line_number);
+            break;
+        }
+        case TOKEN_MIMORIA:
+        {
+            fprintf(stdout, "<MIMORIA value=\'%.*s\' line=%d>\n", token.length, token.start, token.line_number);
+            break;
+        }
+        case TOKEN_TIMENTI:
+        {
+            fprintf(stdout, "<TIMENTI value=\'%.*s\' line=%d>\n", token.length, token.start, token.line_number);
+            break;
+        }
+        case TOKEN_KA:
+        {
+            fprintf(stdout, "<KA value=\'%.*s\' line=%d>\n", token.length, token.start, token.line_number);
+            break;
+        }
+        case TOKEN_KA_IGUAL:
+        {
+            fprintf(stdout, "<KA_IGUAL value=\'%.*s\' line=%d>\n", token.length, token.start, token.line_number);
+            break;
+        }
         }
     }
 }
@@ -494,6 +650,31 @@ static bool lexer_is_digit(char c)
 static bool lexer_is_string(char c)
 {
     return c == '"';
+}
+
+static bool lexer_is_letter_or_underscore(char c)
+{
+    return c == '_' ||
+           (c >= 'a' && c <= 'z') ||
+           (c >= 'A' && c <= 'Z');
+}
+
+static token_kind_t lexer_keyword_kind(token_t token, char const *keyword, int check_start_position, token_kind_t return_kind)
+{
+    int keyword_length = strlen(keyword);
+
+    if (keyword_length != token.length)
+    {
+        return TOKEN_IDENTIFIER;
+    }
+
+    for (int i = check_start_position; i < keyword_length; i++)
+    {
+        if (token.start[i] != keyword[i])
+            return TOKEN_IDENTIFIER;
+    }
+
+    return return_kind;
 }
 
 static token_t lexer_error(lexer_t *lexer, const char *message)
