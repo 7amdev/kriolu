@@ -1,10 +1,7 @@
 #include "kriolu.h"
 
 // TODO
-// [] Scan digits
-// [] Scan plus sign
-// [] Scan minus sign
-// [] Make comment, digit, string test files
+// [] Create a test folder for lexer's token generation
 
 static char lexer_advance(lexer_t *lexer);
 static char lexer_peek(lexer_t *lexer);
@@ -217,9 +214,18 @@ token_t lexer_scan(lexer_t *lexer)
         token.length = (int)(lexer->current - lexer->start);
         token.line_number = lexer->line_number;
 
+        lexer->start = lexer->current;
         lexer_advance(lexer);
 
-        if (*lexer->current == '=')
+        if (*lexer->current == '/' && lexer->current[1])
+        {
+            lexer_advance(lexer);
+            lexer_advance(lexer);
+
+            token.kind = TOKEN_NOT_EQUAL;
+            token.length = (int)(lexer->current - lexer->start);
+        }
+        else if (*lexer->current == '=')
         {
             lexer_advance(lexer);
             token.kind = TOKEN_EQUAL_EQUAL;
@@ -237,6 +243,7 @@ token_t lexer_scan(lexer_t *lexer)
         token.length = (int)(lexer->current - lexer->start);
         token.line_number = lexer->line_number;
 
+        lexer->start = lexer->current;
         lexer_advance(lexer);
 
         if (*lexer->current == '=')
@@ -257,6 +264,7 @@ token_t lexer_scan(lexer_t *lexer)
         token.length = (int)(lexer->current - lexer->start);
         token.line_number = lexer->line_number;
 
+        lexer->start = lexer->current;
         lexer_advance(lexer);
 
         if (*lexer->current == '=')
@@ -334,6 +342,7 @@ token_t lexer_scan(lexer_t *lexer)
         token.length = (int)(lexer->current - lexer->start);
         token.line_number = lexer->line_number;
 
+        // TODO: change checks from lexer-start to token.start
         if (*lexer->start == 'e')
         {
             token.kind = lexer_keyword_kind(token, "e", 0, TOKEN_E);
@@ -344,7 +353,18 @@ token_t lexer_scan(lexer_t *lexer)
         }
         else if (*lexer->start == 'k')
         {
-            token.kind = lexer_keyword_kind(token, "klasi", 1, TOKEN_KLASI);
+            if (lexer->start[1] == 'a')
+            {
+                token.kind = lexer_keyword_kind(token, "ka", 1, TOKEN_KA);
+            }
+            else if (lexer->start[1] == 'l')
+            {
+                token.kind = lexer_keyword_kind(token, "klasi", 2, TOKEN_KLASI);
+            }
+            else if (lexer->start[1] == 'e')
+            {
+                token.kind = lexer_keyword_kind(token, "keli", 2, TOKEN_KELI);
+            }
         }
         else if (*lexer->start == 's')
         {
@@ -363,6 +383,53 @@ token_t lexer_scan(lexer_t *lexer)
             {
                 token.kind = lexer_keyword_kind(token, "super", 2, TOKEN_SUPER);
             }
+        }
+        else if (*lexer->start == 'f')
+        {
+            if (lexer->start[1] == 'a')
+            {
+                token.kind = lexer_keyword_kind(token, "falsu", 2, TOKEN_FALSU);
+            }
+            else if (lexer->start[1] == 'u')
+            {
+                token.kind = lexer_keyword_kind(token, "funson", 2, TOKEN_FUNSON);
+            }
+        }
+        else if (*lexer->start == 'd')
+        {
+            if (lexer->start[1] == 'i')
+            {
+                if (lexer->start[2] == 'v')
+                {
+                    token.kind = lexer_keyword_kind(token, "divolvi", 3, TOKEN_DIVOLVI);
+                }
+                else
+                {
+                    token.kind = lexer_keyword_kind(token, "di", 2, TOKEN_DI);
+                }
+            }
+        }
+        else if (*lexer->start == 't')
+        {
+            if (lexer->start[1] == 'i')
+            {
+                if (lexer->start[2] == 'm')
+                {
+                    token.kind = lexer_keyword_kind(token, "timenti", 3, TOKEN_TIMENTI);
+                }
+                else
+                {
+                    token.kind = lexer_keyword_kind(token, "ti", 2, TOKEN_TI);
+                }
+            }
+        }
+        else if (*lexer->start == 'i')
+        {
+            token.kind = lexer_keyword_kind(token, "imprimi", 1, TOKEN_IMPRIMI);
+        }
+        else if (*lexer->start == 'v')
+        {
+            token.kind = lexer_keyword_kind(token, "verdadi", 1, TOKEN_VERDADI);
         }
         else if (*lexer->start == 'm')
         {
@@ -398,57 +465,57 @@ void lexer_print(lexer_t *lexer)
         {
         case TOKEN_LEFT_PARENTHESIS:
         {
-            fprintf(stdout, "<LEFT_PARENTHESIS: symbol=\'(\' line=%d>\n", token.line_number);
+            fprintf(stdout, "<LEFT_PARENTHESIS symbol='%.*s' line=%d>\n", token.length, token.start, token.line_number);
             break;
         }
         case TOKEN_RIGHT_PARENTHESIS:
         {
-            fprintf(stdout, "<RIGHT_PARENTHESIS symbol=\')\' line=%d>\n", token.line_number);
+            fprintf(stdout, "<RIGHT_PARENTHESIS symbol='%.*s' line=%d>\n", token.length, token.start, token.line_number);
             break;
         }
         case TOKEN_LEFT_BRACE:
         {
-            fprintf(stdout, "<LEFT_BRACE symbol=\'{\' line=%d>\n", token.line_number);
+            fprintf(stdout, "<LEFT_BRACE symbol='%.*s' line=%d>\n", token.length, token.start, token.line_number);
             break;
         }
         case TOKEN_RIGHT_BRACE:
         {
-            fprintf(stdout, "<RIGHT_BRACE symbol=\'}\' line=%d>\n", token.line_number);
+            fprintf(stdout, "<RIGHT_BRACE symbol='%.*s' line=%d>\n", token.length, token.start, token.line_number);
             break;
         }
         case TOKEN_COMMA:
         {
-            fprintf(stdout, "<COMMA symbol=\',\' line=%d>\n", token.line_number);
+            fprintf(stdout, "<COMMA symbol='%.*s' line=%d>\n", token.length, token.start, token.line_number);
             break;
         }
         case TOKEN_DOT:
         {
-            fprintf(stdout, "<DOT symbol=\'.\' line=%d>\n", token.line_number);
+            fprintf(stdout, "<DOT symbol='%.*s' line=%d>\n", token.length, token.start, token.line_number);
             break;
         }
         case TOKEN_MINUS:
         {
-            fprintf(stdout, "<MINUS symbol=\'-\' line=%d>\n", token.line_number);
+            fprintf(stdout, "<MINUS symbol='%.*s' line=%d>\n", token.length, token.start, token.line_number);
             break;
         }
         case TOKEN_PLUS:
         {
-            fprintf(stdout, "<PLUS symbol=\'+\' line=%d>\n", token.line_number);
+            fprintf(stdout, "<PLUS symbol='%.*s' line=%d>\n", token.length, token.start, token.line_number);
             break;
         }
         case TOKEN_SLASH:
         {
-            fprintf(stdout, "<SLASH symbol=\'/\' line=%d>\n", token.line_number);
+            fprintf(stdout, "<SLASH symbol='%.*s' line=%d>\n", token.length, token.start, token.line_number);
             break;
         }
         case TOKEN_ASTERISK:
         {
-            fprintf(stdout, "<ASTERISK symbol=\'*\' line=%d>\n", token.line_number);
+            fprintf(stdout, "<ASTERISK symbol='%.*s' line=%d>\n", token.length, token.start, token.line_number);
             break;
         }
         case TOKEN_SEMICOLON:
         {
-            fprintf(stdout, "<SEMICOLON symbol=\';\' line=%d>\n", token.line_number);
+            fprintf(stdout, "<SEMICOLON symbol='%.*s' line=%d>\n", token.length, token.start, token.line_number);
             break;
         }
         case TOKEN_NUMBER:
@@ -468,12 +535,27 @@ void lexer_print(lexer_t *lexer)
         }
         case TOKEN_EQUAL:
         {
-            fprintf(stdout, "<EQUAL symbol=\'=\' line=%d>\n", token.line_number);
+            fprintf(stdout, "<EQUAL symbol='%.*s' line=%d>\n", token.length, token.start, token.line_number);
             break;
         }
         case TOKEN_EQUAL_EQUAL:
         {
-            fprintf(stdout, "<EQUAL_EQUAL symbol=\'==\' line=%d>\n", token.line_number);
+            fprintf(stdout, "<EQUAL_EQUAL symbol='%.*s' line=%d>\n", token.length, token.start, token.line_number);
+            break;
+        }
+        case TOKEN_NOT_EQUAL:
+        {
+            fprintf(stdout, "<NOT_EQUAL symbol='%.*s' line=%d>\n", token.length, token.start, token.line_number);
+            break;
+        }
+        case TOKEN_LESS:
+        {
+            fprintf(stdout, "<LESS symbol=\'<\' line=%d>\n", token.line_number);
+            break;
+        }
+        case TOKEN_LESS_EQUAL:
+        {
+            fprintf(stdout, "<LESS_EQUAL symbol=\'>=\' line=%d>\n", token.line_number);
             break;
         }
         case TOKEN_GREATER:
@@ -571,14 +653,14 @@ void lexer_print(lexer_t *lexer)
             fprintf(stdout, "<TIMENTI value=\'%.*s\' line=%d>\n", token.length, token.start, token.line_number);
             break;
         }
+        case TOKEN_TI:
+        {
+            fprintf(stdout, "<TI value=\'%.*s\' line=%d>\n", token.length, token.start, token.line_number);
+            break;
+        }
         case TOKEN_KA:
         {
             fprintf(stdout, "<KA value=\'%.*s\' line=%d>\n", token.length, token.start, token.line_number);
-            break;
-        }
-        case TOKEN_KA_IGUAL:
-        {
-            fprintf(stdout, "<KA_IGUAL value=\'%.*s\' line=%d>\n", token.length, token.start, token.line_number);
             break;
         }
         }

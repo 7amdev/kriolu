@@ -90,16 +90,18 @@ Comparing 2(two) values yields a logical value `verdadi` or `falsu`;
 5 > 7;      // 5 maior ki 7 -> falsu
 5 >= 7;     // 5 maior ki ou igual a 7 -> falsu
 
-// Equality
+// Equality and Inequality
 
-1 == 2;               // falsu
-"seti" == 7;          // falsu
-7 == 7;               // verdadi
-"seti" == "seti";     // verdadi
-"cidade" != "velha";  // verdadi
+1 == 2;                // falsu
+"seti" == 7;           // falsu
+7 == 7;                // verdadi
+"seti" == "seti";      // verdadi
+"cidade" =/= "velha";  // verdadi
+7 =/= 7                // falsu
+2 =/= 3                // verdadi
 ```
 
-> _Logical operators_
+_Logical operators_
 
 ```
 // ka
@@ -107,10 +109,10 @@ Comparing 2(two) values yields a logical value `verdadi` or `falsu`;
 ka verdadi;         // falsu
 ka falsu;           // verdadi
 
-// i
+// e
 
-verdadi i falsu;    // falsu
-verdadi i verdadi;  // verdadi
+verdadi e falsu;    // falsu
+verdadi e verdadi;  // verdadi
 
 // ou
 
@@ -119,7 +121,7 @@ verdai ou falsu;    // verdadi
 
 ```
 
-> _Precedence and grouping_
+_Precedence and grouping_
 
 You can change the operators precedence and associativity by using `()` to group particular operations in a expression.
 

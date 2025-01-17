@@ -23,14 +23,13 @@ typedef enum
     TOKEN_SLASH,
     TOKEN_ASTERISK,
 
-    TOKEN_BANG,       // !
-    TOKEN_BANG_EQUAL, // !=
-    TOKEN_EQUAL,
-    TOKEN_EQUAL_EQUAL,
-    TOKEN_GREATER,
-    TOKEN_GREATER_EQUAL,
-    TOKEN_LESS,
-    TOKEN_LESS_EQUAL,
+    TOKEN_EQUAL,         // =
+    TOKEN_EQUAL_EQUAL,   // ==
+    TOKEN_NOT_EQUAL,     // =/=
+    TOKEN_GREATER,       // >
+    TOKEN_GREATER_EQUAL, // >=
+    TOKEN_LESS,          // <
+    TOKEN_LESS_EQUAL,    // <=
 
     TOKEN_IDENTIFIER,
     TOKEN_STRING,
@@ -38,6 +37,7 @@ typedef enum
 
     TOKEN_E, // and
     TOKEN_OU,
+    TOKEN_KA, // Logic NOT Operator
     TOKEN_KLASI,
     TOKEN_SI,
     TOKEN_SINOU,
@@ -52,8 +52,7 @@ typedef enum
     TOKEN_KELI,    // this
     TOKEN_MIMORIA, // variable
     TOKEN_TIMENTI,
-    TOKEN_KA,
-    TOKEN_KA_IGUAL, // ka=
+    TOKEN_TI,
 
     TOKEN_COMMENT,
     TOKEN_ERROR,
@@ -66,7 +65,6 @@ typedef enum
 
 // TODO: use tagged unions data structure to support string
 //       line_number_begin and line_number_end
-//       link: https://blog.ryanmartin.me/tagged-unions
 typedef struct
 {
     token_kind_t kind;
