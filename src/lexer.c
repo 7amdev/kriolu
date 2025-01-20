@@ -56,22 +56,20 @@ token_t lexer_scan(lexer_t *lexer)
             length = (int)(lexer->current - lexer->start);
         }
 
-        return token_make(TOKEN_COMMENT, lexer->start, length, lexer->line_number);
-        // return (token_t){
-        //     .kind = TOKEN_COMMENT,
-        //     .start = lexer->start,
-        //     .length = length,
-        //     .line_number = lexer->line_number};
+        return (token_t){
+            .kind = TOKEN_COMMENT,
+            .start = lexer->start,
+            .length = length,
+            .line_number = lexer->line_number};
     }
 
     if (lexer_is_eof(*lexer->current))
     {
-        return token_make(TOKEN_EOF, lexer->current, 1, lexer->line_number);
-        // return (token_t){
-        //     .kind = TOKEN_EOF,
-        //     .start = lexer->current,
-        //     .line_number = lexer->line_number,
-        //     .length = 1};
+        return (token_t){
+            .kind = TOKEN_EOF,
+            .start = lexer->current,
+            .line_number = lexer->line_number,
+            .length = 1};
     }
 
     if (*lexer->current == '(')
@@ -79,17 +77,11 @@ token_t lexer_scan(lexer_t *lexer)
         lexer->start = lexer->current;
         lexer_advance(lexer);
 
-        return token_make(
-            TOKEN_LEFT_PARENTHESIS,
-            lexer->start,
-            (int)(lexer->current - lexer->start),
-            lexer->line_number);
-
-        // return (token_t){
-        //     .kind = TOKEN_LEFT_PARENTHESIS,
-        //     .start = lexer->start,
-        //     .length = (int)(lexer->current - lexer->start),
-        //     .line_number = lexer->line_number};
+        return (token_t){
+            .kind = TOKEN_LEFT_PARENTHESIS,
+            .start = lexer->start,
+            .length = (int)(lexer->current - lexer->start),
+            .line_number = lexer->line_number};
     }
 
     if (*lexer->current == ')')
@@ -209,9 +201,7 @@ token_t lexer_scan(lexer_t *lexer)
     if (*lexer->current == '=')
     {
         token_t token;
-        token.kind = TOKEN_EQUAL;
         token.start = lexer->current;
-        token.length = (int)(lexer->current - lexer->start);
         token.line_number = lexer->line_number;
 
         lexer->start = lexer->current;
@@ -231,6 +221,11 @@ token_t lexer_scan(lexer_t *lexer)
             token.kind = TOKEN_EQUAL_EQUAL;
             token.length = (int)(lexer->current - lexer->start);
         }
+        else
+        {
+            token.kind = TOKEN_EQUAL;
+            token.length = (int)(lexer->current - lexer->start);
+        }
 
         return token;
     }
@@ -238,9 +233,7 @@ token_t lexer_scan(lexer_t *lexer)
     if (*lexer->current == '>')
     {
         token_t token;
-        token.kind = TOKEN_GREATER;
         token.start = lexer->current;
-        token.length = (int)(lexer->current - lexer->start);
         token.line_number = lexer->line_number;
 
         lexer->start = lexer->current;
@@ -252,6 +245,11 @@ token_t lexer_scan(lexer_t *lexer)
             token.kind = TOKEN_GREATER_EQUAL;
             token.length = (int)(lexer->current - lexer->start);
         }
+        else
+        {
+            token.kind = TOKEN_GREATER;
+            token.length = (int)(lexer->current - lexer->start);
+        }
 
         return token;
     }
@@ -259,9 +257,7 @@ token_t lexer_scan(lexer_t *lexer)
     if (*lexer->current == '<')
     {
         token_t token;
-        token.kind = TOKEN_LESS;
         token.start = lexer->current;
-        token.length = (int)(lexer->current - lexer->start);
         token.line_number = lexer->line_number;
 
         lexer->start = lexer->current;
@@ -271,6 +267,11 @@ token_t lexer_scan(lexer_t *lexer)
         {
             lexer_advance(lexer);
             token.kind = TOKEN_LESS_EQUAL;
+            token.length = (int)(lexer->current - lexer->start);
+        }
+        else // Default
+        {
+            token.kind = TOKEN_LESS;
             token.length = (int)(lexer->current - lexer->start);
         }
 
@@ -314,7 +315,7 @@ token_t lexer_scan(lexer_t *lexer)
 
         if (lexer_is_eof(*lexer->current))
         {
-            return lexer_error(lexer, "Expeected '\"' character, instead found EOF.");
+            return lexer_error(lexer, "Expected '\"' character, instead found EOF.");
         }
 
         lexer_advance(lexer);
@@ -329,48 +330,45 @@ token_t lexer_scan(lexer_t *lexer)
     if (lexer_is_letter_or_underscore(*lexer->current))
     {
         token_t token;
-
-        lexer->start = lexer->current;
+        token.kind = TOKEN_IDENTIFIER;
+        token.start = lexer->current;
+        token.line_number = lexer->line_number;
 
         while (lexer_is_letter_or_underscore(*lexer->current) || lexer_is_digit(*lexer->current))
         {
             lexer_advance(lexer);
         }
 
-        token.kind = TOKEN_IDENTIFIER;
-        token.start = lexer->start;
-        token.length = (int)(lexer->current - lexer->start);
-        token.line_number = lexer->line_number;
+        token.length = (int)(lexer->current - token.start);
 
-        // TODO: change checks from lexer-start to token.start
-        if (*lexer->start == 'e')
+        if (*token.start == 'e')
         {
             token.kind = lexer_keyword_kind(token, "e", 0, TOKEN_E);
         }
-        else if (*lexer->start == 'o')
+        else if (*token.start == 'o')
         {
             token.kind = lexer_keyword_kind(token, "ou", 1, TOKEN_OU);
         }
-        else if (*lexer->start == 'k')
+        else if (*token.start == 'k')
         {
-            if (lexer->start[1] == 'a')
+            if (token.start[1] == 'a')
             {
                 token.kind = lexer_keyword_kind(token, "ka", 1, TOKEN_KA);
             }
-            else if (lexer->start[1] == 'l')
+            else if (token.start[1] == 'l')
             {
                 token.kind = lexer_keyword_kind(token, "klasi", 2, TOKEN_KLASI);
             }
-            else if (lexer->start[1] == 'e')
+            else if (token.start[1] == 'e')
             {
                 token.kind = lexer_keyword_kind(token, "keli", 2, TOKEN_KELI);
             }
         }
-        else if (*lexer->start == 's')
+        else if (*token.start == 's')
         {
-            if (lexer->start[1] == 'i')
+            if (token.start[1] == 'i')
             {
-                if (lexer->start[2] == 'n')
+                if (token.start[2] == 'n')
                 {
                     token.kind = lexer_keyword_kind(token, "sinou", 2, TOKEN_SINOU);
                 }
@@ -379,27 +377,27 @@ token_t lexer_scan(lexer_t *lexer)
                     token.kind = lexer_keyword_kind(token, "si", 2, TOKEN_SI);
                 }
             }
-            else if (lexer->start[1] == 'u')
+            else if (token.start[1] == 'u')
             {
                 token.kind = lexer_keyword_kind(token, "super", 2, TOKEN_SUPER);
             }
         }
-        else if (*lexer->start == 'f')
+        else if (*token.start == 'f')
         {
-            if (lexer->start[1] == 'a')
+            if (token.start[1] == 'a')
             {
                 token.kind = lexer_keyword_kind(token, "falsu", 2, TOKEN_FALSU);
             }
-            else if (lexer->start[1] == 'u')
+            else if (token.start[1] == 'u')
             {
                 token.kind = lexer_keyword_kind(token, "funson", 2, TOKEN_FUNSON);
             }
         }
-        else if (*lexer->start == 'd')
+        else if (*token.start == 'd')
         {
-            if (lexer->start[1] == 'i')
+            if (token.start[1] == 'i')
             {
-                if (lexer->start[2] == 'v')
+                if (token.start[2] == 'v')
                 {
                     token.kind = lexer_keyword_kind(token, "divolvi", 3, TOKEN_DIVOLVI);
                 }
@@ -409,11 +407,11 @@ token_t lexer_scan(lexer_t *lexer)
                 }
             }
         }
-        else if (*lexer->start == 't')
+        else if (*token.start == 't')
         {
-            if (lexer->start[1] == 'i')
+            if (token.start[1] == 'i')
             {
-                if (lexer->start[2] == 'm')
+                if (token.start[2] == 'm')
                 {
                     token.kind = lexer_keyword_kind(token, "timenti", 3, TOKEN_TIMENTI);
                 }
@@ -423,15 +421,15 @@ token_t lexer_scan(lexer_t *lexer)
                 }
             }
         }
-        else if (*lexer->start == 'i')
+        else if (*token.start == 'i')
         {
             token.kind = lexer_keyword_kind(token, "imprimi", 1, TOKEN_IMPRIMI);
         }
-        else if (*lexer->start == 'v')
+        else if (*token.start == 'v')
         {
             token.kind = lexer_keyword_kind(token, "verdadi", 1, TOKEN_VERDADI);
         }
-        else if (*lexer->start == 'm')
+        else if (*token.start == 'm')
         {
             token.kind = lexer_keyword_kind(token, "mimoria", 1, TOKEN_MIMORIA);
         }
@@ -449,11 +447,11 @@ void lexer_print(lexer_t *lexer)
     {
         token = lexer_scan(lexer);
 
-        if (token.kind == TOKEN_ERROR)
-        {
-            fprintf(stdout, "Error: %s\n", token.start);
-            break;
-        }
+        // if (token.kind == TOKEN_ERROR)
+        // {
+        //     fprintf(stdout, "Error: %s\n", token.start);
+        //     continue;
+        // }
 
         if (token.kind == TOKEN_EOF)
         {
@@ -463,6 +461,11 @@ void lexer_print(lexer_t *lexer)
 
         switch (token.kind)
         {
+        case TOKEN_ERROR:
+        {
+            fprintf(stdout, "<ERROR msg='%.*s' line=%d>\n", token.length, token.start, token.line_number);
+            break;
+        }
         case TOKEN_LEFT_PARENTHESIS:
         {
             fprintf(stdout, "<LEFT_PARENTHESIS symbol='%.*s' line=%d>\n", token.length, token.start, token.line_number);
@@ -761,6 +764,17 @@ static token_kind_t lexer_keyword_kind(token_t token, char const *keyword, int c
 
 static token_t lexer_error(lexer_t *lexer, const char *message)
 {
+    // TODO: review later
+    // static char buffer[50];
+    // sprintf(buffer, "Unexpected character %.*s at line %d.", 1, lexer->current, lexer->line_number);
+    // return (token_t){
+    //     .kind = TOKEN_ERROR,
+    //     .start = buffer,
+    //     .length = (int)strlen(buffer),
+    //     .line_number = lexer->line_number};
+
+    lexer_advance(lexer);
+
     return (token_t){
         .kind = TOKEN_ERROR,
         .start = message,

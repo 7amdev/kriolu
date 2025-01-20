@@ -1,3 +1,6 @@
+#!=
+si (i != 10)
+=
 imprimi "oi";
 ka verdadi ou ka falsu
 si (i =/= 10)
@@ -11,7 +14,6 @@ funson test() {
 di 1 ti 10;
 timenti (i < 10) imprimi i;
 verdadi e falsu
-si (i != 10)
 e ou 
 klasi
 si sinou
