@@ -217,7 +217,7 @@ token_t lexer_scan(lexer_t *lexer)
         lexer->start = lexer->current;
         lexer_advance(lexer);
 
-        if (*lexer->current == '/' && lexer->current[1])
+        if (*lexer->current == '/' && lexer->current[1] == '=')
         {
             lexer_advance(lexer);
             lexer_advance(lexer);
