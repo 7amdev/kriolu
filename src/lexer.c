@@ -455,218 +455,221 @@ void lexer_print(lexer_t *lexer)
 
         if (token.kind == TOKEN_EOF)
         {
-            fprintf(stdout, "<EOF>");
+            // fprintf(stdout, "<EOF>");
             break;
         }
+
+        fprintf(stdout, "%2d ", token.line_number);
 
         switch (token.kind)
         {
         case TOKEN_ERROR:
         {
-            fprintf(stdout, "<ERROR msg='%.*s' line=%d>\n", token.length, token.start, token.line_number);
+            fprintf(stdout, "%-25s", "<error>");
             break;
         }
         case TOKEN_LEFT_PARENTHESIS:
         {
-            fprintf(stdout, "<LEFT_PARENTHESIS symbol='%.*s' line=%d>\n", token.length, token.start, token.line_number);
+            fprintf(stdout, "%-25s", "<left-parenthesis>");
             break;
         }
         case TOKEN_RIGHT_PARENTHESIS:
         {
-            fprintf(stdout, "<RIGHT_PARENTHESIS symbol='%.*s' line=%d>\n", token.length, token.start, token.line_number);
+            fprintf(stdout, "%-25s", "<right_parenthesis>");
             break;
         }
         case TOKEN_LEFT_BRACE:
         {
-            fprintf(stdout, "<LEFT_BRACE symbol='%.*s' line=%d>\n", token.length, token.start, token.line_number);
+            fprintf(stdout, "%-25s", "<left_brace>");
             break;
         }
         case TOKEN_RIGHT_BRACE:
         {
-            fprintf(stdout, "<RIGHT_BRACE symbol='%.*s' line=%d>\n", token.length, token.start, token.line_number);
+            fprintf(stdout, "%-25s", "<right_brace>");
             break;
         }
         case TOKEN_COMMA:
         {
-            fprintf(stdout, "<COMMA symbol='%.*s' line=%d>\n", token.length, token.start, token.line_number);
+            fprintf(stdout, "%-25s", "<comma>");
             break;
         }
         case TOKEN_DOT:
         {
-            fprintf(stdout, "<DOT symbol='%.*s' line=%d>\n", token.length, token.start, token.line_number);
+            fprintf(stdout, "%-25s", "<dot>");
             break;
         }
         case TOKEN_MINUS:
         {
-            fprintf(stdout, "<MINUS symbol='%.*s' line=%d>\n", token.length, token.start, token.line_number);
+            fprintf(stdout, "%-25s", "<minus>");
             break;
         }
         case TOKEN_PLUS:
         {
-            fprintf(stdout, "<PLUS symbol='%.*s' line=%d>\n", token.length, token.start, token.line_number);
+            fprintf(stdout, "%-25s", "<plus>");
             break;
         }
         case TOKEN_SLASH:
         {
-            fprintf(stdout, "<SLASH symbol='%.*s' line=%d>\n", token.length, token.start, token.line_number);
+            fprintf(stdout, "%-25s", "<slash>");
             break;
         }
         case TOKEN_ASTERISK:
         {
-            fprintf(stdout, "<ASTERISK symbol='%.*s' line=%d>\n", token.length, token.start, token.line_number);
+            fprintf(stdout, "%-25s", "<asterisk>");
             break;
         }
         case TOKEN_SEMICOLON:
         {
-            fprintf(stdout, "<SEMICOLON symbol='%.*s' line=%d>\n", token.length, token.start, token.line_number);
+            fprintf(stdout, "%-25s", "<semicolon>");
             break;
         }
         case TOKEN_NUMBER:
         {
-            fprintf(stdout, "<NUMBER value=%.*s line=%d>\n", token.length, token.start, token.line_number);
+            fprintf(stdout, "%-25s", "<number>");
             break;
         }
         case TOKEN_COMMENT:
         {
-            fprintf(stdout, "<COMMENT value=%.*s line=%d>\n", token.length, token.start, token.line_number);
+            fprintf(stdout, "%-25s", "<comment>");
             break;
         }
         case TOKEN_STRING:
         {
-            fprintf(stdout, "<STRING value=%.*s line=%d>\n", token.length, token.start, token.line_number);
+            fprintf(stdout, "%-25s", "<string>");
             break;
         }
         case TOKEN_EQUAL:
         {
-            fprintf(stdout, "<EQUAL symbol='%.*s' line=%d>\n", token.length, token.start, token.line_number);
+            fprintf(stdout, "%-25s", "<equal>");
             break;
         }
         case TOKEN_EQUAL_EQUAL:
         {
-            fprintf(stdout, "<EQUAL_EQUAL symbol='%.*s' line=%d>\n", token.length, token.start, token.line_number);
+            fprintf(stdout, "%-25s", "<equal_equal>");
             break;
         }
         case TOKEN_NOT_EQUAL:
         {
-            fprintf(stdout, "<NOT_EQUAL symbol='%.*s' line=%d>\n", token.length, token.start, token.line_number);
+            fprintf(stdout, "%-25s", "<not_equal>");
             break;
         }
         case TOKEN_LESS:
         {
-            fprintf(stdout, "<LESS symbol=\'<\' line=%d>\n", token.line_number);
+            fprintf(stdout, "%-25s", "<less>");
             break;
         }
         case TOKEN_LESS_EQUAL:
         {
-            fprintf(stdout, "<LESS_EQUAL symbol=\'>=\' line=%d>\n", token.line_number);
+            fprintf(stdout, "%-25s", "<less_equal>");
             break;
         }
         case TOKEN_GREATER:
         {
-            fprintf(stdout, "<GREATER symbol=\'>\' line=%d>\n", token.line_number);
+            fprintf(stdout, "%-25s", "<greater>");
             break;
         }
         case TOKEN_GREATER_EQUAL:
         {
-            fprintf(stdout, "<GREATER_EQUAL symbol=\'>=\' line=%d>\n", token.line_number);
+            fprintf(stdout, "%-25s", "<greater_equal>");
             break;
         }
         case TOKEN_IDENTIFIER:
         {
-            fprintf(stdout, "<IDENTIFIER value=\'%.*s\' line=%d>\n", token.length, token.start, token.line_number);
+            fprintf(stdout, "%-25s", "<identifier>");
             break;
         }
         case TOKEN_E:
         {
-            fprintf(stdout, "<E value=\'%.*s\' line=%d>\n", token.length, token.start, token.line_number);
+            fprintf(stdout, "%-25s", "<e>");
             break;
         }
         case TOKEN_OU:
         {
-            fprintf(stdout, "<OU value=\'%.*s\' line=%d>\n", token.length, token.start, token.line_number);
+            fprintf(stdout, "%-25s", "<ou>");
             break;
         }
         case TOKEN_KLASI:
         {
-            fprintf(stdout, "<KLASI value=\'%.*s\' line=%d>\n", token.length, token.start, token.line_number);
+            fprintf(stdout, "%-25s", "<klasi>");
             break;
         }
         case TOKEN_SI:
         {
-            fprintf(stdout, "<SI value=\'%.*s\' line=%d>\n", token.length, token.start, token.line_number);
+            fprintf(stdout, "%-25s", "<si>");
             break;
         }
         case TOKEN_SINOU:
         {
-            fprintf(stdout, "<SINOU value=\'%.*s\' line=%d>\n", token.length, token.start, token.line_number);
+            fprintf(stdout, "%-25s", "<sinou>");
             break;
         }
         case TOKEN_FALSU:
         {
-            fprintf(stdout, "<FALSU value=\'%.*s\' line=%d>\n", token.length, token.start, token.line_number);
+            fprintf(stdout, "%-25s", "<falsu>");
             break;
         }
         case TOKEN_VERDADI:
         {
-            fprintf(stdout, "<VERDADI value=\'%.*s\' line=%d>\n", token.length, token.start, token.line_number);
+            fprintf(stdout, "%-25s", "<verdadi>");
             break;
         }
         case TOKEN_DI:
         {
-            fprintf(stdout, "<DI value=\'%.*s\' line=%d>\n", token.length, token.start, token.line_number);
+            fprintf(stdout, "%-25s", "<di>");
             break;
         }
         case TOKEN_FUNSON:
         {
-            fprintf(stdout, "<FUNSON value=\'%.*s\' line=%d>\n", token.length, token.start, token.line_number);
+            fprintf(stdout, "%-25s", "<funson>");
             break;
         }
         case TOKEN_NULO:
         {
-            fprintf(stdout, "<NULO value=\'%.*s\' line=%d>\n", token.length, token.start, token.line_number);
+            fprintf(stdout, "%-25s", "<nulo>");
             break;
         }
         case TOKEN_IMPRIMI:
         {
-            fprintf(stdout, "<IMPRIMI value=\'%.*s\' line=%d>\n", token.length, token.start, token.line_number);
+            fprintf(stdout, "%-25s", "<imprimi>");
             break;
         }
         case TOKEN_DIVOLVI:
         {
-            fprintf(stdout, "<DIVOLVI value=\'%.*s\' line=%d>\n", token.length, token.start, token.line_number);
+            fprintf(stdout, "%-25s", "<divolvi>");
             break;
         }
         case TOKEN_SUPER:
         {
-            fprintf(stdout, "<SUPER value=\'%.*s\' line=%d>\n", token.length, token.start, token.line_number);
+            fprintf(stdout, "%-25s", "<super>");
             break;
         }
         case TOKEN_KELI:
         {
-            fprintf(stdout, "<KELI value=\'%.*s\' line=%d>\n", token.length, token.start, token.line_number);
+            fprintf(stdout, "%-25s", "<keli>");
             break;
         }
         case TOKEN_MIMORIA:
         {
-            fprintf(stdout, "<MIMORIA value=\'%.*s\' line=%d>\n", token.length, token.start, token.line_number);
+            fprintf(stdout, "%-25s", "<mimoria>");
             break;
         }
         case TOKEN_TIMENTI:
         {
-            fprintf(stdout, "<TIMENTI value=\'%.*s\' line=%d>\n", token.length, token.start, token.line_number);
+            fprintf(stdout, "%-25s", "<timenti>");
             break;
         }
         case TOKEN_TI:
         {
-            fprintf(stdout, "<TI value=\'%.*s\' line=%d>\n", token.length, token.start, token.line_number);
+            fprintf(stdout, "%-25s", "<ti>");
             break;
         }
         case TOKEN_KA:
         {
-            fprintf(stdout, "<KA value=\'%.*s\' line=%d>\n", token.length, token.start, token.line_number);
+            fprintf(stdout, "%-25s", "<ka>");
             break;
         }
         }
+        fprintf(stdout, "'%.*s' \n", token.length, token.start);
     }
 }
 
