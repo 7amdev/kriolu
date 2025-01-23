@@ -1,8 +1,5 @@
 #include "kriolu.h"
 
-// TODO
-// [] Create a test folder for lexer's token generation
-
 static char lexer_advance(lexer_t *lexer);
 static char lexer_peek(lexer_t *lexer);
 static bool lexer_match(lexer_t *lexer, char expected);
