@@ -12,11 +12,11 @@
 void print_usage();
 int file_read(const char *file_path, char **buffer_out);
 bool filename_ends_with(const char *filename, const char *extension);
+void token_print(token_t token);
 
 int main(int argc, const char *argv[])
 {
     const char *source_code;
-    lexer_t lexer;
 
     if (argc < 2)
     {
@@ -37,16 +37,48 @@ int main(int argc, const char *argv[])
         exit(EXIT_FAILURE);
 
     bool is_flag_lexer = false;
+    bool is_flag_ast = false;
+    bool is_flag_bytecode = false;
     for (int i = 2; i < argc; i++)
     {
         if (strcmp(argv[i], "-lexer") == 0)
         {
             is_flag_lexer = true;
         }
+        else if (strcmp(argv[i], "-ast") == 0)
+        {
+            is_flag_ast = true;
+        }
+        else if (strcmp(argv[i], "-bytecode") == 0)
+        {
+            is_flag_bytecode = true;
+        }
     }
 
-    lexer_init(&lexer, source_code);
-    lexer_print(&lexer);
+    if (is_flag_lexer)
+    {
+        lexer_t lexer;
+        lexer_init(&lexer, source_code);
+        lexer_debug_dump_tokens(&lexer);
+    }
+
+    if (is_flag_ast)
+    {
+        printf("flah -ast is set!\n");
+        // compiler_t compiler;
+        // compiler_compile(source_code);
+        // compiler_dump_ast(&compiler);
+    }
+
+    if (is_flag_ast)
+    {
+        printf("flah -bytecode is set!\n");
+        // compiler_t compiler;
+        // compiler_compile(source_code);
+        // compiler_dump_bytecode(&compiler);
+    }
+
+    compiler_compile(source_code);
 
     return 0;
 }

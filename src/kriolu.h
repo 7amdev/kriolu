@@ -73,8 +73,6 @@ typedef struct
     int line_number;
 } token_t;
 
-token_t token_make(token_kind_t kind, const char *start, int length, int line_number);
-
 //
 // Lexer
 //
@@ -86,8 +84,52 @@ typedef struct
     int line_number;
 } lexer_t;
 
+#define l_debug_print_token(token) lexer_debug_print_token(token, "%s")
+
 void lexer_init(lexer_t *lexer, const char *source_code);
 token_t lexer_scan(lexer_t *lexer);
-void lexer_print(lexer_t *lexer);
+void lexer_debug_print_token(token_t token, const char *format);
+void lexer_debug_dump_tokens(lexer_t *lexer);
+
+//
+// Parser
+//
+
+typedef struct
+{
+    token_t current;
+    token_t previous;
+    lexer_t *lexer;
+    bool had_error;
+    bool panic_mode;
+} parser_t;
+
+extern parser_t *parser_global;
+
+#define p_advance() parser_advance(parser_global)
+#define p_consume() parser_consume(parser_global)
+#define p_match(...) parser_match(parser_global, __VA_ARGS__)
+#define p_synchronize() parser_synchronize(parser_global)
+#define p_error(...) parser_error(parser_global, __VA_ARGS__)
+
+void parser_init(parser_t *parser, lexer_t *lexer, bool set_global);
+void parser_advance(parser_t *parser);
+void parser_consume(parser_t *parser);
+bool parser_match_then_advance(parser_t *parser, token_kind_t kind);
+void parser_synchronize(parser_t *parser);
+void parser_error(parser_t *parser, token_t *token, const char *message);
+
+//
+// Compiler
+//
+
+typedef struct
+{
+    token_t locals[256];
+    int local_count;
+} compiler_t;
+
+void compiler_init(compiler_t *compiler);
+int compiler_compile(const char *source);
 
 #endif
