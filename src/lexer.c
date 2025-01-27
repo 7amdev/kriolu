@@ -184,6 +184,17 @@ token_t lexer_scan(lexer_t *lexer)
             .line_number = lexer->line_number};
     }
 
+    if (*lexer->current == '^')
+    {
+        lexer->start = lexer->current;
+        lexer_advance(lexer);
+        return (token_t){
+            .kind = TOKEN_CARET,
+            .start = lexer->start,
+            .length = (int)(lexer->current - lexer->start),
+            .line_number = lexer->line_number};
+    }
+
     if (*lexer->current == ';')
     {
         lexer->start = lexer->current;
@@ -439,6 +450,7 @@ token_t lexer_scan(lexer_t *lexer)
 
 void lexer_debug_print_token(token_t token, const char *format)
 {
+    fprintf(stdout, "%2d ", token.line_number);
     switch (token.kind)
     {
     case TOKEN_ERROR:
@@ -494,6 +506,11 @@ void lexer_debug_print_token(token_t token, const char *format)
     case TOKEN_ASTERISK:
     {
         fprintf(stdout, format, "<asterisk>");
+        break;
+    }
+    case TOKEN_CARET:
+    {
+        fprintf(stdout, format, "<caret>");
         break;
     }
     case TOKEN_SEMICOLON:
@@ -647,6 +664,7 @@ void lexer_debug_print_token(token_t token, const char *format)
         break;
     }
     }
+    fprintf(stdout, "'%.*s' \n", token.length, token.start);
 }
 
 void lexer_debug_dump_tokens(lexer_t *lexer)
@@ -668,219 +686,7 @@ void lexer_debug_dump_tokens(lexer_t *lexer)
             break;
         }
 
-        fprintf(stdout, "%2d ", token.line_number);
-
         lexer_debug_print_token(token, "%-25s");
-
-        // switch (token.kind)
-        // {
-        // case TOKEN_ERROR:
-        // {
-        //     fprintf(stdout, "%-25s", "<error>");
-        //     break;
-        // }
-        // case TOKEN_LEFT_PARENTHESIS:
-        // {
-        //     fprintf(stdout, "%-25s", "<left-parenthesis>");
-        //     break;
-        // }
-        // case TOKEN_RIGHT_PARENTHESIS:
-        // {
-        //     fprintf(stdout, "%-25s", "<right_parenthesis>");
-        //     break;
-        // }
-        // case TOKEN_LEFT_BRACE:
-        // {
-        //     fprintf(stdout, "%-25s", "<left_brace>");
-        //     break;
-        // }
-        // case TOKEN_RIGHT_BRACE:
-        // {
-        //     fprintf(stdout, "%-25s", "<right_brace>");
-        //     break;
-        // }
-        // case TOKEN_COMMA:
-        // {
-        //     fprintf(stdout, "%-25s", "<comma>");
-        //     break;
-        // }
-        // case TOKEN_DOT:
-        // {
-        //     fprintf(stdout, "%-25s", "<dot>");
-        //     break;
-        // }
-        // case TOKEN_MINUS:
-        // {
-        //     fprintf(stdout, "%-25s", "<minus>");
-        //     break;
-        // }
-        // case TOKEN_PLUS:
-        // {
-        //     fprintf(stdout, "%-25s", "<plus>");
-        //     break;
-        // }
-        // case TOKEN_SLASH:
-        // {
-        //     fprintf(stdout, "%-25s", "<slash>");
-        //     break;
-        // }
-        // case TOKEN_ASTERISK:
-        // {
-        //     fprintf(stdout, "%-25s", "<asterisk>");
-        //     break;
-        // }
-        // case TOKEN_SEMICOLON:
-        // {
-        //     fprintf(stdout, "%-25s", "<semicolon>");
-        //     break;
-        // }
-        // case TOKEN_NUMBER:
-        // {
-        //     fprintf(stdout, "%-25s", "<number>");
-        //     break;
-        // }
-        // case TOKEN_COMMENT:
-        // {
-        //     fprintf(stdout, "%-25s", "<comment>");
-        //     break;
-        // }
-        // case TOKEN_STRING:
-        // {
-        //     fprintf(stdout, "%-25s", "<string>");
-        //     break;
-        // }
-        // case TOKEN_EQUAL:
-        // {
-        //     fprintf(stdout, "%-25s", "<equal>");
-        //     break;
-        // }
-        // case TOKEN_EQUAL_EQUAL:
-        // {
-        //     fprintf(stdout, "%-25s", "<equal_equal>");
-        //     break;
-        // }
-        // case TOKEN_NOT_EQUAL:
-        // {
-        //     fprintf(stdout, "%-25s", "<not_equal>");
-        //     break;
-        // }
-        // case TOKEN_LESS:
-        // {
-        //     fprintf(stdout, "%-25s", "<less>");
-        //     break;
-        // }
-        // case TOKEN_LESS_EQUAL:
-        // {
-        //     fprintf(stdout, "%-25s", "<less_equal>");
-        //     break;
-        // }
-        // case TOKEN_GREATER:
-        // {
-        //     fprintf(stdout, "%-25s", "<greater>");
-        //     break;
-        // }
-        // case TOKEN_GREATER_EQUAL:
-        // {
-        //     fprintf(stdout, "%-25s", "<greater_equal>");
-        //     break;
-        // }
-        // case TOKEN_IDENTIFIER:
-        // {
-        //     fprintf(stdout, "%-25s", "<identifier>");
-        //     break;
-        // }
-        // case TOKEN_E:
-        // {
-        //     fprintf(stdout, "%-25s", "<e>");
-        //     break;
-        // }
-        // case TOKEN_OU:
-        // {
-        //     fprintf(stdout, "%-25s", "<ou>");
-        //     break;
-        // }
-        // case TOKEN_KLASI:
-        // {
-        //     fprintf(stdout, "%-25s", "<klasi>");
-        //     break;
-        // }
-        // case TOKEN_SI:
-        // {
-        //     fprintf(stdout, "%-25s", "<si>");
-        //     break;
-        // }
-        // case TOKEN_SINOU:
-        // {
-        //     fprintf(stdout, "%-25s", "<sinou>");
-        //     break;
-        // }
-        // case TOKEN_FALSU:
-        // {
-        //     fprintf(stdout, "%-25s", "<falsu>");
-        //     break;
-        // }
-        // case TOKEN_VERDADI:
-        // {
-        //     fprintf(stdout, "%-25s", "<verdadi>");
-        //     break;
-        // }
-        // case TOKEN_DI:
-        // {
-        //     fprintf(stdout, "%-25s", "<di>");
-        //     break;
-        // }
-        // case TOKEN_FUNSON:
-        // {
-        //     fprintf(stdout, "%-25s", "<funson>");
-        //     break;
-        // }
-        // case TOKEN_NULO:
-        // {
-        //     fprintf(stdout, "%-25s", "<nulo>");
-        //     break;
-        // }
-        // case TOKEN_IMPRIMI:
-        // {
-        //     fprintf(stdout, "%-25s", "<imprimi>");
-        //     break;
-        // }
-        // case TOKEN_DIVOLVI:
-        // {
-        //     fprintf(stdout, "%-25s", "<divolvi>");
-        //     break;
-        // }
-        // case TOKEN_SUPER:
-        // {
-        //     fprintf(stdout, "%-25s", "<super>");
-        //     break;
-        // }
-        // case TOKEN_KELI:
-        // {
-        //     fprintf(stdout, "%-25s", "<keli>");
-        //     break;
-        // }
-        // case TOKEN_MIMORIA:
-        // {
-        //     fprintf(stdout, "%-25s", "<mimoria>");
-        //     break;
-        // }
-        // case TOKEN_TIMENTI:
-        // {
-        //     fprintf(stdout, "%-25s", "<timenti>");
-        //     break;
-        // }
-        // case TOKEN_TI:
-        // {
-        //     fprintf(stdout, "%-25s", "<ti>");
-        //     break;
-        // }
-        // case TOKEN_KA:
-        // {
-        //     fprintf(stdout, "%-25s", "<ka>");
-        //     break;
-        // }
-        // }
-        fprintf(stdout, "'%.*s' \n", token.length, token.start);
     }
 }
 

@@ -4,9 +4,10 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
+#include <stdlib.h>
 
 //
-// Token Kind
+// Token
 //
 
 typedef enum
@@ -22,6 +23,7 @@ typedef enum
     TOKEN_SEMICOLON,
     TOKEN_SLASH,
     TOKEN_ASTERISK,
+    TOKEN_CARET,
 
     TOKEN_EQUAL,         // =
     TOKEN_EQUAL_EQUAL,   // ==
@@ -35,9 +37,9 @@ typedef enum
     TOKEN_STRING,
     TOKEN_NUMBER,
 
-    TOKEN_E, // and
-    TOKEN_OU,
-    TOKEN_KA, // Logic NOT Operator
+    TOKEN_E,  // logic operator AND
+    TOKEN_OU, // logic operator OR
+    TOKEN_KA, // logic operator NOT
     TOKEN_KLASI,
     TOKEN_SI,
     TOKEN_SINOU,
@@ -58,10 +60,6 @@ typedef enum
     TOKEN_ERROR,
     TOKEN_EOF
 } token_kind_t;
-
-//
-// Token
-//
 
 // TODO: use tagged unions data structure to support string
 //       line_number_begin and line_number_end
@@ -84,7 +82,7 @@ typedef struct
     int line_number;
 } lexer_t;
 
-#define l_debug_print_token(token) lexer_debug_print_token(token, "%s")
+#define l_debug_print_token(token) lexer_debug_print_token(token, "%s ")
 
 void lexer_init(lexer_t *lexer, const char *source_code);
 token_t lexer_scan(lexer_t *lexer);
@@ -92,8 +90,38 @@ void lexer_debug_print_token(token_t token, const char *format);
 void lexer_debug_dump_tokens(lexer_t *lexer);
 
 //
+// Compiler
+//
+
+typedef struct
+{
+    token_t locals[256];
+    int local_count;
+} compiler_t;
+
+void compiler_init(compiler_t *compiler);
+int compiler_compile(compiler_t *compiler, const char *source);
+
+//
 // Parser
 //
+
+typedef enum
+{
+    OPERATION_MIN,
+    OPERATION_ASSIGNMENT,                  // =
+    OPERATION_OR,                          // or
+    OPERATION_AND,                         // and
+    OPERATION_EQUALITY,                    // == =/=
+    OPERATION_COMPARISON,                  // < > <= >=
+    OPERATION_ADDITION_AND_SUBTRACTION,    // + -
+    OPERATION_MULTIPLICATION_AND_DIVISION, // * /
+    OPERATION_NEGATE,                      // Unary:  -
+    OPERATION_EXPONENTIATION,              // ^   ex: -2^2 = -1 * 2^2 = -4
+    OPERATION_NOT,                         // Unary: ka
+    OPERATION_PARENTHESIS_AND_GET,         // . ()
+    OPERATION_PRIMARY
+} OrderOfOperation;
 
 typedef struct
 {
@@ -113,23 +141,16 @@ extern parser_t *parser_global;
 #define p_error(...) parser_error(parser_global, __VA_ARGS__)
 
 void parser_init(parser_t *parser, lexer_t *lexer, bool set_global);
+void parser_parse(parser_t *parser);
 void parser_advance(parser_t *parser);
-void parser_consume(parser_t *parser);
+void parser_consume(parser_t *parser, token_kind_t kind, const char *error_message);
 bool parser_match_then_advance(parser_t *parser, token_kind_t kind);
 void parser_synchronize(parser_t *parser);
 void parser_error(parser_t *parser, token_t *token, const char *message);
-
-//
-// Compiler
-//
-
-typedef struct
-{
-    token_t locals[256];
-    int local_count;
-} compiler_t;
-
-void compiler_init(compiler_t *compiler);
-int compiler_compile(const char *source);
+void parser_declaration(parser_t *parser);
+void parser_expression_statement(parser_t *parser);
+void parser_expression(parser_t *parser, OrderOfOperation operator_precedence_previous);
+void parser_unary_and_literals(parser);
+void parser_binary(parser_t *parser);
 
 #endif

@@ -78,7 +78,8 @@ int main(int argc, const char *argv[])
         // compiler_dump_bytecode(&compiler);
     }
 
-    compiler_compile(source_code);
+    compiler_t compiler;
+    compiler_compile(&compiler, source_code);
 
     return 0;
 }

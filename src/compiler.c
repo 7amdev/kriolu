@@ -4,20 +4,15 @@ void compiler_init(compiler_t *compiler)
 {
 }
 
-int compiler_compile(const char *source)
+int compiler_compile(compiler_t *compiler, const char *source)
 {
     lexer_t lexer;
     parser_t parser;
 
     lexer_init(&lexer, source);
-    parser_init(&parser, &lexer, true);
+    parser_init(&parser, &lexer, false);
 
-    p_advance();
-
-    while (!parser_match_then_advance(&parser, TOKEN_EOF))
-    {
-        l_debug_print_token(parser.current);
-    }
+    parser_parse(&parser);
 
     return 0;
 }
