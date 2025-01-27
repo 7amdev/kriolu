@@ -16,7 +16,7 @@ void token_print(token_t token);
 
 int main(int argc, const char *argv[])
 {
-    const char *source_code;
+    const char *source_code = NULL;
 
     if (argc < 2)
     {
@@ -124,7 +124,7 @@ int file_read(const char *file_path, char **buffer_out)
 defer:
     if (file)
         fclose(file);
-    if (buffer_out != NULL && result == -1)
+    if (*buffer_out != NULL && result == -1)
         free(*buffer_out);
 
     return result;
