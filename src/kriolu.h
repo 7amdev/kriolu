@@ -5,6 +5,9 @@
 #include <stdbool.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdint.h>
+
+// todo: change type declaration name to CamelCase
 
 //
 // Token
@@ -12,6 +15,9 @@
 
 typedef enum
 {
+    TOKEN_ERROR,
+    TOKEN_EOF,
+
     TOKEN_LEFT_PARENTHESIS,  // (
     TOKEN_RIGHT_PARENTHESIS, // )
     TOKEN_LEFT_BRACE,        // {
@@ -56,9 +62,7 @@ typedef enum
     TOKEN_TIMENTI,
     TOKEN_TI,
 
-    TOKEN_COMMENT,
-    TOKEN_ERROR,
-    TOKEN_EOF
+    TOKEN_COMMENT
 } token_kind_t;
 
 // TODO: use tagged unions data structure to support string
@@ -106,9 +110,71 @@ int compiler_compile(compiler_t *compiler, const char *source);
 // Parser
 //
 
+typedef uint8_t AstNodeKind;
+enum
+{
+    AST_NODE_NUMBER,
+    AST_NODE_ADDITION,
+    AST_NODE_SUBTRACTION,
+    AST_NODE_MULTIPLICATION,
+    AST_NODE_DIVISION,
+    AST_NODE_EXPONENTIATION
+};
+
+typedef struct AstExpression AstExpression;
+typedef struct
+{
+    double value;
+} AstNodeNumber;
+
+typedef struct
+{
+    AstExpression *left_operand;
+    AstExpression *right_operand;
+} AstNodeAddition;
+
+typedef struct
+{
+    AstExpression *left_operand;
+    AstExpression *right_operand;
+} AstNodeSubtraction;
+
+typedef struct
+{
+    AstExpression *left_operand;
+    AstExpression *right_operand;
+} AstNodeMultiplication;
+
+typedef struct
+{
+    AstExpression *left_operand;
+    AstExpression *right_operand;
+} AstNodeDivision;
+
+typedef struct
+{
+    AstExpression *left_operand;
+    AstExpression *right_operand;
+} AstNodeExponentiation;
+
+struct AstExpression
+{
+    AstNodeKind kind;
+    union
+    {
+        AstNodeNumber number;
+        AstNodeAddition addition;
+        AstNodeSubtraction subtraction;
+        AstNodeMultiplication multiplication;
+        AstNodeDivision division;
+        AstNodeExponentiation exponentiation;
+    };
+};
+
 typedef enum
 {
     OPERATION_MIN,
+
     OPERATION_ASSIGNMENT,                  // =
     OPERATION_OR,                          // or
     OPERATION_AND,                         // and
@@ -119,8 +185,9 @@ typedef enum
     OPERATION_NEGATE,                      // Unary:  -
     OPERATION_EXPONENTIATION,              // ^   ex: -2^2 = -1 * 2^2 = -4
     OPERATION_NOT,                         // Unary: ka
-    OPERATION_PARENTHESIS_AND_GET,         // . ()
-    OPERATION_PRIMARY
+    OPERATION_GROUPING_CALL_AND_GET,       // . (
+
+    OPERATION_MAX
 } OrderOfOperation;
 
 typedef struct
@@ -149,8 +216,11 @@ void parser_synchronize(parser_t *parser);
 void parser_error(parser_t *parser, token_t *token, const char *message);
 void parser_declaration(parser_t *parser);
 void parser_expression_statement(parser_t *parser);
-void parser_expression(parser_t *parser, OrderOfOperation operator_precedence_previous);
-void parser_unary_and_literals(parser);
-void parser_binary(parser_t *parser);
+AstExpression *parser_expression(parser_t *parser, OrderOfOperation operator_precedence_previous);
+AstExpression *parser_unary_and_literals(parser);
+AstExpression *parser_binary(parser_t *parser, AstExpression *left_operand);
+AstExpression *parser_ast_expression_allocate();
+void parser_ast_expression_free();
+void parser_ast_expression_print(AstExpression *ast_node);
 
 #endif
