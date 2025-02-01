@@ -1,6 +1,8 @@
 #include "kriolu.h"
 
 // todo: parser_ast_dump -> use AST data structure
+// todo: parsing grouping
+// todo: change switch to if/else
 
 parser_t *parser_global;
 int debug_line_number = 1;
@@ -167,8 +169,6 @@ static OrderOfOperation parser_operator_precedence(token_kind_t kind)
 
 AstExpression *parser_expression(parser_t *parser, OrderOfOperation operator_precedence_previous)
 {
-    AstExpression *ret = NULL;
-
     parser_advance(parser);
     AstExpression *left_operand = parser_unary_and_literals(parser);
 
@@ -202,11 +202,29 @@ AstExpression *parser_unary_and_literals(parser_t *parser)
 
         printf("%.1f ", value);
     }
-    else if (parser->previous.kind = TOKEN_MINUS)
+    else if (parser->previous.kind == TOKEN_MINUS)
     {
-        ret = parser_expression(parser, OPERATION_NEGATE);
-        // todo: create unary expression (negative??) with 1(one) operand
+        AstExpression *result = parser_expression(parser, OPERATION_NEGATE);
+        AstNodeNegation negation = (AstNodeNegation){
+            .operand = result};
+
+        ret = parser_ast_expression_allocate((AstExpression){
+            .kind = AST_NODE_NEGATION,
+            .negation = negation});
+
         printf("- ");
+    }
+    else if (parser->previous.kind == TOKEN_LEFT_PARENTHESIS)
+    {
+        AstExpression *expression = parser_expression(parser, OPERATION_ASSIGNMENT);
+        AstNodeGrouping grouping = (AstNodeGrouping){
+            .operand = expression};
+
+        ret = parser_ast_expression_allocate((AstExpression){
+            .kind = AST_NODE_GROUPING,
+            .grouping = grouping});
+
+        parser_consume(parser, TOKEN_RIGHT_PARENTHESIS, "Expected ')' after expression.");
     }
 
     return ret;
@@ -309,13 +327,25 @@ AstExpression *parser_ast_expression_allocate(AstExpression ast)
 
 void parser_ast_expression_free(AstExpression *pointer)
 {
-    // todo: add case negate
+    // todo: change switch to if/else
 
     switch (pointer->kind)
     {
     case AST_NODE_NUMBER:
     {
         AstNodeNumber number = pointer->number;
+        break;
+    }
+    case AST_NODE_NEGATION:
+    {
+        AstNodeNegation negation = pointer->negation;
+        parser_ast_expression_free(negation.operand);
+        break;
+    }
+    case AST_NODE_GROUPING:
+    {
+        AstNodeGrouping grouping = pointer->grouping;
+        parser_ast_expression_free(grouping.operand);
         break;
     }
     case AST_NODE_ADDITION:
@@ -360,7 +390,7 @@ void parser_ast_expression_free(AstExpression *pointer)
 
 void parser_ast_expression_print(AstExpression *ast_node)
 {
-    // todo: add case negate
+    // todo: change switch to if/else
 
     switch (ast_node->kind)
     {
@@ -368,6 +398,21 @@ void parser_ast_expression_print(AstExpression *ast_node)
     {
         AstNodeNumber number = ast_node->number;
         printf("%.1f", number.value);
+        break;
+    }
+    case AST_NODE_NEGATION:
+    {
+        AstNodeNegation negation = ast_node->negation;
+        printf("(");
+        printf("-");
+        parser_ast_expression_print(negation.operand);
+        printf(")");
+        break;
+    }
+    case AST_NODE_GROUPING:
+    {
+        AstNodeGrouping grouping = ast_node->grouping;
+        parser_ast_expression_print(grouping.operand);
         break;
     }
     case AST_NODE_ADDITION:
@@ -418,6 +463,7 @@ void parser_ast_expression_print(AstExpression *ast_node)
         printf(" ^ ");
         parser_ast_expression_print(exponentiation.right_operand);
         printf(")");
+        break;
     }
     }
 }

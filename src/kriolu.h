@@ -114,6 +114,8 @@ typedef uint8_t AstNodeKind;
 enum
 {
     AST_NODE_NUMBER,
+    AST_NODE_NEGATION,
+    AST_NODE_GROUPING,
     AST_NODE_ADDITION,
     AST_NODE_SUBTRACTION,
     AST_NODE_MULTIPLICATION,
@@ -122,10 +124,21 @@ enum
 };
 
 typedef struct AstExpression AstExpression;
+
 typedef struct
 {
     double value;
 } AstNodeNumber;
+
+typedef struct
+{
+    AstExpression *operand;
+} AstNodeNegation;
+
+typedef struct
+{
+    AstExpression *operand;
+} AstNodeGrouping;
 
 typedef struct
 {
@@ -163,6 +176,8 @@ struct AstExpression
     union
     {
         AstNodeNumber number;
+        AstNodeNegation negation;
+        AstNodeGrouping grouping;
         AstNodeAddition addition;
         AstNodeSubtraction subtraction;
         AstNodeMultiplication multiplication;
