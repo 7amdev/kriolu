@@ -64,7 +64,7 @@ int main(int argc, const char *argv[])
 
     if (is_flag_ast)
     {
-        printf("flah -ast is set!\n");
+        printf("flag -ast is set!\n");
         // compiler_t compiler;
         // compiler_compile(source_code);
         // compiler_dump_ast(&compiler);
@@ -72,14 +72,19 @@ int main(int argc, const char *argv[])
 
     if (is_flag_ast)
     {
-        printf("flah -bytecode is set!\n");
+        printf("flag -bytecode is set!\n");
         // compiler_t compiler;
         // compiler_compile(source_code);
         // compiler_dump_bytecode(&compiler);
     }
 
-    compiler_t compiler;
-    compiler_compile(&compiler, source_code);
+    lexer_t lexer;
+    parser_t parser;
+
+    lexer_init(&lexer, source_code);
+    parser_init(&parser, &lexer, false);
+
+    parser_parse(&parser);
 
     return 0;
 }

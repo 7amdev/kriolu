@@ -1,8 +1,11 @@
 #include "kriolu.h"
 
-// todo: parser_ast_dump -> use AST data structure
-// todo: parsing grouping
-// todo: change switch to if/else
+// todo: call error function
+// todo: refactor parser interface public and private
+// todo: parser option to output postfix notation or parenthesis
+// todo: write test
+// todo: log error and set parser's panicMode and hasError to true
+// todo: test parser_synchronize
 
 parser_t *parser_global;
 int debug_line_number = 1;
@@ -31,8 +34,6 @@ void parser_parse(parser_t *parser)
             break;
 
         parser_declaration(parser);
-
-        // l_debug_print_token(parser->current);
     }
 }
 
@@ -49,7 +50,7 @@ void parser_advance(parser_t *parser)
         if (parser->current.kind != TOKEN_ERROR)
             break;
 
-        // todo: log error and set parser's panicMode and hasError to true
+        parser_error(parser, &parser->current, "Unexpected character!");
     }
 }
 
@@ -74,6 +75,7 @@ void parser_consume(parser_t *parser, token_kind_t kind, const char *error_messa
     }
 
     // todo: call error function
+    parser_error(parser, &parser->current, error_message);
 }
 
 void parser_synchronize(parser_t *parser)
@@ -106,6 +108,23 @@ void parser_synchronize(parser_t *parser)
 
 void parser_error(parser_t *parser, token_t *token, const char *message)
 {
+    if (parser->panic_mode)
+        return;
+
+    parser->panic_mode = true;
+
+    fprintf(stderr, "[line %d] Error", token->line_number);
+    if (token->kind == TOKEN_EOF)
+    {
+        fprintf(stderr, " at end");
+    }
+    else
+    {
+        fprintf(stderr, " at '%.*s'", token->length, token->start);
+    }
+    fprintf(stderr, " : '%s'\n", message);
+
+    parser->had_error = true;
 }
 
 void parser_declaration(parser_t *parser)
@@ -325,97 +344,83 @@ AstExpression *parser_ast_expression_allocate(AstExpression ast)
     return ast_expression;
 }
 
-void parser_ast_expression_free(AstExpression *pointer)
+void parser_ast_expression_free(AstExpression *ast_node)
 {
-    // todo: change switch to if/else
 
-    switch (pointer->kind)
+    if (ast_node->kind == AST_NODE_NUMBER)
     {
-    case AST_NODE_NUMBER:
-    {
-        AstNodeNumber number = pointer->number;
-        break;
+        AstNodeNumber number = ast_node->number;
     }
-    case AST_NODE_NEGATION:
+    else if (ast_node->kind == AST_NODE_NEGATION)
     {
-        AstNodeNegation negation = pointer->negation;
+        AstNodeNegation negation = ast_node->negation;
         parser_ast_expression_free(negation.operand);
-        break;
     }
-    case AST_NODE_GROUPING:
+    else if (ast_node->kind == AST_NODE_GROUPING)
     {
-        AstNodeGrouping grouping = pointer->grouping;
+        AstNodeGrouping grouping = ast_node->grouping;
         parser_ast_expression_free(grouping.operand);
-        break;
     }
-    case AST_NODE_ADDITION:
+    else if (ast_node->kind == AST_NODE_ADDITION)
     {
-        AstNodeAddition addition = pointer->addition;
+        AstNodeAddition addition = ast_node->addition;
         parser_ast_expression_free(addition.left_operand);
         parser_ast_expression_free(addition.right_operand);
-        break;
     }
-    case AST_NODE_SUBTRACTION:
+    else if (ast_node->kind == AST_NODE_SUBTRACTION)
     {
-        AstNodeSubtraction subtraction = pointer->subtraction;
+        AstNodeSubtraction subtraction = ast_node->subtraction;
         parser_ast_expression_free(subtraction.left_operand);
         parser_ast_expression_free(subtraction.right_operand);
-        break;
     }
-    case AST_NODE_MULTIPLICATION:
+    else if (ast_node->kind == AST_NODE_MULTIPLICATION)
     {
-        AstNodeMultiplication multiplication = pointer->multiplication;
+        AstNodeMultiplication multiplication = ast_node->multiplication;
         parser_ast_expression_free(multiplication.left_operand);
         parser_ast_expression_free(multiplication.right_operand);
-        break;
     }
-    case AST_NODE_DIVISION:
+    else if (ast_node->kind == AST_NODE_DIVISION)
     {
-        AstNodeDivision division = pointer->division;
+        AstNodeDivision division = ast_node->division;
         parser_ast_expression_free(division.left_operand);
         parser_ast_expression_free(division.right_operand);
-        break;
     }
-    case AST_NODE_EXPONENTIATION:
+    else if (ast_node->kind == AST_NODE_EXPONENTIATION)
     {
-        AstNodeExponentiation exponentiation = pointer->exponentiation;
+        AstNodeExponentiation exponentiation = ast_node->exponentiation;
         parser_ast_expression_free(exponentiation.left_operand);
         parser_ast_expression_free(exponentiation.right_operand);
-        break;
     }
+    else
+    {
+        printf("warning: Unrecognized node type!");
     }
 
-    free(pointer);
+    free(ast_node);
 }
 
 void parser_ast_expression_print(AstExpression *ast_node)
 {
-    // todo: change switch to if/else
 
-    switch (ast_node->kind)
-    {
-    case AST_NODE_NUMBER:
+    if (ast_node->kind == AST_NODE_NUMBER)
     {
         AstNodeNumber number = ast_node->number;
         printf("%.1f", number.value);
-        break;
     }
-    case AST_NODE_NEGATION:
+    else if (ast_node->kind == AST_NODE_NEGATION)
     {
         AstNodeNegation negation = ast_node->negation;
         printf("(");
         printf("-");
         parser_ast_expression_print(negation.operand);
         printf(")");
-        break;
     }
-    case AST_NODE_GROUPING:
+    else if (ast_node->kind == AST_NODE_GROUPING)
     {
         AstNodeGrouping grouping = ast_node->grouping;
         parser_ast_expression_print(grouping.operand);
-        break;
     }
-    case AST_NODE_ADDITION:
+    else if (ast_node->kind == AST_NODE_ADDITION)
     {
         AstNodeAddition addition = ast_node->addition;
         printf("(");
@@ -423,9 +428,8 @@ void parser_ast_expression_print(AstExpression *ast_node)
         printf(" + ");
         parser_ast_expression_print(addition.right_operand);
         printf(")");
-        break;
     }
-    case AST_NODE_SUBTRACTION:
+    else if (ast_node->kind == AST_NODE_SUBTRACTION)
     {
         AstNodeSubtraction subtraction = ast_node->subtraction;
         printf("(");
@@ -433,9 +437,8 @@ void parser_ast_expression_print(AstExpression *ast_node)
         printf(" - ");
         parser_ast_expression_print(subtraction.right_operand);
         printf(")");
-        break;
     }
-    case AST_NODE_MULTIPLICATION:
+    else if (ast_node->kind == AST_NODE_MULTIPLICATION)
     {
         AstNodeMultiplication multiplication = ast_node->multiplication;
         printf("(");
@@ -443,9 +446,8 @@ void parser_ast_expression_print(AstExpression *ast_node)
         printf(" * ");
         parser_ast_expression_print(multiplication.right_operand);
         printf(")");
-        break;
     }
-    case AST_NODE_DIVISION:
+    else if (ast_node->kind == AST_NODE_DIVISION)
     {
         AstNodeDivision division = ast_node->division;
         printf("(");
@@ -453,9 +455,8 @@ void parser_ast_expression_print(AstExpression *ast_node)
         printf(" / ");
         parser_ast_expression_print(division.right_operand);
         printf(")");
-        break;
     }
-    case AST_NODE_EXPONENTIATION:
+    else if (ast_node->kind == AST_NODE_EXPONENTIATION)
     {
         AstNodeExponentiation exponentiation = ast_node->exponentiation;
         printf("(");
@@ -463,7 +464,9 @@ void parser_ast_expression_print(AstExpression *ast_node)
         printf(" ^ ");
         parser_ast_expression_print(exponentiation.right_operand);
         printf(")");
-        break;
     }
+    else
+    {
+        printf("Error: node not supported!");
     }
 }

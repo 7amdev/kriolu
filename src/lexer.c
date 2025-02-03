@@ -784,20 +784,30 @@ static token_kind_t lexer_keyword_kind(token_t token, char const *keyword, int c
 
 static token_t lexer_error(lexer_t *lexer, const char *message)
 {
+    // IMPLEMENTATION 1
+    // lexer_advance(lexer);
+    // return (token_t){
+    //     .kind = TOKEN_ERROR,
+    //     .start = message,
+    //     .length = (int)strlen(message),
+    //     .line_number = lexer->line_number};
+
+    // IMPLEMENTATION 2
     // TODO: review later
     // static char buffer[50];
-    // sprintf(buffer, "Unexpected character %.*s at line %d.", 1, lexer->current, lexer->line_number);
+    // sprintf(buffer, "unexpected character '%.*s' at line %d.", 1, lexer->current, lexer->line_number);
+    // lexer_advance(lexer);
     // return (token_t){
     //     .kind = TOKEN_ERROR,
     //     .start = buffer,
     //     .length = (int)strlen(buffer),
     //     .line_number = lexer->line_number};
 
+    lexer->start = lexer->current;
     lexer_advance(lexer);
-
     return (token_t){
         .kind = TOKEN_ERROR,
-        .start = message,
-        .length = (int)strlen(message),
+        .start = lexer->start,
+        .length = (int)(lexer->current - lexer->start),
         .line_number = lexer->line_number};
 }
