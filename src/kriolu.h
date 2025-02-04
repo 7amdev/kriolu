@@ -7,6 +7,8 @@
 #include <stdlib.h>
 #include <stdint.h>
 
+#define DEBUG_LOG_PARSER
+
 // todo: change type declaration name to CamelCase
 
 //
@@ -65,8 +67,6 @@ typedef enum
     TOKEN_COMMENT
 } token_kind_t;
 
-// TODO: use tagged unions data structure to support string
-//       line_number_begin and line_number_end
 typedef struct
 {
     token_kind_t kind;

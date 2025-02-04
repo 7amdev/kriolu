@@ -1,11 +1,11 @@
 #include "kriolu.h"
 
+// todo: emit bytecode instructions
 // todo: call error function
 // todo: refactor parser interface public and private
 // todo: parser option to output postfix notation or parenthesis
 // todo: write test
-// todo: log error and set parser's panicMode and hasError to true
-// todo: test parser_synchronize
+// todo: macro flag to print debug info: postfix and parenthesis notation
 
 parser_t *parser_global;
 int debug_line_number = 1;
@@ -45,8 +45,7 @@ void parser_advance(parser_t *parser)
     {
         parser->current = lexer_scan(parser->lexer);
 
-        // skip comment token
-
+        // todo: skip comment token
         if (parser->current.kind != TOKEN_ERROR)
             break;
 
@@ -74,8 +73,7 @@ void parser_consume(parser_t *parser, token_kind_t kind, const char *error_messa
         return;
     }
 
-    // todo: call error function
-    parser_error(parser, &parser->current, error_message);
+    parser_error(parser, &parser->previous, error_message);
 }
 
 void parser_synchronize(parser_t *parser)
@@ -112,6 +110,7 @@ void parser_error(parser_t *parser, token_t *token, const char *message)
         return;
 
     parser->panic_mode = true;
+    parser->had_error = true;
 
     fprintf(stderr, "[line %d] Error", token->line_number);
     if (token->kind == TOKEN_EOF)
@@ -123,8 +122,6 @@ void parser_error(parser_t *parser, token_t *token, const char *message)
         fprintf(stderr, " at '%.*s'", token->length, token->start);
     }
     fprintf(stderr, " : '%s'\n", message);
-
-    parser->had_error = true;
 }
 
 void parser_declaration(parser_t *parser)
@@ -143,11 +140,12 @@ void parser_expression_statement(parser_t *parser)
 
     expression = parser_expression(parser, OPERATION_ASSIGNMENT);
     parser_consume(parser, TOKEN_SEMICOLON, "Expect ';' after expression.");
-    parser_ast_expression_print(expression);
-    parser_ast_expression_free(expression);
 
-    // for test and debug
+#ifdef DEBUG_LOG_PARSER
+    parser_ast_expression_print(expression);
     printf("\n");
+    parser_ast_expression_free(expression);
+#endif
 }
 
 static OrderOfOperation parser_operator_precedence(token_kind_t kind)
@@ -207,6 +205,7 @@ AstExpression *parser_expression(parser_t *parser, OrderOfOperation operator_pre
 
 AstExpression *parser_unary_and_literals(parser_t *parser)
 {
+    // todo: emit bytecode instructions
     AstExpression *ret = NULL;
 
     if (parser->previous.kind == TOKEN_NUMBER)
@@ -218,8 +217,6 @@ AstExpression *parser_unary_and_literals(parser_t *parser)
         ret = parser_ast_expression_allocate((AstExpression){
             .kind = AST_NODE_NUMBER,
             .number = number});
-
-        printf("%.1f ", value);
     }
     else if (parser->previous.kind == TOKEN_MINUS)
     {
@@ -230,8 +227,6 @@ AstExpression *parser_unary_and_literals(parser_t *parser)
         ret = parser_ast_expression_allocate((AstExpression){
             .kind = AST_NODE_NEGATION,
             .negation = negation});
-
-        printf("- ");
     }
     else if (parser->previous.kind == TOKEN_LEFT_PARENTHESIS)
     {
@@ -260,8 +255,6 @@ AstExpression *parser_binary(parser_t *parser, AstExpression *left_operand)
 
     if (operator_kind_previous == TOKEN_PLUS)
     {
-        printf("+ ");
-
         AstNodeAddition addition = (AstNodeAddition){
             .left_operand = left_operand,
             .right_operand = right_operand};
@@ -274,8 +267,6 @@ AstExpression *parser_binary(parser_t *parser, AstExpression *left_operand)
     }
     else if (operator_kind_previous == TOKEN_MINUS)
     {
-        printf("- ");
-
         AstNodeSubtraction subtraction = (AstNodeSubtraction){
             .left_operand = left_operand,
             .right_operand = right_operand};
@@ -288,8 +279,6 @@ AstExpression *parser_binary(parser_t *parser, AstExpression *left_operand)
     }
     else if (operator_kind_previous == TOKEN_ASTERISK)
     {
-        printf("* ");
-
         AstNodeMultiplication multiplication = (AstNodeMultiplication){
             .left_operand = left_operand,
             .right_operand = right_operand};
@@ -302,8 +291,6 @@ AstExpression *parser_binary(parser_t *parser, AstExpression *left_operand)
     }
     else if (operator_kind_previous == TOKEN_SLASH)
     {
-        printf("/ ");
-
         AstNodeDivision division = (AstNodeDivision){
             .left_operand = left_operand,
             .right_operand = right_operand};
@@ -316,7 +303,6 @@ AstExpression *parser_binary(parser_t *parser, AstExpression *left_operand)
     }
     else if (operator_kind_previous == TOKEN_CARET)
     {
-        printf("^ ");
         AstNodeExponentiation exponential = (AstNodeExponentiation){
             .left_operand = left_operand,
             .right_operand = right_operand};
