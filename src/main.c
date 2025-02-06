@@ -37,7 +37,7 @@ int main(int argc, const char *argv[])
         exit(EXIT_FAILURE);
 
     bool is_flag_lexer = false;
-    bool is_flag_ast = false;
+    bool is_flag_parser = false;
     bool is_flag_bytecode = false;
     for (int i = 2; i < argc; i++)
     {
@@ -45,9 +45,9 @@ int main(int argc, const char *argv[])
         {
             is_flag_lexer = true;
         }
-        else if (strcmp(argv[i], "-ast") == 0)
+        else if (strcmp(argv[i], "-parser") == 0)
         {
-            is_flag_ast = true;
+            is_flag_parser = true;
         }
         else if (strcmp(argv[i], "-bytecode") == 0)
         {
@@ -62,29 +62,26 @@ int main(int argc, const char *argv[])
         lexer_debug_dump_tokens(&lexer);
     }
 
-    if (is_flag_ast)
+    if (is_flag_parser)
     {
-        printf("flag -ast is set!\n");
-        // compiler_t compiler;
-        // compiler_compile(source_code);
-        // compiler_dump_ast(&compiler);
+        lexer_t lexer;
+        parser_t parser;
+
+        lexer_init(&lexer, source_code);
+        parser_init(&parser, &lexer, false);
+        StatementArray *statements = parser_parse(&parser);
+
+        for (int i = 0; i < statements->count; i++)
+        {
+            parser_expression_print_ast(statements->items[i].expression);
+            printf("\n");
+        }
     }
 
-    if (is_flag_ast)
+    if (is_flag_bytecode)
     {
         printf("flag -bytecode is set!\n");
-        // compiler_t compiler;
-        // compiler_compile(source_code);
-        // compiler_dump_bytecode(&compiler);
     }
-
-    lexer_t lexer;
-    parser_t parser;
-
-    lexer_init(&lexer, source_code);
-    parser_init(&parser, &lexer, false);
-
-    parser_parse(&parser);
 
     return 0;
 }

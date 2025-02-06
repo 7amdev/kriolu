@@ -1,20 +1,29 @@
 #include "kriolu.h"
 
-// todo: emit bytecode instructions
-// todo: call error function
-// todo: refactor parser interface public and private
-// todo: parser option to output postfix notation or parenthesis
-// todo: write test
-// todo: macro flag to print debug info: postfix and parenthesis notation
+// TODO:
+// [] Add statement in StatementAstArray
+// [] Deallocate statement
+// [] Emit bytecode instructions
+// [] Refactor parser interface public and private
+// [] Write test
 
 parser_t *parser_global;
+lexer_t parser_lexer_global;
 int debug_line_number = 1;
 
 void parser_init(parser_t *parser, lexer_t *lexer, bool set_global)
 {
     parser->current = (token_t){0};  // token_error
     parser->previous = (token_t){0}; // token_error
-    parser->lexer = lexer;
+    if (lexer == NULL)
+    {
+        parser->lexer = &parser_lexer_global;
+    }
+    else
+    {
+
+        parser->lexer = lexer;
+    }
     parser->panic_mode = false;
     parser->had_error = false;
 
@@ -24,8 +33,9 @@ void parser_init(parser_t *parser, lexer_t *lexer, bool set_global)
     }
 }
 
-void parser_parse(parser_t *parser)
+StatementArray *parser_parse(parser_t *parser)
 {
+    StatementArray *statements = statement_array_allocate();
     parser_advance(parser);
 
     for (;;)
@@ -33,8 +43,19 @@ void parser_parse(parser_t *parser)
         if (parser->current.kind == TOKEN_EOF)
             break;
 
-        parser_declaration(parser);
+        // todo: Add statement in StatementAstArray
+        //       A program is a sequence of Statements
+        Statement statement = parser_statement(parser);
+        statement_array_insert(statements, statement);
+
+        // #ifdef DEBUG_LOG_PARSER
+        //         parser_expression_print_ast(statement.expression);
+        //         printf("\n");
+        //         parser_expression_free_ast(statement.expression);
+        // #endif
     }
+
+    return statements;
 }
 
 void parser_advance(parser_t *parser)
@@ -124,28 +145,41 @@ void parser_error(parser_t *parser, token_t *token, const char *message)
     fprintf(stderr, " : '%s'\n", message);
 }
 
-void parser_declaration(parser_t *parser)
+Statement parser_statement(parser_t *parser)
 {
-    // for now
-    parser_expression_statement(parser);
+    // DECLARATIONS: introduces new identifiers
+    //   klassi, mimoria, funson
+    // INSTRUCTIONS: tells the computer to perform an action
+    //   imprimi, di, si, divolvi, ripiti, block
+    // EXPRESSIONS: a calculation that produces a result
+    //   +, -, /, *, call '(', assignment '=', objectGet '.'
+    //   variableGet, literals
 
-    // todo: test parser_synchronize
+    Statement expression_statement = parser_expression_statement(parser);
+
     if (parser->panic_mode)
         parser_synchronize(parser);
+
+    return expression_statement;
 }
 
-void parser_expression_statement(parser_t *parser)
+Statement parser_expression_statement(parser_t *parser)
 {
-    AstExpression *expression;
 
-    expression = parser_expression(parser, OPERATION_ASSIGNMENT);
+    ExpressionAst *expression = parser_expression(parser, OPERATION_ASSIGNMENT);
     parser_consume(parser, TOKEN_SEMICOLON, "Expect ';' after expression.");
 
-#ifdef DEBUG_LOG_PARSER
-    parser_ast_expression_print(expression);
-    printf("\n");
-    parser_ast_expression_free(expression);
-#endif
+    // todo: deallocate statement
+    // Statement *statement = calloc(1, sizeof(Statement));
+    // assert(statement);
+    // statement->kind = StatementKind_Expression;
+    // statement->expression = expression;
+
+    Statement statement = (Statement){
+        .kind = StatementKind_Expression,
+        .expression = expression};
+
+    return statement;
 }
 
 static OrderOfOperation parser_operator_precedence(token_kind_t kind)
@@ -184,10 +218,12 @@ static OrderOfOperation parser_operator_precedence(token_kind_t kind)
     }
 }
 
-AstExpression *parser_expression(parser_t *parser, OrderOfOperation operator_precedence_previous)
+ExpressionAst *parser_expression(parser_t *parser, OrderOfOperation operator_precedence_previous)
 {
     parser_advance(parser);
-    AstExpression *left_operand = parser_unary_and_literals(parser);
+
+    ExpressionAst *left_operand = parser_unary_and_literals(parser);
+    ExpressionAst *expression = left_operand;
 
     token_kind_t operator_kind_current = parser->current.kind;
     OrderOfOperation operator_precedence_current = parser_operator_precedence(operator_kind_current);
@@ -195,47 +231,50 @@ AstExpression *parser_expression(parser_t *parser, OrderOfOperation operator_pre
     while (operator_precedence_current > operator_precedence_previous)
     {
         parser_advance(parser);
-        left_operand = parser_binary(parser, left_operand);
+        // left_operand = parser_binary(parser, left_operand);
+        expression = parser_binary(parser, left_operand);
 
         operator_precedence_current = parser_operator_precedence(parser->current.kind);
     }
 
-    return left_operand;
+    // return left_operand;
+    return expression;
 }
 
-AstExpression *parser_unary_and_literals(parser_t *parser)
+ExpressionAst *parser_unary_and_literals(parser_t *parser)
 {
     // todo: emit bytecode instructions
-    AstExpression *ret = NULL;
+    // todo: change name ret to expression
+    ExpressionAst *ret = NULL;
 
     if (parser->previous.kind == TOKEN_NUMBER)
     {
         double value = strtod(parser->previous.start, NULL);
-        AstNodeNumber number = (AstNodeNumber){
+        ExpressionNumber number = (ExpressionNumber){
             .value = value};
 
-        ret = parser_ast_expression_allocate((AstExpression){
-            .kind = AST_NODE_NUMBER,
+        ret = parser_expression_allocate_ast((ExpressionAst){
+            .kind = ExpressionKind_Number,
             .number = number});
     }
     else if (parser->previous.kind == TOKEN_MINUS)
     {
-        AstExpression *result = parser_expression(parser, OPERATION_NEGATE);
-        AstNodeNegation negation = (AstNodeNegation){
+        ExpressionAst *result = parser_expression(parser, OPERATION_NEGATE);
+        ExpressionNegation negation = (ExpressionNegation){
             .operand = result};
 
-        ret = parser_ast_expression_allocate((AstExpression){
-            .kind = AST_NODE_NEGATION,
+        ret = parser_expression_allocate_ast((ExpressionAst){
+            .kind = ExpressionKind_Negation,
             .negation = negation});
     }
     else if (parser->previous.kind == TOKEN_LEFT_PARENTHESIS)
     {
-        AstExpression *expression = parser_expression(parser, OPERATION_ASSIGNMENT);
-        AstNodeGrouping grouping = (AstNodeGrouping){
+        ExpressionAst *expression = parser_expression(parser, OPERATION_ASSIGNMENT);
+        ExpressionGrouping grouping = (ExpressionGrouping){
             .operand = expression};
 
-        ret = parser_ast_expression_allocate((AstExpression){
-            .kind = AST_NODE_GROUPING,
+        ret = parser_expression_allocate_ast((ExpressionAst){
+            .kind = ExpressionKind_Grouping,
             .grouping = grouping});
 
         parser_consume(parser, TOKEN_RIGHT_PARENTHESIS, "Expected ')' after expression.");
@@ -244,82 +283,82 @@ AstExpression *parser_unary_and_literals(parser_t *parser)
     return ret;
 }
 
-AstExpression *parser_binary(parser_t *parser, AstExpression *left_operand)
+ExpressionAst *parser_binary(parser_t *parser, ExpressionAst *left_operand)
 {
-    AstExpression *ret = NULL;
+    ExpressionAst *ret = NULL;
 
     token_kind_t operator_kind_previous = parser->previous.kind;
     OrderOfOperation operator_precedence_previous = parser_operator_precedence(operator_kind_previous);
 
-    AstExpression *right_operand = parser_expression(parser, operator_precedence_previous);
+    ExpressionAst *right_operand = parser_expression(parser, operator_precedence_previous);
 
     if (operator_kind_previous == TOKEN_PLUS)
     {
-        AstNodeAddition addition = (AstNodeAddition){
+        ExpressionAddition addition = (ExpressionAddition){
             .left_operand = left_operand,
             .right_operand = right_operand};
 
-        AstExpression addition_expression = (AstExpression){
-            .kind = AST_NODE_ADDITION,
+        ExpressionAst addition_expression = (ExpressionAst){
+            .kind = ExpressionKind_Addition,
             .addition = addition};
 
-        ret = parser_ast_expression_allocate(addition_expression);
+        ret = parser_expression_allocate_ast(addition_expression);
     }
     else if (operator_kind_previous == TOKEN_MINUS)
     {
-        AstNodeSubtraction subtraction = (AstNodeSubtraction){
+        ExpressionSubtraction subtraction = (ExpressionSubtraction){
             .left_operand = left_operand,
             .right_operand = right_operand};
 
-        AstExpression subtraction_expression = (AstExpression){
-            .kind = AST_NODE_SUBTRACTION,
+        ExpressionAst subtraction_expression = (ExpressionAst){
+            .kind = ExpressionKind_Subtraction,
             .subtraction = subtraction};
 
-        ret = parser_ast_expression_allocate(subtraction_expression);
+        ret = parser_expression_allocate_ast(subtraction_expression);
     }
     else if (operator_kind_previous == TOKEN_ASTERISK)
     {
-        AstNodeMultiplication multiplication = (AstNodeMultiplication){
+        ExpressionMultiplication multiplication = (ExpressionMultiplication){
             .left_operand = left_operand,
             .right_operand = right_operand};
 
-        AstExpression multiplication_expression = (AstExpression){
-            .kind = AST_NODE_MULTIPLICATION,
+        ExpressionAst multiplication_expression = (ExpressionAst){
+            .kind = ExpressionKind_Multiplication,
             .multiplication = multiplication};
 
-        ret = parser_ast_expression_allocate(multiplication_expression);
+        ret = parser_expression_allocate_ast(multiplication_expression);
     }
     else if (operator_kind_previous == TOKEN_SLASH)
     {
-        AstNodeDivision division = (AstNodeDivision){
+        ExpressionDivision division = (ExpressionDivision){
             .left_operand = left_operand,
             .right_operand = right_operand};
 
-        AstExpression division_expression = (AstExpression){
-            .kind = AST_NODE_DIVISION,
+        ExpressionAst division_expression = (ExpressionAst){
+            .kind = ExpressionKind_Division,
             .division = division};
 
-        ret = parser_ast_expression_allocate(division_expression);
+        ret = parser_expression_allocate_ast(division_expression);
     }
     else if (operator_kind_previous == TOKEN_CARET)
     {
-        AstNodeExponentiation exponential = (AstNodeExponentiation){
+        ExpressionExponentiation exponential = (ExpressionExponentiation){
             .left_operand = left_operand,
             .right_operand = right_operand};
 
-        AstExpression exponential_expression = (AstExpression){
-            .kind = AST_NODE_EXPONENTIATION,
+        ExpressionAst exponential_expression = (ExpressionAst){
+            .kind = ExpressionKind_Exponentiation,
             .exponentiation = exponential};
 
-        ret = parser_ast_expression_allocate(exponential_expression);
+        ret = parser_expression_allocate_ast(exponential_expression);
     }
 
     return ret;
 }
 
-AstExpression *parser_ast_expression_allocate(AstExpression ast)
+ExpressionAst *parser_expression_allocate_ast(ExpressionAst ast)
 {
-    AstExpression *ast_expression = malloc(sizeof(ast));
+    ExpressionAst *ast_expression = (ExpressionAst *)malloc(sizeof(ast));
     if (ast_expression == NULL)
     {
         exit(EXIT_FAILURE);
@@ -330,125 +369,125 @@ AstExpression *parser_ast_expression_allocate(AstExpression ast)
     return ast_expression;
 }
 
-void parser_ast_expression_free(AstExpression *ast_node)
+void parser_expression_free_ast(ExpressionAst *expression)
 {
 
-    if (ast_node->kind == AST_NODE_NUMBER)
+    if (expression->kind == ExpressionKind_Number)
     {
-        AstNodeNumber number = ast_node->number;
+        ExpressionNumber number = expression->number;
     }
-    else if (ast_node->kind == AST_NODE_NEGATION)
+    else if (expression->kind == ExpressionKind_Negation)
     {
-        AstNodeNegation negation = ast_node->negation;
-        parser_ast_expression_free(negation.operand);
+        ExpressionNegation negation = expression->negation;
+        parser_expression_free_ast(negation.operand);
     }
-    else if (ast_node->kind == AST_NODE_GROUPING)
+    else if (expression->kind == ExpressionKind_Grouping)
     {
-        AstNodeGrouping grouping = ast_node->grouping;
-        parser_ast_expression_free(grouping.operand);
+        ExpressionGrouping grouping = expression->grouping;
+        parser_expression_free_ast(grouping.operand);
     }
-    else if (ast_node->kind == AST_NODE_ADDITION)
+    else if (expression->kind == ExpressionKind_Addition)
     {
-        AstNodeAddition addition = ast_node->addition;
-        parser_ast_expression_free(addition.left_operand);
-        parser_ast_expression_free(addition.right_operand);
+        ExpressionAddition addition = expression->addition;
+        parser_expression_free_ast(addition.left_operand);
+        parser_expression_free_ast(addition.right_operand);
     }
-    else if (ast_node->kind == AST_NODE_SUBTRACTION)
+    else if (expression->kind == ExpressionKind_Subtraction)
     {
-        AstNodeSubtraction subtraction = ast_node->subtraction;
-        parser_ast_expression_free(subtraction.left_operand);
-        parser_ast_expression_free(subtraction.right_operand);
+        ExpressionSubtraction subtraction = expression->subtraction;
+        parser_expression_free_ast(subtraction.left_operand);
+        parser_expression_free_ast(subtraction.right_operand);
     }
-    else if (ast_node->kind == AST_NODE_MULTIPLICATION)
+    else if (expression->kind == ExpressionKind_Multiplication)
     {
-        AstNodeMultiplication multiplication = ast_node->multiplication;
-        parser_ast_expression_free(multiplication.left_operand);
-        parser_ast_expression_free(multiplication.right_operand);
+        ExpressionMultiplication multiplication = expression->multiplication;
+        parser_expression_free_ast(multiplication.left_operand);
+        parser_expression_free_ast(multiplication.right_operand);
     }
-    else if (ast_node->kind == AST_NODE_DIVISION)
+    else if (expression->kind == ExpressionKind_Division)
     {
-        AstNodeDivision division = ast_node->division;
-        parser_ast_expression_free(division.left_operand);
-        parser_ast_expression_free(division.right_operand);
+        ExpressionDivision division = expression->division;
+        parser_expression_free_ast(division.left_operand);
+        parser_expression_free_ast(division.right_operand);
     }
-    else if (ast_node->kind == AST_NODE_EXPONENTIATION)
+    else if (expression->kind == ExpressionKind_Exponentiation)
     {
-        AstNodeExponentiation exponentiation = ast_node->exponentiation;
-        parser_ast_expression_free(exponentiation.left_operand);
-        parser_ast_expression_free(exponentiation.right_operand);
+        ExpressionExponentiation exponentiation = expression->exponentiation;
+        parser_expression_free_ast(exponentiation.left_operand);
+        parser_expression_free_ast(exponentiation.right_operand);
     }
     else
     {
         printf("warning: Unrecognized node type!");
     }
 
-    free(ast_node);
+    free(expression);
 }
 
-void parser_ast_expression_print(AstExpression *ast_node)
+void parser_expression_print_ast(ExpressionAst *expression)
 {
 
-    if (ast_node->kind == AST_NODE_NUMBER)
+    if (expression->kind == ExpressionKind_Number)
     {
-        AstNodeNumber number = ast_node->number;
+        ExpressionNumber number = expression->number;
         printf("%.1f", number.value);
     }
-    else if (ast_node->kind == AST_NODE_NEGATION)
+    else if (expression->kind == ExpressionKind_Negation)
     {
-        AstNodeNegation negation = ast_node->negation;
+        ExpressionNegation negation = expression->negation;
         printf("(");
         printf("-");
-        parser_ast_expression_print(negation.operand);
+        parser_expression_print_ast(negation.operand);
         printf(")");
     }
-    else if (ast_node->kind == AST_NODE_GROUPING)
+    else if (expression->kind == ExpressionKind_Grouping)
     {
-        AstNodeGrouping grouping = ast_node->grouping;
-        parser_ast_expression_print(grouping.operand);
+        ExpressionGrouping grouping = expression->grouping;
+        parser_expression_print_ast(grouping.operand);
     }
-    else if (ast_node->kind == AST_NODE_ADDITION)
+    else if (expression->kind == ExpressionKind_Addition)
     {
-        AstNodeAddition addition = ast_node->addition;
+        ExpressionAddition addition = expression->addition;
         printf("(");
-        parser_ast_expression_print(addition.left_operand);
+        parser_expression_print_ast(addition.left_operand);
         printf(" + ");
-        parser_ast_expression_print(addition.right_operand);
+        parser_expression_print_ast(addition.right_operand);
         printf(")");
     }
-    else if (ast_node->kind == AST_NODE_SUBTRACTION)
+    else if (expression->kind == ExpressionKind_Subtraction)
     {
-        AstNodeSubtraction subtraction = ast_node->subtraction;
+        ExpressionSubtraction subtraction = expression->subtraction;
         printf("(");
-        parser_ast_expression_print(subtraction.left_operand);
+        parser_expression_print_ast(subtraction.left_operand);
         printf(" - ");
-        parser_ast_expression_print(subtraction.right_operand);
+        parser_expression_print_ast(subtraction.right_operand);
         printf(")");
     }
-    else if (ast_node->kind == AST_NODE_MULTIPLICATION)
+    else if (expression->kind == ExpressionKind_Multiplication)
     {
-        AstNodeMultiplication multiplication = ast_node->multiplication;
+        ExpressionMultiplication multiplication = expression->multiplication;
         printf("(");
-        parser_ast_expression_print(multiplication.left_operand);
+        parser_expression_print_ast(multiplication.left_operand);
         printf(" * ");
-        parser_ast_expression_print(multiplication.right_operand);
+        parser_expression_print_ast(multiplication.right_operand);
         printf(")");
     }
-    else if (ast_node->kind == AST_NODE_DIVISION)
+    else if (expression->kind == ExpressionKind_Division)
     {
-        AstNodeDivision division = ast_node->division;
+        ExpressionDivision division = expression->division;
         printf("(");
-        parser_ast_expression_print(division.left_operand);
+        parser_expression_print_ast(division.left_operand);
         printf(" / ");
-        parser_ast_expression_print(division.right_operand);
+        parser_expression_print_ast(division.right_operand);
         printf(")");
     }
-    else if (ast_node->kind == AST_NODE_EXPONENTIATION)
+    else if (expression->kind == ExpressionKind_Exponentiation)
     {
-        AstNodeExponentiation exponentiation = ast_node->exponentiation;
+        ExpressionExponentiation exponentiation = expression->exponentiation;
         printf("(");
-        parser_ast_expression_print(exponentiation.left_operand);
+        parser_expression_print_ast(exponentiation.left_operand);
         printf(" ^ ");
-        parser_ast_expression_print(exponentiation.right_operand);
+        parser_expression_print_ast(exponentiation.right_operand);
         printf(")");
     }
     else
