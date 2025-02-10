@@ -12,7 +12,7 @@
 void print_usage();
 int file_read(const char *file_path, char **buffer_out);
 bool filename_ends_with(const char *filename, const char *extension);
-void token_print(token_t token);
+void token_print(Token token);
 
 int main(int argc, const char *argv[])
 {
@@ -57,15 +57,15 @@ int main(int argc, const char *argv[])
 
     if (is_flag_lexer)
     {
-        lexer_t lexer;
+        Lexer lexer;
         lexer_init(&lexer, source_code);
         lexer_debug_dump_tokens(&lexer);
     }
 
     if (is_flag_parser)
     {
-        lexer_t lexer;
-        parser_t parser;
+        Lexer lexer;
+        Parser parser;
 
         lexer_init(&lexer, source_code);
         parser_init(&parser, &lexer, false);

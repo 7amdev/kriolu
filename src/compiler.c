@@ -1,13 +1,13 @@
 #include "kriolu.h"
 
-void compiler_init(compiler_t *compiler)
+void compiler_init(Compiler *compiler)
 {
 }
 
-int compiler_compile(compiler_t *compiler, const char *source)
+int compiler_compile(Compiler *compiler, const char *source)
 {
-    lexer_t lexer;
-    parser_t parser;
+    Lexer lexer;
+    Parser parser;
 
     lexer_init(&lexer, source);
     parser_init(&parser, &lexer, false);

@@ -1,27 +1,27 @@
 #include "kriolu.h"
 
-static char lexer_advance(lexer_t *lexer);
-static char lexer_peek(lexer_t *lexer);
-static bool lexer_match(lexer_t *lexer, char expected);
+static char lexer_advance(Lexer *lexer);
+static char lexer_peek(Lexer *lexer);
+static bool lexer_match(Lexer *lexer, char expected);
 static bool lexer_is_eof(char c);
 static bool lexer_is_digit(char c);
 static bool lexer_is_letter_or_underscore(char c);
 static bool lexer_is_whitespace(char c);
-static bool lexer_is_comment(lexer_t *lexer);
+static bool lexer_is_comment(Lexer *lexer);
 static bool lexer_is_new_line(char c);
 static bool lexer_is_string(char c);
 // TODO: static bool lexer_is_uppercase_letter(char c);
 // TODO: static bool lexer_is_lowercase_letter(char c);
-static token_kind_t lexer_keyword_kind(token_t token, char const *keyword, int check_start_position, token_kind_t return_kind);
-static token_t lexer_error(lexer_t *lexer, const char *message);
+static TokenKind lexer_keyword_kind(Token token, char const *keyword, int check_start_position, TokenKind return_kind);
+static Token lexer_error(Lexer *lexer, const char *message);
 
-void lexer_init(lexer_t *lexer, const char *source_code)
+void lexer_init(Lexer *lexer, const char *source_code)
 {
     lexer->current = source_code;
     lexer->line_number = 1;
 }
 
-token_t lexer_scan(lexer_t *lexer)
+Token lexer_scan(Lexer *lexer)
 {
     while (lexer_is_whitespace(*lexer->current))
     {
@@ -53,7 +53,7 @@ token_t lexer_scan(lexer_t *lexer)
             length = (int)(lexer->current - lexer->start);
         }
 
-        return (token_t){
+        return (Token){
             .kind = TOKEN_COMMENT,
             .start = lexer->start,
             .length = length,
@@ -62,7 +62,7 @@ token_t lexer_scan(lexer_t *lexer)
 
     if (lexer_is_eof(*lexer->current))
     {
-        return (token_t){
+        return (Token){
             .kind = TOKEN_EOF,
             .start = lexer->current,
             .line_number = lexer->line_number,
@@ -74,7 +74,7 @@ token_t lexer_scan(lexer_t *lexer)
         lexer->start = lexer->current;
         lexer_advance(lexer);
 
-        return (token_t){
+        return (Token){
             .kind = TOKEN_LEFT_PARENTHESIS,
             .start = lexer->start,
             .length = (int)(lexer->current - lexer->start),
@@ -86,7 +86,7 @@ token_t lexer_scan(lexer_t *lexer)
         lexer->start = lexer->current;
         lexer_advance(lexer);
 
-        return (token_t){
+        return (Token){
             .kind = TOKEN_RIGHT_PARENTHESIS,
             .start = lexer->start,
             .length = (int)(lexer->current - lexer->start),
@@ -98,7 +98,7 @@ token_t lexer_scan(lexer_t *lexer)
         lexer->start = lexer->current;
         lexer_advance(lexer);
 
-        return (token_t){
+        return (Token){
             .kind = TOKEN_LEFT_BRACE,
             .start = lexer->start,
             .length = (int)(lexer->current - lexer->start),
@@ -110,7 +110,7 @@ token_t lexer_scan(lexer_t *lexer)
         lexer->start = lexer->current;
         lexer_advance(lexer);
 
-        return (token_t){
+        return (Token){
             .kind = TOKEN_RIGHT_BRACE,
             .start = lexer->start,
             .length = (int)(lexer->current - lexer->start),
@@ -122,7 +122,7 @@ token_t lexer_scan(lexer_t *lexer)
         lexer->start = lexer->current;
         lexer_advance(lexer);
 
-        return (token_t){
+        return (Token){
             .kind = TOKEN_COMMA,
             .start = lexer->start,
             .length = (int)(lexer->current - lexer->start),
@@ -133,7 +133,7 @@ token_t lexer_scan(lexer_t *lexer)
     {
         lexer->start = lexer->current;
         lexer_advance(lexer);
-        return (token_t){
+        return (Token){
             .kind = TOKEN_DOT,
             .start = lexer->start,
             .length = (int)(lexer->current - lexer->start),
@@ -144,7 +144,7 @@ token_t lexer_scan(lexer_t *lexer)
     {
         lexer->start = lexer->current;
         lexer_advance(lexer);
-        return (token_t){
+        return (Token){
             .kind = TOKEN_MINUS,
             .start = lexer->start,
             .length = (int)(lexer->current - lexer->start),
@@ -155,7 +155,7 @@ token_t lexer_scan(lexer_t *lexer)
     {
         lexer->start = lexer->current;
         lexer_advance(lexer);
-        return (token_t){
+        return (Token){
             .kind = TOKEN_PLUS,
             .start = lexer->start,
             .length = (int)(lexer->current - lexer->start),
@@ -166,7 +166,7 @@ token_t lexer_scan(lexer_t *lexer)
     {
         lexer->start = lexer->current;
         lexer_advance(lexer);
-        return (token_t){
+        return (Token){
             .kind = TOKEN_SLASH,
             .start = lexer->start,
             .length = (int)(lexer->current - lexer->start),
@@ -177,7 +177,7 @@ token_t lexer_scan(lexer_t *lexer)
     {
         lexer->start = lexer->current;
         lexer_advance(lexer);
-        return (token_t){
+        return (Token){
             .kind = TOKEN_ASTERISK,
             .start = lexer->start,
             .length = (int)(lexer->current - lexer->start),
@@ -188,7 +188,7 @@ token_t lexer_scan(lexer_t *lexer)
     {
         lexer->start = lexer->current;
         lexer_advance(lexer);
-        return (token_t){
+        return (Token){
             .kind = TOKEN_CARET,
             .start = lexer->start,
             .length = (int)(lexer->current - lexer->start),
@@ -199,7 +199,7 @@ token_t lexer_scan(lexer_t *lexer)
     {
         lexer->start = lexer->current;
         lexer_advance(lexer);
-        return (token_t){
+        return (Token){
             .kind = TOKEN_SEMICOLON,
             .start = lexer->start,
             .length = (int)(lexer->current - lexer->start),
@@ -208,7 +208,7 @@ token_t lexer_scan(lexer_t *lexer)
 
     if (*lexer->current == '=')
     {
-        token_t token;
+        Token token;
         token.start = lexer->current;
         token.line_number = lexer->line_number;
 
@@ -240,7 +240,7 @@ token_t lexer_scan(lexer_t *lexer)
 
     if (*lexer->current == '>')
     {
-        token_t token;
+        Token token;
         token.start = lexer->current;
         token.line_number = lexer->line_number;
 
@@ -264,7 +264,7 @@ token_t lexer_scan(lexer_t *lexer)
 
     if (*lexer->current == '<')
     {
-        token_t token;
+        Token token;
         token.start = lexer->current;
         token.line_number = lexer->line_number;
 
@@ -301,7 +301,7 @@ token_t lexer_scan(lexer_t *lexer)
                 lexer_advance(lexer);
         }
 
-        return (token_t){
+        return (Token){
             .kind = TOKEN_NUMBER,
             .start = lexer->start,
             .length = (int)(lexer->current - lexer->start),
@@ -328,7 +328,7 @@ token_t lexer_scan(lexer_t *lexer)
 
         lexer_advance(lexer);
 
-        return (token_t){
+        return (Token){
             .kind = TOKEN_STRING,
             .start = lexer->start,
             .length = (int)(lexer->current - lexer->start),
@@ -337,7 +337,7 @@ token_t lexer_scan(lexer_t *lexer)
 
     if (lexer_is_letter_or_underscore(*lexer->current))
     {
-        token_t token;
+        Token token;
         token.kind = TOKEN_IDENTIFIER;
         token.start = lexer->current;
         token.line_number = lexer->line_number;
@@ -448,7 +448,7 @@ token_t lexer_scan(lexer_t *lexer)
     return lexer_error(lexer, "Unexpected Caracter.");
 }
 
-void lexer_debug_print_token(token_t token, const char *format)
+void lexer_debug_print_token(Token token, const char *format)
 {
     fprintf(stdout, "%2d ", token.line_number);
     switch (token.kind)
@@ -667,9 +667,9 @@ void lexer_debug_print_token(token_t token, const char *format)
     fprintf(stdout, "'%.*s' \n", token.length, token.start);
 }
 
-void lexer_debug_dump_tokens(lexer_t *lexer)
+void lexer_debug_dump_tokens(Lexer *lexer)
 {
-    token_t token;
+    Token token;
     for (;;)
     {
         token = lexer_scan(lexer);
@@ -690,18 +690,18 @@ void lexer_debug_dump_tokens(lexer_t *lexer)
     }
 }
 
-static char lexer_advance(lexer_t *lexer)
+static char lexer_advance(Lexer *lexer)
 {
     lexer->current += 1;
     return lexer->current[-1];
 }
 
-static char lexer_peek(lexer_t *lexer)
+static char lexer_peek(Lexer *lexer)
 {
     return lexer->current[0];
 }
 
-static bool lexer_match(lexer_t *lexer, char expected)
+static bool lexer_match(Lexer *lexer, char expected)
 {
     if (lexer_is_eof(*lexer->current))
         return false;
@@ -727,7 +727,7 @@ static bool lexer_is_whitespace(char c)
     //    || (c == '/');
 }
 
-static bool lexer_is_comment(lexer_t *lexer)
+static bool lexer_is_comment(Lexer *lexer)
 {
     return lexer->current[0] == '/' &&
            lexer->current[1] == '/';
@@ -764,7 +764,7 @@ static bool lexer_is_letter_or_underscore(char c)
            (c >= 'A' && c <= 'Z');
 }
 
-static token_kind_t lexer_keyword_kind(token_t token, char const *keyword, int check_start_position, token_kind_t return_kind)
+static TokenKind lexer_keyword_kind(Token token, char const *keyword, int check_start_position, TokenKind return_kind)
 {
     int keyword_length = strlen(keyword);
 
@@ -782,11 +782,11 @@ static token_kind_t lexer_keyword_kind(token_t token, char const *keyword, int c
     return return_kind;
 }
 
-static token_t lexer_error(lexer_t *lexer, const char *message)
+static Token lexer_error(Lexer *lexer, const char *message)
 {
     // IMPLEMENTATION 1
     // lexer_advance(lexer);
-    // return (token_t){
+    // return (Token){
     //     .kind = TOKEN_ERROR,
     //     .start = message,
     //     .length = (int)strlen(message),
@@ -797,7 +797,7 @@ static token_t lexer_error(lexer_t *lexer, const char *message)
     // static char buffer[50];
     // sprintf(buffer, "unexpected character '%.*s' at line %d.", 1, lexer->current, lexer->line_number);
     // lexer_advance(lexer);
-    // return (token_t){
+    // return (Token){
     //     .kind = TOKEN_ERROR,
     //     .start = buffer,
     //     .length = (int)strlen(buffer),
@@ -805,7 +805,7 @@ static token_t lexer_error(lexer_t *lexer, const char *message)
 
     lexer->start = lexer->current;
     lexer_advance(lexer);
-    return (token_t){
+    return (Token){
         .kind = TOKEN_ERROR,
         .start = lexer->start,
         .length = (int)(lexer->current - lexer->start),

@@ -66,15 +66,15 @@ typedef enum
     TOKEN_TI,
 
     TOKEN_COMMENT
-} token_kind_t;
+} TokenKind;
 
 typedef struct
 {
-    token_kind_t kind;
+    TokenKind kind;
     const char *start;
     int length;
     int line_number;
-} token_t;
+} Token;
 
 //
 // Lexer
@@ -85,14 +85,14 @@ typedef struct
     const char *start;
     const char *current;
     int line_number;
-} lexer_t;
+} Lexer;
 
 #define l_debug_print_token(token) lexer_debug_print_token(token, "%s ")
 
-void lexer_init(lexer_t *lexer, const char *source_code);
-token_t lexer_scan(lexer_t *lexer);
-void lexer_debug_print_token(token_t token, const char *format);
-void lexer_debug_dump_tokens(lexer_t *lexer);
+void lexer_init(Lexer *lexer, const char *source_code);
+Token lexer_scan(Lexer *lexer);
+void lexer_debug_print_token(Token token, const char *format);
+void lexer_debug_dump_tokens(Lexer *lexer);
 
 //
 // Compiler
@@ -100,18 +100,26 @@ void lexer_debug_dump_tokens(lexer_t *lexer);
 
 typedef struct
 {
-    token_t locals[256];
+    Token locals[256];
     int local_count;
-} compiler_t;
+} Compiler;
 
-void compiler_init(compiler_t *compiler);
-int compiler_compile(compiler_t *compiler, const char *source);
+void compiler_init(Compiler *compiler);
+int compiler_compile(Compiler *compiler, const char *source);
 
 //
 // Abstract Syntax Tree
 //
+//
+// AST Nodes Kind
+//     ExpressionNumber
+//     ExpresionNegation
+//     ExpressoinAddition
+//     ExpressionSubtraction
+//     ExpressionMultiplication
+//     ...
 
-typedef struct Expression ExpressionAst;
+typedef struct Expression Expression;
 
 typedef struct
 {
@@ -120,42 +128,42 @@ typedef struct
 
 typedef struct
 {
-    ExpressionAst *operand;
+    Expression *operand;
 } ExpressionNegation;
 
 typedef struct
 {
-    ExpressionAst *operand;
+    Expression *expression;
 } ExpressionGrouping;
 
 typedef struct
 {
-    ExpressionAst *left_operand;
-    ExpressionAst *right_operand;
+    Expression *left_operand;
+    Expression *right_operand;
 } ExpressionAddition;
 
 typedef struct
 {
-    ExpressionAst *left_operand;
-    ExpressionAst *right_operand;
+    Expression *left_operand;
+    Expression *right_operand;
 } ExpressionSubtraction;
 
 typedef struct
 {
-    ExpressionAst *left_operand;
-    ExpressionAst *right_operand;
+    Expression *left_operand;
+    Expression *right_operand;
 } ExpressionMultiplication;
 
 typedef struct
 {
-    ExpressionAst *left_operand;
-    ExpressionAst *right_operand;
+    Expression *left_operand;
+    Expression *right_operand;
 } ExpressionDivision;
 
 typedef struct
 {
-    ExpressionAst *left_operand;
-    ExpressionAst *right_operand;
+    Expression *left_operand;
+    Expression *right_operand;
 } ExpressionExponentiation;
 
 typedef uint8_t ExpressionKind;
@@ -189,6 +197,13 @@ struct Expression
     };
 };
 
+Expression *expression_allocate(Expression expr);
+Expression *expression_allocate_number(double value);
+Expression *expression_allocate_grouping(Expression *expr);
+Expression *expression_allocate_negation(Expression *operand);
+Expression *expression_allocate_binary(ExpressionKind kind, Expression *left_operand, Expression *right_operand);
+void expression_free(Expression *expression);
+
 typedef uint8_t StatementKind;
 enum
 {
@@ -207,7 +222,7 @@ struct Statement
     StatementKind kind;
     union
     {
-        ExpressionAst *expression;
+        Expression *expression;
     };
 };
 
@@ -220,8 +235,6 @@ typedef struct
 
 StatementArray *statement_array_allocate();
 uint32_t statement_array_insert(StatementArray *statements, Statement statement);
-void statement_array_remove_last(StatementArray *statements);
-void statement_array_remove_at(StatementArray *statements, uint32_t index);
 void statement_array_free(StatementArray *statements);
 
 //
@@ -249,14 +262,14 @@ typedef enum
 
 typedef struct
 {
-    token_t current;
-    token_t previous;
-    lexer_t *lexer;
+    Token current;
+    Token previous;
+    Lexer *lexer;
     bool had_error;
     bool panic_mode;
-} parser_t;
+} Parser;
 
-extern parser_t *parser_global;
+extern Parser *parser_global;
 
 #define p_advance() parser_advance(parser_global)
 #define p_consume() parser_consume(parser_global)
@@ -264,20 +277,20 @@ extern parser_t *parser_global;
 #define p_synchronize() parser_synchronize(parser_global)
 #define p_error(...) parser_error(parser_global, __VA_ARGS__)
 
-void parser_init(parser_t *parser, lexer_t *lexer, bool set_global);
-StatementArray *parser_parse(parser_t *parser);
-void parser_advance(parser_t *parser);
-void parser_consume(parser_t *parser, token_kind_t kind, const char *error_message);
-bool parser_match_then_advance(parser_t *parser, token_kind_t kind);
-void parser_synchronize(parser_t *parser);
-void parser_error(parser_t *parser, token_t *token, const char *message);
-Statement parser_statement(parser_t *parser);
-Statement parser_expression_statement(parser_t *parser);
-ExpressionAst *parser_expression(parser_t *parser, OrderOfOperation operator_precedence_previous);
-ExpressionAst *parser_unary_and_literals(parser);
-ExpressionAst *parser_binary(parser_t *parser, ExpressionAst *left_operand);
-void parser_expression_print_ast(ExpressionAst *ast_node);
-ExpressionAst *parser_expression_allocate_ast();
-void parser_expression_free_ast();
+void parser_init(Parser *parser, Lexer *lexer, bool set_global);
+StatementArray *parser_parse(Parser *parser);
+void parser_advance(Parser *parser);
+void parser_consume(Parser *parser, TokenKind kind, const char *error_message);
+bool parser_match_then_advance(Parser *parser, TokenKind kind);
+void parser_synchronize(Parser *parser);
+void parser_error(Parser *parser, Token *token, const char *message);
+Statement parser_statement(Parser *parser);
+Statement parser_expression_statement(Parser *parser);
+Expression *parser_expression(Parser *parser, OrderOfOperation operator_precedence_previous);
+Expression *parser_unary_and_literals(parser);
+Expression *parser_binary(Parser *parser, Expression *left_operand);
+void parser_expression_print_ast(Expression *ast_node);
+Expression *parser_expression_allocate_ast();
+void parser_expression_free_ast(Expression *expression);
 
 #endif
