@@ -1,29 +1,54 @@
 #include "kriolu.h"
 
 // TODO:
+// [] Change parser init function to receive source code and
+//    initialize lexer.
+// [] Emit bytecode instructions
 // [x] Encapsulate expression allocation function in the expression.c file
-// [] Refactor parser interface public and private
+// [x] Refactor parser interface public and private
 // [x] Change ExpresisonAst to Expression
 // [x] Add statement in StatementAstArray
-// [] Deallocate statement
-// [] Emit bytecode instructions
+// [x] Deallocate statement
 // [] Write test
 
+typedef enum
+{
+    OPERATION_MIN,
+
+    OPERATION_ASSIGNMENT,                  // =
+    OPERATION_OR,                          // or
+    OPERATION_AND,                         // and
+    OPERATION_EQUALITY,                    // == =/=
+    OPERATION_COMPARISON,                  // < > <= >=
+    OPERATION_ADDITION_AND_SUBTRACTION,    // + -
+    OPERATION_MULTIPLICATION_AND_DIVISION, // * /
+    OPERATION_NEGATE,                      // Unary:  -
+    OPERATION_EXPONENTIATION,              // ^   ex: -2^2 = -1 * 2^2 = -4
+    OPERATION_NOT,                         // Unary: ka
+    OPERATION_GROUPING_CALL_AND_GET,       // . (
+
+    OPERATION_MAX
+} OrderOfOperation;
+
 Parser *parser_global;
-Lexer parser_lexer_global;
 int debug_line_number = 1;
+
+static void parser_advance(Parser *parser);
+static void parser_consume(Parser *parser, TokenKind kind, const char *error_message);
+static bool parser_match_then_advance(Parser *parser, TokenKind kind);
+static void parser_synchronize(Parser *parser);
+static void parser_error(Parser *parser, Token *token, const char *message);
+static Statement parser_statement(Parser *parser);
+static Statement parser_expression_statement(Parser *parser);
+static Expression *parser_expression(Parser *parser, OrderOfOperation operator_precedence_previous);
+static Expression *parser_unary_and_literals(parser);
+static Expression *parser_binary(Parser *parser, Expression *left_operand);
 
 void parser_init(Parser *parser, Lexer *lexer, bool set_global)
 {
     parser->current = (Token){0};  // token_error
     parser->previous = (Token){0}; // token_error
     parser->lexer = lexer;
-    if (parser->lexer == NULL)
-    {
-        parser->lexer = &parser_lexer_global;
-        // todo: review this later. parser doen't have source code to init lexer
-        // lexer_init();
-    }
     parser->panic_mode = false;
     parser->had_error = false;
 
@@ -45,18 +70,12 @@ StatementArray *parser_parse(Parser *parser)
 
         Statement statement = parser_statement(parser);
         statement_array_insert(statements, statement);
-
-        // #ifdef DEBUG_LOG_PARSER
-        //         parser_expression_print_ast(statement.expression);
-        //         printf("\n");
-        //         parser_expression_free_ast(statement.expression);
-        // #endif
     }
 
     return statements;
 }
 
-void parser_advance(Parser *parser)
+static void parser_advance(Parser *parser)
 {
     parser->previous = parser->current;
 
@@ -72,7 +91,7 @@ void parser_advance(Parser *parser)
     }
 }
 
-bool parser_match_then_advance(Parser *parser, TokenKind kind)
+static bool parser_match_then_advance(Parser *parser, TokenKind kind)
 {
 
     if (parser->current.kind == kind)
@@ -84,7 +103,7 @@ bool parser_match_then_advance(Parser *parser, TokenKind kind)
     return false;
 }
 
-void parser_consume(Parser *parser, TokenKind kind, const char *error_message)
+static void parser_consume(Parser *parser, TokenKind kind, const char *error_message)
 {
     if (parser->current.kind == kind)
     {
@@ -95,7 +114,7 @@ void parser_consume(Parser *parser, TokenKind kind, const char *error_message)
     parser_error(parser, &parser->previous, error_message);
 }
 
-void parser_synchronize(Parser *parser)
+static void parser_synchronize(Parser *parser)
 {
     parser->panic_mode = false;
 
@@ -123,7 +142,7 @@ void parser_synchronize(Parser *parser)
     }
 }
 
-void parser_error(Parser *parser, Token *token, const char *message)
+static void parser_error(Parser *parser, Token *token, const char *message)
 {
     if (parser->panic_mode)
         return;
@@ -143,7 +162,7 @@ void parser_error(Parser *parser, Token *token, const char *message)
     fprintf(stderr, " : '%s'\n", message);
 }
 
-Statement parser_statement(Parser *parser)
+static Statement parser_statement(Parser *parser)
 {
     // DECLARATIONS: introduces new identifiers
     //   klassi, mimoria, funson
@@ -161,17 +180,11 @@ Statement parser_statement(Parser *parser)
     return expression_statement;
 }
 
-Statement parser_expression_statement(Parser *parser)
+static Statement parser_expression_statement(Parser *parser)
 {
 
     Expression *expression = parser_expression(parser, OPERATION_ASSIGNMENT);
     parser_consume(parser, TOKEN_SEMICOLON, "Expect ';' after expression.");
-
-    // todo: deallocate statement
-    // Statement *statement = calloc(1, sizeof(Statement));
-    // assert(statement);
-    // statement->kind = StatementKind_Expression;
-    // statement->expression = expression;
 
     Statement statement = (Statement){
         .kind = StatementKind_Expression,
@@ -216,7 +229,7 @@ static OrderOfOperation parser_operator_precedence(TokenKind kind)
     }
 }
 
-Expression *parser_expression(Parser *parser, OrderOfOperation operator_precedence_previous)
+static Expression *parser_expression(Parser *parser, OrderOfOperation operator_precedence_previous)
 {
     parser_advance(parser);
 
@@ -237,34 +250,33 @@ Expression *parser_expression(Parser *parser, OrderOfOperation operator_preceden
     return expression;
 }
 
-Expression *parser_unary_and_literals(Parser *parser)
+static Expression *parser_unary_and_literals(Parser *parser)
 {
-    // todo: emit bytecode instructions
-    // todo: change name ret to expression
-    Expression *return_value = NULL;
-
     if (parser->previous.kind == TOKEN_NUMBER)
     {
         double value = strtod(parser->previous.start, NULL);
-        return_value = expression_allocate_number(value);
+        return expression_allocate_number(value);
     }
-    else if (parser->previous.kind == TOKEN_MINUS)
+
+    if (parser->previous.kind == TOKEN_MINUS)
     {
         Expression *expression = parser_expression(parser, OPERATION_NEGATE);
-        return_value = expression_allocate_negation(expression);
+        return expression_allocate_negation(expression);
     }
-    else if (parser->previous.kind == TOKEN_LEFT_PARENTHESIS)
+
+    if (parser->previous.kind == TOKEN_LEFT_PARENTHESIS)
     {
         Expression *expression = parser_expression(parser, OPERATION_ASSIGNMENT);
-        return_value = expression_allocate_grouping(expression);
+        Expression *grouping = expression_allocate_grouping(expression);
 
         parser_consume(parser, TOKEN_RIGHT_PARENTHESIS, "Expected ')' after expression.");
+        return grouping;
     }
 
-    return return_value;
+    return NULL;
 }
 
-Expression *parser_binary(Parser *parser, Expression *left_operand)
+static Expression *parser_binary(Parser *parser, Expression *left_operand)
 {
     TokenKind operator_kind_previous = parser->previous.kind;
     OrderOfOperation operator_precedence_previous = parser_operator_precedence(operator_kind_previous);
@@ -272,166 +284,19 @@ Expression *parser_binary(Parser *parser, Expression *left_operand)
     Expression *right_operand = parser_expression(parser, operator_precedence_previous);
 
     if (operator_kind_previous == TOKEN_PLUS)
-    {
         return expression_allocate_binary(ExpressionKind_Addition, left_operand, right_operand);
-    }
-    else if (operator_kind_previous == TOKEN_MINUS)
-    {
+
+    if (operator_kind_previous == TOKEN_MINUS)
         return expression_allocate_binary(ExpressionKind_Subtraction, left_operand, right_operand);
-    }
-    else if (operator_kind_previous == TOKEN_ASTERISK)
-    {
+
+    if (operator_kind_previous == TOKEN_ASTERISK)
         return expression_allocate_binary(ExpressionKind_Multiplication, left_operand, right_operand);
-    }
-    else if (operator_kind_previous == TOKEN_SLASH)
-    {
+
+    if (operator_kind_previous == TOKEN_SLASH)
         return expression_allocate_binary(ExpressionKind_Division, left_operand, right_operand);
-    }
-    else if (operator_kind_previous == TOKEN_CARET)
-    {
+
+    if (operator_kind_previous == TOKEN_CARET)
         return expression_allocate_binary(ExpressionKind_Exponentiation, left_operand, right_operand);
-    }
 
     return NULL;
-}
-
-Expression *parser_expression_allocate_ast(Expression ast)
-{
-    Expression *ast_expression = (Expression *)malloc(sizeof(ast));
-    if (ast_expression == NULL)
-    {
-        exit(EXIT_FAILURE);
-    }
-
-    *ast_expression = ast;
-
-    return ast_expression;
-}
-
-// todo: remove
-void parser_expression_free_ast(Expression *expression)
-{
-
-    if (expression->kind == ExpressionKind_Number)
-    {
-        ExpressionNumber number = expression->number;
-    }
-    else if (expression->kind == ExpressionKind_Negation)
-    {
-        ExpressionNegation negation = expression->negation;
-        parser_expression_free_ast(negation.operand);
-    }
-    else if (expression->kind == ExpressionKind_Grouping)
-    {
-        ExpressionGrouping grouping = expression->grouping;
-        parser_expression_free_ast(grouping.expression);
-    }
-    else if (expression->kind == ExpressionKind_Addition)
-    {
-        ExpressionAddition addition = expression->addition;
-        parser_expression_free_ast(addition.left_operand);
-        parser_expression_free_ast(addition.right_operand);
-    }
-    else if (expression->kind == ExpressionKind_Subtraction)
-    {
-        ExpressionSubtraction subtraction = expression->subtraction;
-        parser_expression_free_ast(subtraction.left_operand);
-        parser_expression_free_ast(subtraction.right_operand);
-    }
-    else if (expression->kind == ExpressionKind_Multiplication)
-    {
-        ExpressionMultiplication multiplication = expression->multiplication;
-        parser_expression_free_ast(multiplication.left_operand);
-        parser_expression_free_ast(multiplication.right_operand);
-    }
-    else if (expression->kind == ExpressionKind_Division)
-    {
-        ExpressionDivision division = expression->division;
-        parser_expression_free_ast(division.left_operand);
-        parser_expression_free_ast(division.right_operand);
-    }
-    else if (expression->kind == ExpressionKind_Exponentiation)
-    {
-        ExpressionExponentiation exponentiation = expression->exponentiation;
-        parser_expression_free_ast(exponentiation.left_operand);
-        parser_expression_free_ast(exponentiation.right_operand);
-    }
-    else
-    {
-        printf("warning: Unrecognized node type!");
-    }
-
-    free(expression);
-}
-
-void parser_expression_print_ast(Expression *expression)
-{
-
-    if (expression->kind == ExpressionKind_Number)
-    {
-        ExpressionNumber number = expression->number;
-        printf("%.1f", number.value);
-    }
-    else if (expression->kind == ExpressionKind_Negation)
-    {
-        ExpressionNegation negation = expression->negation;
-        printf("(");
-        printf("-");
-        parser_expression_print_ast(negation.operand);
-        printf(")");
-    }
-    else if (expression->kind == ExpressionKind_Grouping)
-    {
-        ExpressionGrouping grouping = expression->grouping;
-        parser_expression_print_ast(grouping.expression);
-    }
-    else if (expression->kind == ExpressionKind_Addition)
-    {
-        ExpressionAddition addition = expression->addition;
-        printf("(");
-        parser_expression_print_ast(addition.left_operand);
-        printf(" + ");
-        parser_expression_print_ast(addition.right_operand);
-        printf(")");
-    }
-    else if (expression->kind == ExpressionKind_Subtraction)
-    {
-        ExpressionSubtraction subtraction = expression->subtraction;
-        printf("(");
-        parser_expression_print_ast(subtraction.left_operand);
-        printf(" - ");
-        parser_expression_print_ast(subtraction.right_operand);
-        printf(")");
-    }
-    else if (expression->kind == ExpressionKind_Multiplication)
-    {
-        ExpressionMultiplication multiplication = expression->multiplication;
-        printf("(");
-        parser_expression_print_ast(multiplication.left_operand);
-        printf(" * ");
-        parser_expression_print_ast(multiplication.right_operand);
-        printf(")");
-    }
-    else if (expression->kind == ExpressionKind_Division)
-    {
-        ExpressionDivision division = expression->division;
-        printf("(");
-        parser_expression_print_ast(division.left_operand);
-        printf(" / ");
-        parser_expression_print_ast(division.right_operand);
-        printf(")");
-    }
-    else if (expression->kind == ExpressionKind_Exponentiation)
-    {
-        ExpressionExponentiation exponentiation = expression->exponentiation;
-        printf("(");
-        parser_expression_print_ast(exponentiation.left_operand);
-        printf(" ^ ");
-        parser_expression_print_ast(exponentiation.right_operand);
-        printf(")");
-    }
-    else
-    {
-        printf("Error: node not supported!");
-    }
 }

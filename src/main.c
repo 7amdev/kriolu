@@ -73,8 +73,9 @@ int main(int argc, const char *argv[])
 
         for (int i = 0; i < statements->count; i++)
         {
-            parser_expression_print_ast(statements->items[i].expression);
+            expression_print(statements->items[i].expression);
             printf("\n");
+            expression_free(statements->items[i].expression);
         }
     }
 

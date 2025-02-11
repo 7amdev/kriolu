@@ -202,6 +202,7 @@ Expression *expression_allocate_number(double value);
 Expression *expression_allocate_grouping(Expression *expr);
 Expression *expression_allocate_negation(Expression *operand);
 Expression *expression_allocate_binary(ExpressionKind kind, Expression *left_operand, Expression *right_operand);
+void expression_print(Expression *expression);
 void expression_free(Expression *expression);
 
 typedef uint8_t StatementKind;
@@ -241,25 +242,6 @@ void statement_array_free(StatementArray *statements);
 // Parser
 //
 
-typedef enum
-{
-    OPERATION_MIN,
-
-    OPERATION_ASSIGNMENT,                  // =
-    OPERATION_OR,                          // or
-    OPERATION_AND,                         // and
-    OPERATION_EQUALITY,                    // == =/=
-    OPERATION_COMPARISON,                  // < > <= >=
-    OPERATION_ADDITION_AND_SUBTRACTION,    // + -
-    OPERATION_MULTIPLICATION_AND_DIVISION, // * /
-    OPERATION_NEGATE,                      // Unary:  -
-    OPERATION_EXPONENTIATION,              // ^   ex: -2^2 = -1 * 2^2 = -4
-    OPERATION_NOT,                         // Unary: ka
-    OPERATION_GROUPING_CALL_AND_GET,       // . (
-
-    OPERATION_MAX
-} OrderOfOperation;
-
 typedef struct
 {
     Token current;
@@ -269,28 +251,7 @@ typedef struct
     bool panic_mode;
 } Parser;
 
-extern Parser *parser_global;
-
-#define p_advance() parser_advance(parser_global)
-#define p_consume() parser_consume(parser_global)
-#define p_match(...) parser_match(parser_global, __VA_ARGS__)
-#define p_synchronize() parser_synchronize(parser_global)
-#define p_error(...) parser_error(parser_global, __VA_ARGS__)
-
 void parser_init(Parser *parser, Lexer *lexer, bool set_global);
 StatementArray *parser_parse(Parser *parser);
-void parser_advance(Parser *parser);
-void parser_consume(Parser *parser, TokenKind kind, const char *error_message);
-bool parser_match_then_advance(Parser *parser, TokenKind kind);
-void parser_synchronize(Parser *parser);
-void parser_error(Parser *parser, Token *token, const char *message);
-Statement parser_statement(Parser *parser);
-Statement parser_expression_statement(Parser *parser);
-Expression *parser_expression(Parser *parser, OrderOfOperation operator_precedence_previous);
-Expression *parser_unary_and_literals(parser);
-Expression *parser_binary(Parser *parser, Expression *left_operand);
-void parser_expression_print_ast(Expression *ast_node);
-Expression *parser_expression_allocate_ast();
-void parser_expression_free_ast(Expression *expression);
 
 #endif
