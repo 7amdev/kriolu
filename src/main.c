@@ -64,11 +64,11 @@ int main(int argc, const char *argv[])
 
     if (is_flag_parser)
     {
-        Lexer lexer;
+        // Lexer lexer;
         Parser parser;
 
-        lexer_init(&lexer, source_code);
-        parser_init(&parser, &lexer, false);
+        // lexer_init(&lexer, source_code);
+        parser_init(&parser, source_code);
         StatementArray *statements = parser_parse(&parser);
 
         for (int i = 0; i < statements->count; i++)

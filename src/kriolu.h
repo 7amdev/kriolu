@@ -89,23 +89,12 @@ typedef struct
 
 #define l_debug_print_token(token) lexer_debug_print_token(token, "%s ")
 
+Lexer *lexer_create_static();
 void lexer_init(Lexer *lexer, const char *source_code);
 Token lexer_scan(Lexer *lexer);
 void lexer_debug_print_token(Token token, const char *format);
 void lexer_debug_dump_tokens(Lexer *lexer);
-
-//
-// Compiler
-//
-
-typedef struct
-{
-    Token locals[256];
-    int local_count;
-} Compiler;
-
-void compiler_init(Compiler *compiler);
-int compiler_compile(Compiler *compiler, const char *source);
+void lexer_destroy_static(Lexer *lexer);
 
 //
 // Abstract Syntax Tree
@@ -251,7 +240,9 @@ typedef struct
     bool panic_mode;
 } Parser;
 
-void parser_init(Parser *parser, Lexer *lexer, bool set_global);
+#define parser_init(parser, source_code) parser_initialize(parser, source_code, NULL)
+
+void parser_initialize(Parser *parser, const char *source_code, Lexer *lexer);
 StatementArray *parser_parse(Parser *parser);
 
 #endif

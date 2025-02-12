@@ -1,7 +1,7 @@
 #include "kriolu.h"
 
 // TODO:
-// [] Change parser init function to receive source code and
+// [x] Change parser init function to receive source code and
 //    initialize lexer.
 // [] Emit bytecode instructions
 // [x] Encapsulate expression allocation function in the expression.c file
@@ -10,6 +10,7 @@
 // [x] Add statement in StatementAstArray
 // [x] Deallocate statement
 // [] Write test
+// [] parser destroy implementation
 
 typedef enum
 {
@@ -30,9 +31,6 @@ typedef enum
     OPERATION_MAX
 } OrderOfOperation;
 
-Parser *parser_global;
-int debug_line_number = 1;
-
 static void parser_advance(Parser *parser);
 static void parser_consume(Parser *parser, TokenKind kind, const char *error_message);
 static bool parser_match_then_advance(Parser *parser, TokenKind kind);
@@ -44,17 +42,19 @@ static Expression *parser_expression(Parser *parser, OrderOfOperation operator_p
 static Expression *parser_unary_and_literals(parser);
 static Expression *parser_binary(Parser *parser, Expression *left_operand);
 
-void parser_init(Parser *parser, Lexer *lexer, bool set_global)
+void parser_initialize(Parser *parser, const char *source_code, Lexer *lexer)
 {
     parser->current = (Token){0};  // token_error
     parser->previous = (Token){0}; // token_error
-    parser->lexer = lexer;
     parser->panic_mode = false;
     parser->had_error = false;
-
-    if (set_global)
+    parser->lexer = lexer;
+    if (lexer == NULL)
     {
-        parser_global = parser;
+        parser->lexer = lexer_create_static();
+        assert(parser->lexer);
+
+        lexer_init(parser->lexer, source_code);
     }
 }
 
@@ -300,3 +300,5 @@ static Expression *parser_binary(Parser *parser, Expression *left_operand)
 
     return NULL;
 }
+
+// todo: parser destroy implementation

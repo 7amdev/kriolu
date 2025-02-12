@@ -1,5 +1,15 @@
 #include "kriolu.h"
 
+#define LEXER_MEMORY_POOL_MAX 25
+
+typedef struct
+{
+    bool is_used;
+    Lexer lexer;
+} LexerMemoryPool;
+
+static LexerMemoryPool lexer_memory_pool[LEXER_MEMORY_POOL_MAX];
+
 static char lexer_advance(Lexer *lexer);
 static char lexer_peek(Lexer *lexer);
 static bool lexer_match(Lexer *lexer, char expected);
@@ -14,6 +24,23 @@ static bool lexer_is_string(char c);
 // TODO: static bool lexer_is_lowercase_letter(char c);
 static TokenKind lexer_keyword_kind(Token token, char const *keyword, int check_start_position, TokenKind return_kind);
 static Token lexer_error(Lexer *lexer, const char *message);
+
+Lexer *lexer_create_static()
+{
+    Lexer *lexer = NULL;
+
+    for (int i = 0; i < LEXER_MEMORY_POOL_MAX; ++i)
+    {
+        if (lexer_memory_pool[i].is_used == false)
+        {
+            lexer_memory_pool->is_used = true;
+            lexer = &lexer_memory_pool[i].lexer;
+            break;
+        }
+    }
+
+    return lexer;
+}
 
 void lexer_init(Lexer *lexer, const char *source_code)
 {
@@ -810,4 +837,18 @@ static Token lexer_error(Lexer *lexer, const char *message)
         .start = lexer->start,
         .length = (int)(lexer->current - lexer->start),
         .line_number = lexer->line_number};
+}
+
+void lexer_destroy_static(Lexer *lexer)
+{
+    for (int i = 0; i < LEXER_MEMORY_POOL_MAX; ++i)
+    {
+        if (lexer == &lexer_memory_pool[i].lexer)
+        {
+            lexer_memory_pool[i].is_used = false;
+            lexer_memory_pool[i].lexer = (Lexer){0};
+            lexer = NULL;
+            break;
+        }
+    }
 }
