@@ -42,6 +42,12 @@ static Expression *parser_expression(Parser *parser, OrderOfOperation operator_p
 static Expression *parser_unary_and_literals(parser);
 static Expression *parser_binary(Parser *parser, Expression *left_operand);
 
+//
+// Globals
+//
+// i.e
+Bytecode g_bytecode;
+
 void parser_initialize(Parser *parser, const char *source_code, Lexer *lexer)
 {
     parser->current = (Token){0};  // token_error

@@ -84,6 +84,20 @@ int main(int argc, const char *argv[])
         printf("flag -bytecode is set!\n");
     }
 
+    // Test for OpCode_Constant_long
+    //
+    Bytecode bytecode;
+    bytecode_init(&bytecode);
+
+    for (int i = 0; i < 260; i++)
+        bytecode_write_constant(&bytecode, 3.3, 123);
+
+    bytecode_write_instruction(&bytecode, OpCode_Return, 123);
+
+    bytecode_disassemble(&bytecode, "Test");
+
+    bytecode_free(&bytecode);
+
     return 0;
 }
 

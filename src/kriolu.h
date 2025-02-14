@@ -245,4 +245,70 @@ typedef struct
 void parser_initialize(Parser *parser, const char *source_code, Lexer *lexer);
 StatementArray *parser_parse(Parser *parser);
 
+//
+// Instruction
+//
+
+typedef uint8_t OpCode;
+enum
+{
+    OpCode_Invalid,
+
+    OpCode_Constant,
+    OpCode_Constant_Long,
+    OpCode_Return
+};
+
+typedef struct
+{
+    uint8_t *items;
+    int *lines;
+    uint32_t count;
+    uint32_t capacity;
+} InstructionArray;
+
+void instruction_array_init(InstructionArray *instructions);
+uint32_t instruction_array_insert(InstructionArray *instructions, uint8_t item, int line_number);
+uint32_t instruction_array_insert_opcode(InstructionArray *instructions, OpCode opcode, int line_number);
+uint32_t instruction_array_insert_operand_u8(InstructionArray *instructions, uint8_t operand, int line_number);
+uint32_t instruction_array_insert_operand_u24(InstructionArray *instructions, uint32_t operand, int line_number);
+void instruction_array_free(InstructionArray *instructions);
+
+//
+// Value
+//
+
+typedef double Value;
+
+typedef struct
+{
+    Value *items;
+    uint32_t count;
+    uint32_t capacity;
+} ValueArray;
+
+void value_array_init(ValueArray *values);
+uint32_t value_array_insert(ValueArray *values, Value value);
+void value_array_free(ValueArray *values);
+
+//
+// Bytecode
+//
+
+// Bytecode is a series of instructions. Eventually, we'll store
+// some other data along with instructions, so ...
+//
+typedef struct
+{
+    InstructionArray instructions;
+    ValueArray values;
+} Bytecode;
+
+void bytecode_init(Bytecode *bytecode);
+void bytecode_write_instruction(Bytecode *bytecode, OpCode instruction_code, int line_number);
+uint32_t bytecode_write_value(Bytecode *bytecode, Value value);
+void bytecode_write_constant(Bytecode *bytecode, Value value, int line_number);
+void bytecode_disassemble(Bytecode *bytecode, const char *name);
+void bytecode_free(Bytecode *bytecode);
+
 #endif
