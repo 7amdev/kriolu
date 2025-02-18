@@ -8,7 +8,7 @@ void instruction_array_init(InstructionArray *instructions)
     instructions->capacity = 0;
 }
 
-uint32_t instruction_array_insert(InstructionArray *instructions, uint8_t item, int line_number)
+int instruction_array_insert(InstructionArray *instructions, uint8_t item, int line_number)
 {
     if (instructions->capacity < instructions->count + 1)
     {
@@ -20,7 +20,7 @@ uint32_t instruction_array_insert(InstructionArray *instructions, uint8_t item, 
         for (
             int i = instructions->capacity - 1;
             // cast is necessary, because (int(i) = -1) >= (uint32_t(count) = 0) is true
-            i >= (int)(instructions->count);
+            i >= instructions->count;
             --i)
         {
             instructions->items[i] = OpCode_Invalid;
@@ -34,28 +34,25 @@ uint32_t instruction_array_insert(InstructionArray *instructions, uint8_t item, 
     return instructions->count - 1;
 }
 
-uint32_t instruction_array_insert_opcode(InstructionArray *instructions, OpCode opcode, int line_number)
+int instruction_array_insert_opcode(InstructionArray *instructions, OpCode opcode, int line_number)
 {
     return instruction_array_insert(instructions, opcode, line_number);
 }
 
-uint32_t instruction_array_insert_operand_u8(InstructionArray *instructions, uint8_t operand, int line_number)
+int instruction_array_insert_operand_u8(InstructionArray *instructions, uint8_t operand, int line_number)
 {
     return instruction_array_insert(instructions, operand, line_number);
 }
 
-// TODO
-uint32_t instruction_array_insert_operand_u24(InstructionArray *instructions, uint32_t operand, int line_number)
+int instruction_array_insert_operand_u24(InstructionArray *instructions, uint32_t operand, int line_number)
 {
-    uint8_t _8bit1 = (uint8_t)(operand & 0x00FF);
+    uint8_t _8bit1 = (uint8_t)(operand & 0xFF);
     uint8_t _8bit2 = (uint8_t)((operand >> 8) & 0xFF);
     uint8_t _8bit3 = (uint8_t)((operand >> 16) & 0xFF);
 
     instruction_array_insert(instructions, _8bit3, line_number);
     instruction_array_insert(instructions, _8bit2, line_number);
     instruction_array_insert(instructions, _8bit1, line_number);
-
-    // uint32_t _operand = (uint32_t)((((_8bit3 << 8) | _8bit2) << 8) | _8bit1);
 
     return instructions->count - 1;
 }

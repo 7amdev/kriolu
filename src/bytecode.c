@@ -6,33 +6,30 @@ void bytecode_init(Bytecode *bytecode)
     value_array_init(&bytecode->values);
 }
 
-// todo: rename to bytecode_instruction_write_opcode
-void bytecode_write_instruction(Bytecode *bytecode, OpCode instruction_code, int line_number)
-{
-    instruction_array_insert(&bytecode->instructions, instruction_code, line_number);
-}
-
-uint32_t bytecode_write_value(Bytecode *bytecode, Value value)
+int bytecode_write_value(Bytecode *bytecode, Value value)
 {
     return value_array_insert(&bytecode->values, value);
 }
 
-// todo: rename to bytecode_instruction_write_constant
-void bytecode_write_constant(Bytecode *bytecode, Value value, int line_number)
+int bytecode_instruction_write_opcode(Bytecode *bytecode, OpCode instruction_code, int line_number)
 {
-    uint32_t value_index = bytecode_write_value(bytecode, value);
+    return instruction_array_insert(&bytecode->instructions, instruction_code, line_number);
+}
+
+int bytecode_instruction_write_constant(Bytecode *bytecode, Value value, int line_number)
+{
+    int value_index = bytecode_write_value(bytecode, value);
     if (value_index < 256)
     {
         instruction_array_insert_opcode(&bytecode->instructions, OpCode_Constant, line_number);
-        instruction_array_insert_operand_u8(&bytecode->instructions, value_index, line_number);
-        return;
+        instruction_array_insert_operand_u8(&bytecode->instructions, (uint8_t)value_index, line_number);
+        return bytecode->instructions.count - 1;
     }
 
     instruction_array_insert_opcode(&bytecode->instructions, OpCode_Constant_Long, line_number);
     instruction_array_insert_operand_u24(&bytecode->instructions, value_index, line_number);
 
-    // bytecode_write_instruction(bytecode, (uint8_t)OpCode_Constant, 123);
-    // bytecode_write_instruction(bytecode, (uint8_t)value_index, 123);
+    return bytecode->instructions.count - 1;
 }
 
 void bytecode_disassemble(Bytecode *bytecode, const char *name)
@@ -97,8 +94,6 @@ void bytecode_disassemble(Bytecode *bytecode, const char *name)
 
         printf("Unknown OpCode %d\n", opcode);
         offset += 1;
-
-        // offset = instruction_disassemble(&bytecode->instructions, offset);
     }
 }
 

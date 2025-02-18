@@ -263,15 +263,15 @@ typedef struct
 {
     uint8_t *items;
     int *lines;
-    uint32_t count;
-    uint32_t capacity;
+    int count;
+    int capacity;
 } InstructionArray;
 
 void instruction_array_init(InstructionArray *instructions);
-uint32_t instruction_array_insert(InstructionArray *instructions, uint8_t item, int line_number);
-uint32_t instruction_array_insert_opcode(InstructionArray *instructions, OpCode opcode, int line_number);
-uint32_t instruction_array_insert_operand_u8(InstructionArray *instructions, uint8_t operand, int line_number);
-uint32_t instruction_array_insert_operand_u24(InstructionArray *instructions, uint32_t operand, int line_number);
+int instruction_array_insert(InstructionArray *instructions, uint8_t item, int line_number);
+int instruction_array_insert_opcode(InstructionArray *instructions, OpCode opcode, int line_number);
+int instruction_array_insert_operand_u8(InstructionArray *instructions, uint8_t operand, int line_number);
+int instruction_array_insert_operand_u24(InstructionArray *instructions, uint32_t operand, int line_number);
 void instruction_array_free(InstructionArray *instructions);
 
 //
@@ -283,8 +283,8 @@ typedef double Value;
 typedef struct
 {
     Value *items;
-    uint32_t count;
-    uint32_t capacity;
+    int count;
+    int capacity;
 } ValueArray;
 
 void value_array_init(ValueArray *values);
@@ -305,10 +305,14 @@ typedef struct
 } Bytecode;
 
 void bytecode_init(Bytecode *bytecode);
-void bytecode_write_instruction(Bytecode *bytecode, OpCode instruction_code, int line_number);
-uint32_t bytecode_write_value(Bytecode *bytecode, Value value);
-void bytecode_write_constant(Bytecode *bytecode, Value value, int line_number);
+int bytecode_write_value(Bytecode *bytecode, Value value);
+int bytecode_instruction_write_opcode(Bytecode *bytecode, OpCode instruction_code, int line_number);
+int bytecode_instruction_write_constant(Bytecode *bytecode, Value value, int line_number);
 void bytecode_disassemble(Bytecode *bytecode, const char *name);
 void bytecode_free(Bytecode *bytecode);
+
+// void bytecode_emitter_begin(Bytecode *bytecode);
+// void bytecode_emit(OpCode opcode);
+// InstructionArray bytecode_emitter_end();
 
 #endif

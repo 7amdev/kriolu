@@ -4,7 +4,7 @@
 
 typedef struct
 {
-    bool is_used;
+    bool allocated;
     Lexer lexer;
 } LexerMemoryPool;
 
@@ -29,12 +29,13 @@ Lexer *lexer_create_static()
 {
     Lexer *lexer = NULL;
 
+    // TODO: make it faster using pointer arithmetic
     for (int i = 0; i < LEXER_MEMORY_POOL_MAX; ++i)
     {
-        if (lexer_memory_pool[i].is_used == false)
+        if (lexer_memory_pool[i].allocated == false)
         {
-            lexer_memory_pool->is_used = true;
-            lexer = &lexer_memory_pool[i].lexer;
+            lexer_memory_pool->allocated = true;
+            lexer = &(lexer_memory_pool[i].lexer);
             break;
         }
     }
@@ -843,12 +844,14 @@ void lexer_destroy_static(Lexer *lexer)
 {
     for (int i = 0; i < LEXER_MEMORY_POOL_MAX; ++i)
     {
-        if (lexer == &lexer_memory_pool[i].lexer)
+        if (lexer == &(lexer_memory_pool[i].lexer))
         {
-            lexer_memory_pool[i].is_used = false;
+            assert(lexer_memory_pool[i].allocated == true);
+            lexer_memory_pool[i].allocated = false;
             lexer_memory_pool[i].lexer = (Lexer){0};
             lexer = NULL;
-            break;
+            return;
         }
     }
+    assert(false); // this is a bug, look into it.
 }

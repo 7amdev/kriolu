@@ -90,9 +90,9 @@ int main(int argc, const char *argv[])
     bytecode_init(&bytecode);
 
     for (int i = 0; i < 260; i++)
-        bytecode_write_constant(&bytecode, 3.3, 123);
+        bytecode_instruction_write_constant(&bytecode, 3.3, 123);
 
-    bytecode_write_instruction(&bytecode, OpCode_Return, 123);
+    bytecode_instruction_write_opcode(&bytecode, OpCode_Return, 123);
 
     bytecode_disassemble(&bytecode, "Test");
 
