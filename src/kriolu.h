@@ -246,6 +246,22 @@ void parser_initialize(Parser *parser, const char *source_code, Lexer *lexer);
 StatementArray *parser_parse(Parser *parser);
 
 //
+// Line Number
+//
+
+typedef struct
+{
+    int *items;
+    int count;
+    int capacity;
+} LineNumberArray;
+
+void line_array_init(LineNumberArray *lines);
+int line_array_insert(LineNumberArray *lines, int line);
+int line_array_insert_3x(LineNumberArray *lines, int line);
+void line_array_free(LineNumberArray *lines);
+
+//
 // Instruction
 //
 
@@ -262,16 +278,13 @@ enum
 typedef struct
 {
     uint8_t *items;
-    int *lines;
     int count;
     int capacity;
 } InstructionArray;
 
 void instruction_array_init(InstructionArray *instructions);
-int instruction_array_insert(InstructionArray *instructions, uint8_t item, int line_number);
-int instruction_array_insert_opcode(InstructionArray *instructions, OpCode opcode, int line_number);
-int instruction_array_insert_operand_u8(InstructionArray *instructions, uint8_t operand, int line_number);
-int instruction_array_insert_operand_u24(InstructionArray *instructions, uint32_t operand, int line_number);
+int instruction_array_insert(InstructionArray *instructions, uint8_t item);
+int instruction_array_insert_u24(InstructionArray *instructions, uint32_t item);
 void instruction_array_free(InstructionArray *instructions);
 
 //
@@ -301,13 +314,19 @@ void value_array_free(ValueArray *values);
 typedef struct
 {
     InstructionArray instructions;
+    LineNumberArray lines;
     ValueArray values;
 } Bytecode;
 
+#define bytecode_write_opcode(bytecode, opcode, line_number) bytecode_write_instruction_u8(bytecode, opcode, line_number)
+#define bytecode_write_operand_u8(bytecode, operand, line_number) bytecode_write_instruction_u8(bytecode, operand, line_number)
+#define bytecode_write_operand_u24(bytecode, operand, line_number) bytecode_write_instruction_u24(bytecode, operand, line_number)
+
 void bytecode_init(Bytecode *bytecode);
 int bytecode_write_value(Bytecode *bytecode, Value value);
-int bytecode_instruction_write_opcode(Bytecode *bytecode, OpCode instruction_code, int line_number);
-int bytecode_instruction_write_constant(Bytecode *bytecode, Value value, int line_number);
+int bytecode_write_instruction_u8(Bytecode *bytecode, uint8_t data, int line_number);
+int bytecode_write_instruction_u24(Bytecode *bytecode, uint32_t data, int line_number);
+int bytecode_write_constant(Bytecode *bytecode, Value value, int line_number);
 void bytecode_disassemble(Bytecode *bytecode, const char *name);
 void bytecode_free(Bytecode *bytecode);
 
