@@ -1,5 +1,7 @@
 #include "kriolu.h"
 
+// todo: String interpolation implementation
+
 #define LEXER_MEMORY_POOL_MAX 25
 
 typedef struct

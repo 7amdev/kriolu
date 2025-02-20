@@ -45,8 +45,6 @@ static Expression *parser_binary(Parser *parser, Expression *left_operand);
 //
 // Globals
 //
-// i.e
-Bytecode g_bytecode;
 
 void parser_initialize(Parser *parser, const char *source_code, Lexer *lexer)
 {
@@ -248,7 +246,7 @@ static Expression *parser_expression(Parser *parser, OrderOfOperation operator_p
     while (operator_precedence_current > operator_precedence_previous)
     {
         parser_advance(parser);
-        expression = parser_binary(parser, left_operand);
+        expression = parser_binary(parser, expression);
 
         operator_precedence_current = parser_operator_precedence(parser->current.kind);
     }
@@ -261,12 +259,16 @@ static Expression *parser_unary_and_literals(Parser *parser)
     if (parser->previous.kind == TOKEN_NUMBER)
     {
         double value = strtod(parser->previous.start, NULL);
+
+        bytecode_emit_constant(value, parser->previous.line_number);
         return expression_allocate_number(value);
     }
 
     if (parser->previous.kind == TOKEN_MINUS)
     {
         Expression *expression = parser_expression(parser, OPERATION_NEGATE);
+
+        bytecode_emit_byte(OpCode_Negation, parser->previous.line_number);
         return expression_allocate_negation(expression);
     }
 
@@ -290,19 +292,34 @@ static Expression *parser_binary(Parser *parser, Expression *left_operand)
     Expression *right_operand = parser_expression(parser, operator_precedence_previous);
 
     if (operator_kind_previous == TOKEN_PLUS)
+    {
+        bytecode_emit_byte(OpCode_Addition, parser->previous.line_number);
         return expression_allocate_binary(ExpressionKind_Addition, left_operand, right_operand);
+    }
 
     if (operator_kind_previous == TOKEN_MINUS)
+    {
+        bytecode_emit_byte(OpCode_Addition, parser->previous.line_number);
         return expression_allocate_binary(ExpressionKind_Subtraction, left_operand, right_operand);
+    }
 
     if (operator_kind_previous == TOKEN_ASTERISK)
+    {
+        bytecode_emit_byte(OpCode_Multiplication, parser->previous.line_number);
         return expression_allocate_binary(ExpressionKind_Multiplication, left_operand, right_operand);
+    }
 
     if (operator_kind_previous == TOKEN_SLASH)
+    {
+        bytecode_emit_byte(OpCode_Division, parser->previous.line_number);
         return expression_allocate_binary(ExpressionKind_Division, left_operand, right_operand);
+    }
 
     if (operator_kind_previous == TOKEN_CARET)
+    {
+        bytecode_emit_byte(OpCode_Exponentiation, parser->previous.line_number);
         return expression_allocate_binary(ExpressionKind_Exponentiation, left_operand, right_operand);
+    }
 
     return NULL;
 }

@@ -66,11 +66,18 @@ int main(int argc, const char *argv[])
     {
         // Lexer lexer;
         Parser parser;
+        Bytecode bytecode;
 
         // lexer_init(&lexer, source_code);
         parser_init(&parser, source_code);
+        bytecode_emitter_begin();
         StatementArray *statements = parser_parse(&parser);
+        bytecode = bytecode_emitter_end();
 
+        bytecode_disassemble(&bytecode, "Test");
+        bytecode_free(&bytecode);
+
+        printf("\n");
         for (int i = 0; i < statements->count; i++)
         {
             expression_print(statements->items[i].expression);
@@ -81,22 +88,34 @@ int main(int argc, const char *argv[])
 
     if (is_flag_bytecode)
     {
-        printf("flag -bytecode is set!\n");
+        // todo: remove parser by making statements one
+        //       level global
+        Parser parser;
+        Bytecode bytecode;
+
+        parser_init(&parser, source_code);
+        bytecode_emitter_begin();
+        StatementArray *statements = parser_parse(&parser);
+        bytecode = bytecode_emitter_end();
+        // todo: should i make emitter_end return void??
+
+        bytecode_disassemble(&bytecode, "Bytecode");
+        bytecode_free(&bytecode);
     }
 
     // Test for OpCode_Constant_long
     //
-    Bytecode bytecode;
-    bytecode_init(&bytecode);
+    // Bytecode bytecode;
+    // bytecode_init(&bytecode);
 
-    for (int i = 0; i < 260; i++)
-        bytecode_write_constant(&bytecode, 3.3, 123);
+    // for (int i = 0; i < 260; i++)
+    //     bytecode_write_constant(&bytecode, 3.3, 123);
 
-    bytecode_write_opcode(&bytecode, OpCode_Return, 123);
+    // bytecode_write_opcode(&bytecode, OpCode_Return, 123);
 
-    bytecode_disassemble(&bytecode, "Test");
+    // bytecode_disassemble(&bytecode, "Test");
 
-    bytecode_free(&bytecode);
+    // bytecode_free(&bytecode);
 
     return 0;
 }

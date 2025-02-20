@@ -10,8 +10,6 @@
 
 #define DEBUG_LOG_PARSER
 
-// todo: change type declaration name to CamelCase
-
 //
 // Token
 //
@@ -170,6 +168,7 @@ enum
     ExpressionKind_Exponentiation,
 };
 
+// TODO: make it more compact
 struct Expression
 {
     ExpressionKind kind;
@@ -272,6 +271,13 @@ enum
 
     OpCode_Constant,
     OpCode_Constant_Long,
+    OpCode_Addition,
+    OpCode_Subtraction,
+    OpCode_Multiplication,
+    OpCode_Division,
+    OpCode_Exponentiation,
+    OpCode_Negation,
+
     OpCode_Return
 };
 
@@ -318,20 +324,20 @@ typedef struct
     ValueArray values;
 } Bytecode;
 
-#define bytecode_write_opcode(bytecode, opcode, line_number) bytecode_write_instruction_u8(bytecode, opcode, line_number)
-#define bytecode_write_operand_u8(bytecode, operand, line_number) bytecode_write_instruction_u8(bytecode, operand, line_number)
+extern Bytecode g_bytecode;
+
+#define bytecode_emit_byte(data, line) bytecode_write_byte(&g_bytecode, data, line)
+#define bytecode_emit_constant(value, line) bytecode_write_constant(&g_bytecode, value, line)
+#define bytecode_write_opcode(bytecode, opcode, line_number) bytecode_write_byte(bytecode, opcode, line_number)
+#define bytecode_write_operand_u8(bytecode, operand, line_number) bytecode_write_byte(bytecode, operand, line_number)
 #define bytecode_write_operand_u24(bytecode, operand, line_number) bytecode_write_instruction_u24(bytecode, operand, line_number)
 
 void bytecode_init(Bytecode *bytecode);
-int bytecode_write_value(Bytecode *bytecode, Value value);
-int bytecode_write_instruction_u8(Bytecode *bytecode, uint8_t data, int line_number);
-int bytecode_write_instruction_u24(Bytecode *bytecode, uint32_t data, int line_number);
+int bytecode_write_byte(Bytecode *bytecode, uint8_t data, int line_number);
 int bytecode_write_constant(Bytecode *bytecode, Value value, int line_number);
 void bytecode_disassemble(Bytecode *bytecode, const char *name);
+void bytecode_emitter_begin();
+Bytecode bytecode_emitter_end();
 void bytecode_free(Bytecode *bytecode);
-
-// void bytecode_emitter_begin(Bytecode *bytecode);
-// void bytecode_emit(OpCode opcode);
-// InstructionArray bytecode_emitter_end();
 
 #endif
