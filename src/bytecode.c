@@ -50,6 +50,13 @@ int bytecode_write_constant(Bytecode *bytecode, Value value, int line_number)
     }
 
     bytecode_write_opcode(bytecode, OpCode_Constant_Long, line_number);
+    // todo: refactor function signature of bytecode_write_operand_u24
+    //       to receive 3 bytes.
+    //
+    // uint8_t byte1 = (value_index >> 0 & 0xff);
+    // uint8_t byte2 = (value_index >> 8 & 0xff);
+    // uint8_t byte3 = (value_index >> 16 & 0xff);
+    // bytecode_write_operand_u24(bytecode, byte1, byte2, byte3);
     bytecode_write_operand_u24(bytecode, (uint32_t)value_index, line_number);
 
     return bytecode->instructions.count - 1;

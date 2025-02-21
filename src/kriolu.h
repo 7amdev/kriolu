@@ -10,6 +10,9 @@
 
 #define DEBUG_LOG_PARSER
 
+// todo: change Array, Stack, and Ast naming convention to:
+//       AstExpression, StackValue, ArrayInstruction, ArrayStatement, ...
+
 //
 // Token
 //
@@ -339,5 +342,38 @@ void bytecode_disassemble(Bytecode *bytecode, const char *name);
 void bytecode_emitter_begin();
 Bytecode bytecode_emitter_end();
 void bytecode_free(Bytecode *bytecode);
+
+//
+// Value Stack
+//
+
+#define STACK_MAX 4
+
+typedef struct
+{
+    Value items[STACK_MAX];
+    Value *top;
+} ValueStack;
+
+void value_stack_init(ValueStack *stack);
+void value_stack_reset(ValueStack *stack);
+Value value_stack_push(ValueStack *stack, Value value);
+Value vlaue_stack_pop(ValueStack *stack);
+bool value_stack_is_full(ValueStack *stack);
+bool value_stack_is_empty(ValueStack *stack);
+
+//
+// Virtual Machine
+//
+
+typedef struct
+{
+    Bytecode *bytecode;
+    ValueStack stack_value;
+    uint8_t *ip; // Instruction Pointer
+} VirtualMachine;
+
+void virtual_machine_init(VirtualMachine *vm);
+void virtual_machine_interpret(VirtualMachine *vm);
 
 #endif
