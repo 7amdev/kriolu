@@ -293,7 +293,7 @@ typedef struct
 
 void instruction_array_init(InstructionArray *instructions);
 int instruction_array_insert(InstructionArray *instructions, uint8_t item);
-int instruction_array_insert_u24(InstructionArray *instructions, uint32_t item);
+int instruction_array_insert_u24(InstructionArray *instructions, uint8_t byte1, uint8_t byte2, uint8_t byte3);
 void instruction_array_free(InstructionArray *instructions);
 
 //
@@ -328,17 +328,18 @@ typedef struct
 } Bytecode;
 
 extern Bytecode g_bytecode;
-
 #define bytecode_emit_byte(data, line) bytecode_write_byte(&g_bytecode, data, line)
 #define bytecode_emit_constant(value, line) bytecode_write_constant(&g_bytecode, value, line)
+
 #define bytecode_write_opcode(bytecode, opcode, line_number) bytecode_write_byte(bytecode, opcode, line_number)
 #define bytecode_write_operand_u8(bytecode, operand, line_number) bytecode_write_byte(bytecode, operand, line_number)
-#define bytecode_write_operand_u24(bytecode, operand, line_number) bytecode_write_instruction_u24(bytecode, operand, line_number)
+#define bytecode_write_operand_u24(bytecode, byte1, byte2, byte3, line_number) bytecode_write_instruction_u24(bytecode, byte1, byte2, byte3, line_number)
 
 void bytecode_init(Bytecode *bytecode);
 int bytecode_write_byte(Bytecode *bytecode, uint8_t data, int line_number);
 int bytecode_write_constant(Bytecode *bytecode, Value value, int line_number);
 void bytecode_disassemble(Bytecode *bytecode, const char *name);
+int bytecode_disassemble_instruction(Bytecode *bytecode, int offset);
 void bytecode_emitter_begin();
 Bytecode bytecode_emitter_end();
 void bytecode_free(Bytecode *bytecode);
@@ -347,33 +348,43 @@ void bytecode_free(Bytecode *bytecode);
 // Value Stack
 //
 
-#define STACK_MAX 4
+#define STACK_MAX 256
 
 typedef struct
 {
     Value items[STACK_MAX];
     Value *top;
-} ValueStack;
+} StackValue;
 
-void value_stack_init(ValueStack *stack);
-void value_stack_reset(ValueStack *stack);
-Value value_stack_push(ValueStack *stack, Value value);
-Value vlaue_stack_pop(ValueStack *stack);
-bool value_stack_is_full(ValueStack *stack);
-bool value_stack_is_empty(ValueStack *stack);
+void stack_value_reset(StackValue *stack);
+Value stack_value_push(StackValue *stack, Value value);
+Value stack_value_pop(StackValue *stack);
+bool stack_value_is_full(StackValue *stack);
+bool stack_value_is_empty(StackValue *stack);
+void stack_value_trace(StackValue *stack);
 
 //
 // Virtual Machine
 //
 
+typedef enum
+{
+    Interpreter_Ok,
+    Interpreter_Compiler_error,
+    Interpreter_Runtime_Error
+} InterpreterResult;
+
 typedef struct
 {
     Bytecode *bytecode;
-    ValueStack stack_value;
+    StackValue stack_value;
     uint8_t *ip; // Instruction Pointer
 } VirtualMachine;
 
-void virtual_machine_init(VirtualMachine *vm);
-void virtual_machine_interpret(VirtualMachine *vm);
+#define DEBUG_TRACE_EXECUTION
+
+void virtual_machine_init(VirtualMachine *vm, Bytecode *bytecode);
+InterpreterResult virtual_machine_interpret(VirtualMachine *vm);
+void virtual_machine_free(VirtualMachine *vm);
 
 #endif

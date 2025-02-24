@@ -67,15 +67,20 @@ int main(int argc, const char *argv[])
         // Lexer lexer;
         Parser parser;
         Bytecode bytecode;
+        VirtualMachine VM;
 
         // lexer_init(&lexer, source_code);
         parser_init(&parser, source_code);
+
         bytecode_emitter_begin();
         StatementArray *statements = parser_parse(&parser);
         bytecode = bytecode_emitter_end();
 
-        bytecode_disassemble(&bytecode, "Test");
-        bytecode_free(&bytecode);
+        virtual_machine_init(&VM, &bytecode);
+        virtual_machine_interpret(&VM);
+
+        // bytecode_disassemble(&bytecode, "Test");
+        // bytecode_free(&bytecode);
 
         printf("\n");
         for (int i = 0; i < statements->count; i++)
@@ -97,25 +102,10 @@ int main(int argc, const char *argv[])
         bytecode_emitter_begin();
         StatementArray *statements = parser_parse(&parser);
         bytecode = bytecode_emitter_end();
-        // todo: should i make emitter_end return void??
 
         bytecode_disassemble(&bytecode, "Bytecode");
         bytecode_free(&bytecode);
     }
-
-    // Test for OpCode_Constant_long
-    //
-    // Bytecode bytecode;
-    // bytecode_init(&bytecode);
-
-    // for (int i = 0; i < 260; i++)
-    //     bytecode_write_constant(&bytecode, 3.3, 123);
-
-    // bytecode_write_opcode(&bytecode, OpCode_Return, 123);
-
-    // bytecode_disassemble(&bytecode, "Test");
-
-    // bytecode_free(&bytecode);
 
     return 0;
 }

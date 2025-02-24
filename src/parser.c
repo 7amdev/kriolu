@@ -70,7 +70,11 @@ StatementArray *parser_parse(Parser *parser)
     for (;;)
     {
         if (parser->current.kind == TOKEN_EOF)
+        {
+            // todo: Remove this later. For testing purpose.
+            bytecode_emit_byte(OpCode_Return, parser->current.line_number);
             break;
+        }
 
         Statement statement = parser_statement(parser);
         statement_array_insert(statements, statement);

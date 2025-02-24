@@ -26,15 +26,11 @@ int instruction_array_insert(InstructionArray *instructions, uint8_t item)
     return instructions->count - 1;
 }
 
-int instruction_array_insert_u24(InstructionArray *instructions, uint32_t item)
+int instruction_array_insert_u24(InstructionArray *instructions, uint8_t byte1, uint8_t byte2, uint8_t byte3)
 {
-    uint8_t _8bit1 = (uint8_t)(item & 0xFF);
-    uint8_t _8bit2 = (uint8_t)((item >> 8) & 0xFF);
-    uint8_t _8bit3 = (uint8_t)((item >> 16) & 0xFF);
-
-    instruction_array_insert(instructions, _8bit3);
-    instruction_array_insert(instructions, _8bit2);
-    instruction_array_insert(instructions, _8bit1);
+    instruction_array_insert(instructions, byte3);
+    instruction_array_insert(instructions, byte2);
+    instruction_array_insert(instructions, byte1);
 
     return instructions->count - 1;
 }

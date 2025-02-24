@@ -18,10 +18,9 @@ static int bytecode_write_value(Bytecode *bytecode, Value value)
     return value_array_insert(&bytecode->values, value);
 }
 
-static int bytecode_write_instruction_u24(Bytecode *bytecode, uint32_t data, int line_number)
+static int bytecode_write_instruction_u24(Bytecode *bytecode, uint8_t byte1, uint8_t byte2, uint8_t byte3, int line_number)
 {
-    // todo: assert(bytecode->instructions.items != NULL);
-    int instruction_index = instruction_array_insert_u24(&bytecode->instructions, data);
+    int instruction_index = instruction_array_insert_u24(&bytecode->instructions, byte1, byte2, byte3);
     int line_index = line_array_insert_3x(&bytecode->lines, line_number);
     assert(instruction_index == line_index);
 
@@ -49,15 +48,11 @@ int bytecode_write_constant(Bytecode *bytecode, Value value, int line_number)
         return bytecode->instructions.count - 1;
     }
 
+    uint8_t byte1 = (value_index >> 0 & 0xff);
+    uint8_t byte2 = (value_index >> 8 & 0xff);
+    uint8_t byte3 = (value_index >> 16 & 0xff);
     bytecode_write_opcode(bytecode, OpCode_Constant_Long, line_number);
-    // todo: refactor function signature of bytecode_write_operand_u24
-    //       to receive 3 bytes.
-    //
-    // uint8_t byte1 = (value_index >> 0 & 0xff);
-    // uint8_t byte2 = (value_index >> 8 & 0xff);
-    // uint8_t byte3 = (value_index >> 16 & 0xff);
-    // bytecode_write_operand_u24(bytecode, byte1, byte2, byte3);
-    bytecode_write_operand_u24(bytecode, (uint32_t)value_index, line_number);
+    bytecode_write_operand_u24(bytecode, byte1, byte2, byte3, line_number);
 
     return bytecode->instructions.count - 1;
 }
@@ -95,7 +90,7 @@ static int bytecode_debug_instruction_4bytes(Bytecode *bytecode, const char *opc
     return ret_offset_increment;
 }
 
-static int bytecode_debugger_print(Bytecode *bytecode, int offset)
+int bytecode_disassemble_instruction(Bytecode *bytecode, int offset)
 {
     printf("%04d ", offset);
     if (offset > 0 && bytecode->lines.items[offset] == bytecode->lines.items[offset - 1])
@@ -129,13 +124,12 @@ static int bytecode_debugger_print(Bytecode *bytecode, int offset)
 
 void bytecode_disassemble(Bytecode *bytecode, const char *name)
 {
-    // todo: compress this code
     printf("== %s ==\n", name);
     printf("Offset  Line#  OpCode OperandIndex Operandvalue\n");
 
     for (int offset = 0; offset < bytecode->instructions.count;)
     {
-        offset = bytecode_debugger_print(bytecode, offset);
+        offset = bytecode_disassemble_instruction(bytecode, offset);
     }
 }
 
@@ -160,5 +154,5 @@ void bytecode_free(Bytecode *bytecode)
 
     instruction_array_init(&bytecode->instructions);
     line_array_init(&bytecode->lines);
-    value_array_free(&bytecode->values);
+    value_array_init(&bytecode->values);
 }
