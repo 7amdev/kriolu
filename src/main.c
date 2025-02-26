@@ -67,7 +67,6 @@ int main(int argc, const char *argv[])
         // Lexer lexer;
         Parser parser;
         Bytecode bytecode;
-        VirtualMachine VM;
 
         // lexer_init(&lexer, source_code);
         parser_init(&parser, source_code);
@@ -76,11 +75,11 @@ int main(int argc, const char *argv[])
         StatementArray *statements = parser_parse(&parser);
         bytecode = bytecode_emitter_end();
 
-        virtual_machine_init(&VM, &bytecode);
-        virtual_machine_interpret(&VM);
+        vm_init(&bytecode);
+        vm_interpret();
 
         // bytecode_disassemble(&bytecode, "Test");
-        // bytecode_free(&bytecode);
+        bytecode_free(&bytecode);
 
         printf("\n");
         for (int i = 0; i < statements->count; i++)

@@ -1,5 +1,14 @@
 #include "kriolu.h"
 
+StackValue *stack_value_create(void)
+{
+    StackValue *stack = (StackValue *)calloc(1, sizeof(StackValue));
+    assert(stack);
+
+    stack->top = stack->items;
+    return stack;
+}
+
 void stack_value_reset(StackValue *stack)
 {
     stack->top = stack->items;
@@ -41,7 +50,10 @@ Value stack_value_pop(StackValue *stack)
 
 void stack_value_trace(StackValue *stack)
 {
-    printf("          ");
+    if (stack->items == stack->top)
+        return;
+
+    printf("    Stack | ");
     for (Value *slot = stack->items; slot < stack->top; slot++)
     {
         printf("[ ");
@@ -49,4 +61,9 @@ void stack_value_trace(StackValue *stack)
         printf(" ]");
     }
     printf("\n");
+}
+
+void stack_free(StackValue *stack)
+{
+    free(stack);
 }

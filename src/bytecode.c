@@ -68,7 +68,7 @@ static int bytecode_debug_instruction_2bytes(Bytecode *bytecode, const char *opc
     uint8_t value_index = bytecode->instructions.items[ret_offset_increment - 1];
     Value value = bytecode->values.items[value_index];
 
-    printf("%-16s %4d '", opcode_text, value_index);
+    printf("%-22s %5d '", opcode_text, value_index);
     printf("%g", value);
     printf("'\n");
 
@@ -92,7 +92,7 @@ static int bytecode_debug_instruction_4bytes(Bytecode *bytecode, const char *opc
 
 int bytecode_disassemble_instruction(Bytecode *bytecode, int offset)
 {
-    printf("%04d ", offset);
+    printf("%06d ", offset);
     if (offset > 0 && bytecode->lines.items[offset] == bytecode->lines.items[offset - 1])
         printf("   | ");
     else
@@ -110,7 +110,7 @@ int bytecode_disassemble_instruction(Bytecode *bytecode, int offset)
     if (opcode == OpCode_Multiplication)
         return bytecode_debug_instruction_byte("OPCODE_MULTIPLICATION", (offset + 1));
     if (opcode == OpCode_Division)
-        return bytecode_debug_instruction_byte("OPCODE_DIVITION", (offset + 1));
+        return bytecode_debug_instruction_byte("OPCODE_DIVISION", (offset + 1));
     if (opcode == OpCode_Exponentiation)
         return bytecode_debug_instruction_byte("OPCODE_EXPONENTIATION", (offset + 1));
     if (opcode == OpCode_Negation)
@@ -124,8 +124,10 @@ int bytecode_disassemble_instruction(Bytecode *bytecode, int offset)
 
 void bytecode_disassemble(Bytecode *bytecode, const char *name)
 {
-    printf("== %s ==\n", name);
-    printf("Offset  Line#  OpCode OperandIndex Operandvalue\n");
+    printf("===== %s =====\n", name);
+    printf("                                     Operand  \n");
+    printf("Offset Line         OpCode         index value\n");
+    printf("------ ---- ---------------------- ----- -----\n");
 
     for (int offset = 0; offset < bytecode->instructions.count;)
     {

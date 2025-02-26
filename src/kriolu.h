@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <assert.h>
+#include <math.h>
 
 #define DEBUG_LOG_PARSER
 
@@ -356,16 +357,20 @@ typedef struct
     Value *top;
 } StackValue;
 
+StackValue *stack_value_create(void);
 void stack_value_reset(StackValue *stack);
 Value stack_value_push(StackValue *stack, Value value);
 Value stack_value_pop(StackValue *stack);
 bool stack_value_is_full(StackValue *stack);
 bool stack_value_is_empty(StackValue *stack);
 void stack_value_trace(StackValue *stack);
+void stack_free(StackValue *stack);
 
 //
 // Virtual Machine
 //
+
+#define DEBUG_TRACE_EXECUTION
 
 typedef enum
 {
@@ -381,7 +386,11 @@ typedef struct
     uint8_t *ip; // Instruction Pointer
 } VirtualMachine;
 
-#define DEBUG_TRACE_EXECUTION
+extern VirtualMachine g_vm;
+
+#define vm_init(bytecode) virtual_machine_init(&g_vm, bytecode)
+#define vm_interpret() virtual_machine_interpret(&g_vm)
+#define vm_free() virtual_machine_init(&g_vm)
 
 void virtual_machine_init(VirtualMachine *vm, Bytecode *bytecode);
 InterpreterResult virtual_machine_interpret(VirtualMachine *vm);
