@@ -46,6 +46,7 @@ typedef enum
 
     TOKEN_IDENTIFIER,
     TOKEN_STRING,
+    TOKEN_STRING_INTERPOLATION,
     TOKEN_NUMBER,
 
     TOKEN_E,  // logic operator AND
@@ -82,11 +83,17 @@ typedef struct
 // Lexer
 //
 
+#define STRING_INTERPOLATION_MAX 8
+
 typedef struct
 {
     const char *start;
     const char *current;
     int line_number;
+
+    int string_nested_interpolation[STRING_INTERPOLATION_MAX];
+    int string_interpolation_count;
+
 } Lexer;
 
 #define l_debug_print_token(token) lexer_debug_print_token(token, "%s ")
