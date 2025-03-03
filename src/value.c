@@ -21,6 +21,13 @@ uint32_t value_array_insert(ValueArray *values, Value value)
     return values->count - 1;
 }
 
+void value_print(Value value)
+{
+    // TODO: add cases for values such as boolean and nil
+    printf("%g", value_as_number(value));
+    // printf("'\n");
+}
+
 void value_array_free(ValueArray *values)
 {
     free(values->items);

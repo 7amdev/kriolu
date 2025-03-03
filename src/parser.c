@@ -260,14 +260,47 @@ static Expression *parser_expression(Parser *parser, OrderOfOperation operator_p
 
 static Expression *parser_unary_and_literals(Parser *parser)
 {
+    // Literals
+    //
     if (parser->previous.kind == TOKEN_NUMBER)
     {
         double value = strtod(parser->previous.start, NULL);
+        Value number = value_make_number(value);
 
-        bytecode_emit_constant(value, parser->previous.line_number);
-        return expression_allocate_number(value);
+        bytecode_emit_constant(number, parser->previous.line_number);
+        return expression_allocate_value(number);
     }
 
+    if (parser->previous.kind == TOKEN_VERDADI)
+    {
+        Value value = value_make_boolean(true);
+
+        bytecode_emit_byte(OpCode_True, parser->previous.line_number);
+        return expression_allocate_value(value);
+    }
+
+    if (parser->previous.kind == TOKEN_FALSU)
+    {
+        Value value = value_make_boolean(false);
+
+        bytecode_emit_byte(OpCode_False, parser->previous.line_number);
+        return expression_allocate_value(value);
+    }
+
+    if (parser->previous.kind == TOKEN_NULO)
+    {
+        Value value = value_make_nil();
+        Expression expression = (Expression){
+            .kind = ExpressionKind_Value,
+            .as = {
+                .value = value}};
+
+        bytecode_emit_byte(OpCode_Nil, parser->previous.line_number);
+        return expression_allocate(expression);
+    }
+
+    // Unary
+    //
     if (parser->previous.kind == TOKEN_MINUS)
     {
         Expression *expression = parser_expression(parser, OPERATION_NEGATE);

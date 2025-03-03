@@ -69,7 +69,7 @@ static int bytecode_debug_instruction_2bytes(Bytecode *bytecode, const char *opc
     Value value = bytecode->values.items[value_index];
 
     printf("%-22s %5d '", opcode_text, value_index);
-    printf("%g", value);
+    value_print(value);
     printf("'\n");
 
     return ret_offset_increment;
@@ -84,7 +84,7 @@ static int bytecode_debug_instruction_4bytes(Bytecode *bytecode, const char *opc
     Value value = bytecode->values.items[value_index];
 
     printf("%-16s %4d '", opcode_text, value_index);
-    printf("%g", value);
+    value_print(value); // printf("%g", value);
     printf("'\n");
 
     return ret_offset_increment;
@@ -98,6 +98,7 @@ int bytecode_disassemble_instruction(Bytecode *bytecode, int offset)
     else
         printf("%4d ", bytecode->lines.items[offset]);
 
+    // TODO: handle OpCode_True, OpCode_False, and OpCode_Nil
     OpCode opcode = bytecode->instructions.items[offset];
     if (opcode == OpCode_Constant)
         return bytecode_debug_instruction_2bytes(bytecode, "OPCODE_CONSTANT", (offset + 2));

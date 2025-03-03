@@ -11,23 +11,24 @@ Expression *expression_allocate(Expression expr)
     return expression;
 }
 
-Expression *expression_allocate_number(double value)
+Expression *expression_allocate_value(Value value)
 {
     Expression *expression = calloc(1, sizeof(Expression));
     assert(expression);
 
-    expression->kind = ExpressionKind_Number;
-    expression->number.value = value;
+    expression->kind = ExpressionKind_Value;
+    expression->as.value = value;
 
     return expression;
 }
+
 Expression *expression_allocate_grouping(Expression *expr)
 {
     Expression *expression = calloc(1, sizeof(Expression));
     assert(expression);
 
     expression->kind = ExpressionKind_Grouping;
-    expression->grouping.expression = expr;
+    expression->as.unary.operand = expr;
 
     return expression;
 }
@@ -38,7 +39,7 @@ Expression *expression_allocate_negation(Expression *operand)
     assert(expression);
 
     expression->kind = ExpressionKind_Negation;
-    expression->negation.operand = operand;
+    expression->as.unary.operand = operand;
 
     return expression;
 }
@@ -49,76 +50,185 @@ Expression *expression_allocate_binary(ExpressionKind kind, Expression *left_ope
     assert(expression);
 
     expression->kind = kind;
-    expression->addition.left_operand = left_operand;
-    expression->addition.right_operand = right_operand;
+    expression->as.binary.left = left_operand;
+    expression->as.binary.right = right_operand;
 
     return expression;
+}
+
+void expression_print_tree(Expression *expression, int indent)
+{
+    for (int i = 0; i < indent; i++)
+        printf("  ");
+
+    if (expression->kind == ExpressionKind_Value)
+    {
+        Value value = expression_as_value(*expression);
+        if (value_is_number(value))
+        {
+            double number = value_as_number(value);
+            printf("%.1f\n", number);
+        }
+        else if (value_is_boolean(value))
+        {
+            printf("%s\n", value_as_boolean(value) == true ? "true" : "false");
+        }
+        else if (value_is_nil(value))
+        {
+            printf("nulo\n");
+        }
+    }
+    else if (expression->kind == ExpressionKind_Negation)
+    {
+        Expression *operand = expression_as_negation(*expression).operand;
+
+        printf("-:\n");
+        expression_print_tree(operand, indent + 1);
+    }
+    else if (expression->kind == ExpressionKind_Grouping)
+    {
+        Expression *expr = expression_as_negation(*expression).operand;
+        expression_print_tree(expr, indent + 1);
+    }
+    else if (expression->kind == ExpressionKind_Addition)
+    {
+        Expression *left_operand = expression_as_addition(*expression).left;
+        Expression *right_operand = expression_as_addition(*expression).right;
+
+        printf("+:\n");
+        expression_print_tree(left_operand, indent + 1);
+        expression_print_tree(right_operand, indent + 1);
+    }
+    else if (expression->kind == ExpressionKind_Subtraction)
+    {
+        Expression *left_operand = expression_as_subtraction(*expression).left;
+        Expression *right_operand = expression_as_subtraction(*expression).right;
+
+        printf("-:\n");
+        expression_print_tree(left_operand, indent + 1);
+        expression_print_tree(left_operand, indent + 1);
+    }
+    else if (expression->kind == ExpressionKind_Multiplication)
+    {
+        Expression *left_operand = expression_as_multiplication(*expression).left;
+        Expression *right_operand = expression_as_multiplication(*expression).right;
+
+        printf("*:\n");
+        expression_print_tree(left_operand, indent + 1);
+        expression_print_tree(right_operand, indent + 1);
+    }
+    else if (expression->kind == ExpressionKind_Division)
+    {
+        Expression *left_operand = expression_as_division(*expression).left;
+        Expression *right_operand = expression_as_division(*expression).right;
+
+        printf("/:\n");
+        expression_print_tree(left_operand, indent + 1);
+        expression_print_tree(right_operand, indent + 1);
+    }
+    else if (expression->kind == ExpressionKind_Exponentiation)
+    {
+        Expression *left_operand = expression_as_exponentiation(*expression).left;
+        Expression *right_operand = expression_as_exponentiation(*expression).right;
+
+        printf("^:\n");
+        expression_print_tree(left_operand, indent + 1);
+        expression_print_tree(right_operand, indent + 1);
+    }
+    else
+    {
+        printf("Error: node not supported!");
+    }
 }
 
 void expression_print(Expression *expression)
 {
 
-    if (expression->kind == ExpressionKind_Number)
+    // TODO: im not creating literal expression Nil, or Boolean correctly
+    if (expression->kind == ExpressionKind_Value)
     {
-        ExpressionNumber number = expression->number;
-        printf("%.1f", number.value);
+        Value value = expression_as_value(*expression);
+        if (value_is_number(value))
+        {
+            double number = value_as_number(value);
+            printf("%.1f", number);
+        }
+        else if (value_is_boolean(value))
+        {
+            printf("%s", value_as_boolean(value) == true ? "true" : "false");
+        }
+        else if (value_is_nil(value))
+        {
+            printf("nulo");
+        }
     }
     else if (expression->kind == ExpressionKind_Negation)
     {
-        ExpressionNegation negation = expression->negation;
+        Expression *operand = expression_as_negation(*expression).operand;
+
         printf("(");
         printf("-");
-        expression_print(negation.operand);
+        expression_print(operand);
         printf(")");
     }
     else if (expression->kind == ExpressionKind_Grouping)
     {
-        ExpressionGrouping grouping = expression->grouping;
-        expression_print(grouping.expression);
+        Expression *expr = expression_as_negation(*expression).operand;
+        expression_print(expr);
     }
     else if (expression->kind == ExpressionKind_Addition)
     {
-        ExpressionAddition addition = expression->addition;
+        Expression *left_operand = expression_as_addition(*expression).left;
+        Expression *right_operand = expression_as_addition(*expression).right;
+
         printf("(");
-        expression_print(addition.left_operand);
+        expression_print(left_operand);
         printf(" + ");
-        expression_print(addition.right_operand);
+        expression_print(right_operand);
         printf(")");
     }
     else if (expression->kind == ExpressionKind_Subtraction)
     {
-        ExpressionSubtraction subtraction = expression->subtraction;
+        Expression *left_operand = expression_as_subtraction(*expression).left;
+        Expression *right_operand = expression_as_subtraction(*expression).right;
+
         printf("(");
-        expression_print(subtraction.left_operand);
+        expression_print(left_operand);
         printf(" - ");
-        expression_print(subtraction.right_operand);
+        expression_print(right_operand);
         printf(")");
     }
     else if (expression->kind == ExpressionKind_Multiplication)
     {
-        ExpressionMultiplication multiplication = expression->multiplication;
+        Expression *left_operand = expression_as_multiplication(*expression).left;
+        Expression *right_operand = expression_as_multiplication(*expression).right;
+
         printf("(");
-        expression_print(multiplication.left_operand);
+        expression_print(left_operand);
         printf(" * ");
-        expression_print(multiplication.right_operand);
+        expression_print(right_operand);
         printf(")");
     }
     else if (expression->kind == ExpressionKind_Division)
     {
-        ExpressionDivision division = expression->division;
+        Expression *left_operand = expression_as_division(*expression).left;
+        Expression *right_operand = expression_as_division(*expression).right;
+
         printf("(");
-        expression_print(division.left_operand);
+        expression_print(left_operand);
         printf(" / ");
-        expression_print(division.right_operand);
+        expression_print(right_operand);
         printf(")");
     }
     else if (expression->kind == ExpressionKind_Exponentiation)
     {
-        ExpressionExponentiation exponentiation = expression->exponentiation;
+        Expression *left_operand = expression_as_exponentiation(*expression).left;
+        Expression *right_operand = expression_as_exponentiation(*expression).right;
+
         printf("(");
-        expression_print(exponentiation.left_operand);
+        expression_print(left_operand);
         printf(" ^ ");
-        expression_print(exponentiation.right_operand);
+        expression_print(right_operand);
         printf(")");
     }
     else
@@ -128,53 +238,29 @@ void expression_print(Expression *expression)
 }
 void expression_free(Expression *expression)
 {
-    if (expression->kind == ExpressionKind_Number)
+
+    switch (expression->kind)
     {
-        ExpressionNumber number = expression->number;
+    case ExpressionKind_Negation:
+    case ExpressionKind_Grouping:
+    {
+        Expression *operand = expression_as_negation(*expression).operand;
+        expression_free(operand);
+        break;
     }
-    else if (expression->kind == ExpressionKind_Negation)
+    case ExpressionKind_Addition:
+    case ExpressionKind_Subtraction:
+    case ExpressionKind_Multiplication:
+    case ExpressionKind_Division:
+    case ExpressionKind_Exponentiation:
     {
-        ExpressionNegation negation = expression->negation;
-        expression_free(negation.operand);
+        Expression *left_operand = expression_as_addition(*expression).left;
+        Expression *right_operand = expression_as_addition(*expression).right;
+
+        expression_free(left_operand);
+        expression_free(right_operand);
+        break;
     }
-    else if (expression->kind == ExpressionKind_Grouping)
-    {
-        ExpressionGrouping grouping = expression->grouping;
-        expression_free(grouping.expression);
-    }
-    else if (expression->kind == ExpressionKind_Addition)
-    {
-        ExpressionAddition addition = expression->addition;
-        expression_free(addition.left_operand);
-        expression_free(addition.right_operand);
-    }
-    else if (expression->kind == ExpressionKind_Subtraction)
-    {
-        ExpressionSubtraction subtraction = expression->subtraction;
-        expression_free(subtraction.left_operand);
-        expression_free(subtraction.right_operand);
-    }
-    else if (expression->kind == ExpressionKind_Multiplication)
-    {
-        ExpressionMultiplication multiplication = expression->multiplication;
-        expression_free(multiplication.left_operand);
-        expression_free(multiplication.right_operand);
-    }
-    else if (expression->kind == ExpressionKind_Division)
-    {
-        ExpressionDivision division = expression->division;
-        expression_free(division.left_operand);
-        expression_free(division.right_operand);
-    }
-    else if (expression->kind == ExpressionKind_Exponentiation)
-    {
-        ExpressionExponentiation exponentiation = expression->exponentiation;
-        expression_free(exponentiation.left_operand);
-        expression_free(exponentiation.right_operand);
-    }
-    else
-    {
-        printf("warning: Unrecognized node type!");
     }
 
     free(expression);

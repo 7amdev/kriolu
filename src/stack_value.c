@@ -48,6 +48,11 @@ Value stack_value_pop(StackValue *stack)
     return *stack->top;
 }
 
+Value stack_value_peek(StackValue *stack, int offset)
+{
+    return stack->top[-1 - offset];
+}
+
 void stack_value_trace(StackValue *stack)
 {
     if (stack->items == stack->top)
@@ -57,7 +62,7 @@ void stack_value_trace(StackValue *stack)
     for (Value *slot = stack->items; slot < stack->top; slot++)
     {
         printf("[ ");
-        printf("%g", *slot);
+        value_print(*slot); // printf("%g", *slot);
         printf(" ]");
     }
     printf("\n");

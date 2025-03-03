@@ -86,6 +86,7 @@ int main(int argc, const char *argv[])
         {
             expression_print(statements->items[i].expression);
             printf("\n");
+            expression_print_tree(statements->items[i].expression, 0);
             expression_free(statements->items[i].expression);
         }
     }

@@ -106,70 +106,61 @@ void lexer_debug_dump_tokens(Lexer *lexer);
 void lexer_destroy_static(Lexer *lexer);
 
 //
+// Value
+//
+
+typedef enum
+{
+    Value_Boolean,
+    Value_Nil,
+    Value_Number
+} ValueKind;
+
+typedef struct
+{
+    ValueKind kind;
+    union
+    {
+        bool boolean;
+        double number;
+    } as;
+} Value;
+
+typedef struct
+{
+    Value *items;
+    int count;
+    int capacity;
+} ValueArray;
+
+#define value_make_boolean(value) ((Value){.kind = Value_Boolean, .as = {.boolean = value}})
+#define value_make_number(value) ((Value){.kind = Value_Number, .as = {.number = value}})
+#define value_make_nil() ((Value){.kind = Value_Nil, .as = {.number = 0}})
+
+#define value_as_boolean(value) ((value).as.boolean)
+#define value_as_number(value) ((value).as.number)
+
+#define value_is_boolean(value) ((value).kind == Value_Boolean)
+#define value_is_number(value) ((value).kind == Value_Number)
+#define value_is_nil(value) ((value).kind == Value_Nil)
+
+void value_array_init(ValueArray *values);
+uint32_t value_array_insert(ValueArray *values, Value value);
+void value_print(Value value);
+void value_array_free(ValueArray *values);
+
+//
 // Abstract Syntax Tree
 //
-//
-// AST Nodes Kind
-//     ExpressionNumber
-//     ExpresionNegation
-//     ExpressoinAddition
-//     ExpressionSubtraction
-//     ExpressionMultiplication
-//     ...
 
 typedef struct Expression Expression;
-
-typedef struct
-{
-    double value;
-} ExpressionNumber;
-
-typedef struct
-{
-    Expression *operand;
-} ExpressionNegation;
-
-typedef struct
-{
-    Expression *expression;
-} ExpressionGrouping;
-
-typedef struct
-{
-    Expression *left_operand;
-    Expression *right_operand;
-} ExpressionAddition;
-
-typedef struct
-{
-    Expression *left_operand;
-    Expression *right_operand;
-} ExpressionSubtraction;
-
-typedef struct
-{
-    Expression *left_operand;
-    Expression *right_operand;
-} ExpressionMultiplication;
-
-typedef struct
-{
-    Expression *left_operand;
-    Expression *right_operand;
-} ExpressionDivision;
-
-typedef struct
-{
-    Expression *left_operand;
-    Expression *right_operand;
-} ExpressionExponentiation;
 
 typedef uint8_t ExpressionKind;
 enum
 {
     ExpressionKind_Invalid,
 
-    ExpressionKind_Number,
+    ExpressionKind_Value,
     ExpressionKind_Negation,
     ExpressionKind_Grouping,
     ExpressionKind_Addition,
@@ -185,23 +176,35 @@ struct Expression
     ExpressionKind kind;
     union
     {
-        ExpressionNumber number;
-        ExpressionNegation negation;
-        ExpressionGrouping grouping;
-        ExpressionAddition addition;
-        ExpressionSubtraction subtraction;
-        ExpressionMultiplication multiplication;
-        ExpressionDivision division;
-        ExpressionExponentiation exponentiation;
-    };
+        Value value;
+        struct
+        {
+            Expression *operand;
+        } unary;
+        struct
+        {
+            Expression *left;
+            Expression *right;
+        } binary;
+    } as;
 };
 
+#define expression_as_value(expression) ((expression).as.value)
+#define expression_as_negation(expression) ((expression).as.unary)
+#define expression_as_grouping(expression) ((expression).as.unary)
+#define expression_as_addition(expression) ((expression).as.binary)
+#define expression_as_subtraction(expression) ((expression).as.binary)
+#define expression_as_multiplication(expression) ((expression).as.binary)
+#define expression_as_division(expression) ((expression).as.binary)
+#define expression_as_exponentiation(expression) ((expression).as.binary)
+
 Expression *expression_allocate(Expression expr);
-Expression *expression_allocate_number(double value);
+Expression *expression_allocate_value(Value value);
 Expression *expression_allocate_grouping(Expression *expr);
 Expression *expression_allocate_negation(Expression *operand);
 Expression *expression_allocate_binary(ExpressionKind kind, Expression *left_operand, Expression *right_operand);
 void expression_print(Expression *expression);
+void expression_print_tree(Expression *expression, int indent);
 void expression_free(Expression *expression);
 
 typedef uint8_t StatementKind;
@@ -282,6 +285,9 @@ enum
 
     OpCode_Constant,
     OpCode_Constant_Long,
+    OpCode_Nil,
+    OpCode_True,
+    OpCode_False,
     OpCode_Addition,
     OpCode_Subtraction,
     OpCode_Multiplication,
@@ -303,23 +309,6 @@ void instruction_array_init(InstructionArray *instructions);
 int instruction_array_insert(InstructionArray *instructions, uint8_t item);
 int instruction_array_insert_u24(InstructionArray *instructions, uint8_t byte1, uint8_t byte2, uint8_t byte3);
 void instruction_array_free(InstructionArray *instructions);
-
-//
-// Value
-//
-
-typedef double Value;
-
-typedef struct
-{
-    Value *items;
-    int count;
-    int capacity;
-} ValueArray;
-
-void value_array_init(ValueArray *values);
-uint32_t value_array_insert(ValueArray *values, Value value);
-void value_array_free(ValueArray *values);
 
 //
 // Bytecode
@@ -368,6 +357,7 @@ StackValue *stack_value_create(void);
 void stack_value_reset(StackValue *stack);
 Value stack_value_push(StackValue *stack, Value value);
 Value stack_value_pop(StackValue *stack);
+Value stack_value_peek(StackValue *stack, int offset);
 bool stack_value_is_full(StackValue *stack);
 bool stack_value_is_empty(StackValue *stack);
 void stack_value_trace(StackValue *stack);

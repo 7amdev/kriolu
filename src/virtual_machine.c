@@ -1,4 +1,5 @@
 #include "kriolu.h"
+#include <stdarg.h>
 
 //
 // Globals
@@ -11,6 +12,20 @@ void virtual_machine_init(VirtualMachine *vm, Bytecode *bytecode)
     vm->bytecode = bytecode;
     stack_value_reset(&vm->stack_value);
     vm->ip = vm->bytecode->instructions.items;
+}
+
+void virtual_machine_runtime_error(VirtualMachine *vm, const char *format, ...)
+{
+    va_list args;
+    va_start(args, format);
+    vfprintf(stderr, format, args);
+    va_end(args);
+    fputs("\n", stderr);
+
+    size_t instruction = vm->ip - vm->bytecode->instructions.items - 1;
+    int line = vm->bytecode->lines.items[instruction];
+    fprintf(stderr, "[line %d] in script\n", line);
+    stack_value_reset(&vm->stack_value);
 }
 
 InterpreterResult virtual_machine_interpret(VirtualMachine *vm)
@@ -39,6 +54,8 @@ InterpreterResult virtual_machine_interpret(VirtualMachine *vm)
             (int)(vm->ip - vm->bytecode->instructions.items));
 #endif
 
+        // TODO: Handle instruction OpCode_True, OpCode_False, OpCode_Nil
+
         uint8_t instruction = READ_BYTE_THEN_INCREMENT();
         switch (instruction)
         {
@@ -56,54 +73,108 @@ InterpreterResult virtual_machine_interpret(VirtualMachine *vm)
         }
         case OpCode_Negation:
         {
+            if (!value_is_number(stack_value_peek(&vm->stack_value, 0)))
+            {
+                virtual_machine_runtime_error(vm, "Operand must be a number.");
+                return Interpreter_Runtime_Error;
+            }
+
             Value value = stack_value_pop(&vm->stack_value);
-            stack_value_push(&vm->stack_value, -(value));
+            double number = value_as_number(value);
+            Value value_negated = value_make_number(-(number));
+
+            stack_value_push(&vm->stack_value, value_negated);
             break;
         }
         case OpCode_Addition:
         {
+            if (!value_is_number(stack_value_peek(&vm->stack_value, 0)) ||
+                !value_is_number(stack_value_peek(&vm->stack_value, 1)))
+            {
+                virtual_machine_runtime_error(vm, "Operands must be numbers.");
+                return Interpreter_Runtime_Error;
+            }
+
             Value b = stack_value_pop(&vm->stack_value);
             Value a = stack_value_pop(&vm->stack_value);
-            stack_value_push(&vm->stack_value, (a + b));
+            double sum = value_as_number(a) + value_as_number(b);
+            Value value_sum = value_make_number(sum);
 
+            stack_value_push(&vm->stack_value, value_sum);
             break;
         }
         case OpCode_Subtraction:
         {
+            if (!value_is_number(stack_value_peek(&vm->stack_value, 0)) ||
+                !value_is_number(stack_value_peek(&vm->stack_value, 1)))
+            {
+                virtual_machine_runtime_error(vm, "Operands must be numbers.");
+                return Interpreter_Runtime_Error;
+            }
+
             Value b = stack_value_pop(&vm->stack_value);
             Value a = stack_value_pop(&vm->stack_value);
-            stack_value_push(&vm->stack_value, (a - b));
+            double difference = value_as_number(a) - value_as_number(b);
+            Value value_difference = value_make_number(difference);
 
+            stack_value_push(&vm->stack_value, value_difference);
             break;
         }
         case OpCode_Multiplication:
         {
+            if (!value_is_number(stack_value_peek(&vm->stack_value, 0)) ||
+                !value_is_number(stack_value_peek(&vm->stack_value, 1)))
+            {
+                virtual_machine_runtime_error(vm, "Operands must be numbers.");
+                return Interpreter_Runtime_Error;
+            }
+
             Value b = stack_value_pop(&vm->stack_value);
             Value a = stack_value_pop(&vm->stack_value);
-            stack_value_push(&vm->stack_value, (a * b));
+            double product = value_as_number(a) * value_as_number(b);
+            Value value_product = value_make_number(product);
 
+            stack_value_push(&vm->stack_value, value_product);
             break;
         }
         case OpCode_Division:
         {
+            if (!value_is_number(stack_value_peek(&vm->stack_value, 0)) ||
+                !value_is_number(stack_value_peek(&vm->stack_value, 1)))
+            {
+                virtual_machine_runtime_error(vm, "Operands must be numbers.");
+                return Interpreter_Runtime_Error;
+            }
+
             Value b = stack_value_pop(&vm->stack_value);
             Value a = stack_value_pop(&vm->stack_value);
-            stack_value_push(&vm->stack_value, (a / b));
+            double quotient = value_as_number(a) / value_as_number(b);
+            Value value_quotient = value_make_number(quotient);
 
+            stack_value_push(&vm->stack_value, value_quotient);
             break;
         }
         case OpCode_Exponentiation:
         {
+            if (!value_is_number(stack_value_peek(&vm->stack_value, 0)) ||
+                !value_is_number(stack_value_peek(&vm->stack_value, 1)))
+            {
+                virtual_machine_runtime_error(vm, "Operands must be numbers.");
+                return Interpreter_Runtime_Error;
+            }
+
             Value b = stack_value_pop(&vm->stack_value);
             Value a = stack_value_pop(&vm->stack_value);
-            stack_value_push(&vm->stack_value, pow(a, b));
+            double power = pow(value_as_number(a), value_as_number(b));
+            Value value_power = value_make_number(power);
 
+            stack_value_push(&vm->stack_value, value_power);
             break;
         }
         case OpCode_Return:
         {
             Value constant = stack_value_pop(&vm->stack_value);
-            printf("%g", constant);
+            value_print(constant); // printf("%g", constant);
             printf("\n");
 
             return Interpreter_Ok;
