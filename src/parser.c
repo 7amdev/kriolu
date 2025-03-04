@@ -266,37 +266,35 @@ static Expression *parser_unary_and_literals(Parser *parser)
     {
         double value = strtod(parser->previous.start, NULL);
         Value number = value_make_number(value);
+        Expression e_number = expression_make_number(value);
 
         bytecode_emit_constant(number, parser->previous.line_number);
-        return expression_allocate_value(number);
+
+        return expression_allocate(e_number);
     }
 
     if (parser->previous.kind == TOKEN_VERDADI)
     {
-        Value value = value_make_boolean(true);
+        Expression e_true = expression_make_boolean(true);
 
         bytecode_emit_byte(OpCode_True, parser->previous.line_number);
-        return expression_allocate_value(value);
+        return expression_allocate(e_true);
     }
 
     if (parser->previous.kind == TOKEN_FALSU)
     {
-        Value value = value_make_boolean(false);
+        Expression e_false = expression_make_boolean(false);
 
         bytecode_emit_byte(OpCode_False, parser->previous.line_number);
-        return expression_allocate_value(value);
+        return expression_allocate(e_false);
     }
 
     if (parser->previous.kind == TOKEN_NULO)
     {
-        Value value = value_make_nil();
-        Expression expression = (Expression){
-            .kind = ExpressionKind_Value,
-            .as = {
-                .value = value}};
+        Expression nil = expression_make_nil();
 
         bytecode_emit_byte(OpCode_Nil, parser->previous.line_number);
-        return expression_allocate(expression);
+        return expression_allocate(nil);
     }
 
     // Unary
@@ -304,18 +302,20 @@ static Expression *parser_unary_and_literals(Parser *parser)
     if (parser->previous.kind == TOKEN_MINUS)
     {
         Expression *expression = parser_expression(parser, OPERATION_NEGATE);
+        Expression negation = expression_make_negation(expression);
 
         bytecode_emit_byte(OpCode_Negation, parser->previous.line_number);
-        return expression_allocate_negation(expression);
+
+        return expression_allocate(negation);
     }
 
     if (parser->previous.kind == TOKEN_LEFT_PARENTHESIS)
     {
         Expression *expression = parser_expression(parser, OPERATION_ASSIGNMENT);
-        Expression *grouping = expression_allocate_grouping(expression);
+        Expression grouping = expression_make_grouping(expression);
 
         parser_consume(parser, TOKEN_RIGHT_PARENTHESIS, "Expected ')' after expression.");
-        return grouping;
+        return expression_allocate(grouping);
     }
 
     return NULL;
@@ -331,31 +331,41 @@ static Expression *parser_binary(Parser *parser, Expression *left_operand)
     if (operator_kind_previous == TOKEN_PLUS)
     {
         bytecode_emit_byte(OpCode_Addition, parser->previous.line_number);
-        return expression_allocate_binary(ExpressionKind_Addition, left_operand, right_operand);
+
+        Expression addition = expression_make_addition(left_operand, right_operand);
+        return expression_allocate(addition);
     }
 
     if (operator_kind_previous == TOKEN_MINUS)
     {
         bytecode_emit_byte(OpCode_Addition, parser->previous.line_number);
-        return expression_allocate_binary(ExpressionKind_Subtraction, left_operand, right_operand);
+        Expression subtraction = expression_make_subtraction(left_operand, right_operand);
+
+        return expression_allocate(subtraction);
     }
 
     if (operator_kind_previous == TOKEN_ASTERISK)
     {
         bytecode_emit_byte(OpCode_Multiplication, parser->previous.line_number);
-        return expression_allocate_binary(ExpressionKind_Multiplication, left_operand, right_operand);
+        Expression multiplication = expression_make_multiplication(left_operand, right_operand);
+
+        return expression_allocate(multiplication);
     }
 
     if (operator_kind_previous == TOKEN_SLASH)
     {
         bytecode_emit_byte(OpCode_Division, parser->previous.line_number);
-        return expression_allocate_binary(ExpressionKind_Division, left_operand, right_operand);
+        Expression division = expression_make_division(left_operand, right_operand);
+
+        return expression_allocate(division);
     }
 
     if (operator_kind_previous == TOKEN_CARET)
     {
         bytecode_emit_byte(OpCode_Exponentiation, parser->previous.line_number);
-        return expression_allocate_binary(ExpressionKind_Exponentiation, left_operand, right_operand);
+        Expression exponentiation = expression_make_division(left_operand, right_operand);
+
+        return expression_allocate(exponentiation);
     }
 
     return NULL;

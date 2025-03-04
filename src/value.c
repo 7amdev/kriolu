@@ -23,9 +23,28 @@ uint32_t value_array_insert(ValueArray *values, Value value)
 
 void value_print(Value value)
 {
-    // TODO: add cases for values such as boolean and nil
-    printf("%g", value_as_number(value));
-    // printf("'\n");
+    switch (value.kind)
+    {
+    default:
+    {
+        assert(false && "Unsupported Value Type. ");
+    }
+    case Value_Number:
+    {
+        printf("%g", value_as_number(value));
+        break;
+    }
+    case Value_Boolean:
+    {
+        printf("%s", value_as_boolean(value) == true ? "true" : "false");
+        break;
+    }
+    case Value_Nil:
+    {
+        printf("nulo");
+        break;
+    }
+    }
 }
 
 void value_array_free(ValueArray *values)

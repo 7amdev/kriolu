@@ -104,6 +104,12 @@ int bytecode_disassemble_instruction(Bytecode *bytecode, int offset)
         return bytecode_debug_instruction_2bytes(bytecode, "OPCODE_CONSTANT", (offset + 2));
     if (opcode == OpCode_Constant_Long)
         return bytecode_debug_instruction_4bytes(bytecode, "OPCODE_CONSTANT_LONG", (offset + 4));
+    if (opcode == OpCode_True)
+        return bytecode_debug_instruction_byte("OPCODE_TRUE", (offset + 1));
+    if (opcode == OpCode_False)
+        return bytecode_debug_instruction_byte("OPCODE_FALSE", (offset + 1));
+    if (opcode == OpCode_Nil)
+        return bytecode_debug_instruction_byte("OPCODE_NIL", (offset + 1));
     if (opcode == OpCode_Addition)
         return bytecode_debug_instruction_byte("OPCODE_ADDITION", (offset + 1));
     if (opcode == OpCode_Subtraction)

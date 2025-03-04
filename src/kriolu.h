@@ -153,14 +153,14 @@ void value_array_free(ValueArray *values);
 // Abstract Syntax Tree
 //
 
-typedef struct Expression Expression;
-
 typedef uint8_t ExpressionKind;
 enum
 {
     ExpressionKind_Invalid,
 
-    ExpressionKind_Value,
+    ExpressionKind_Number,
+    ExpressionKind_Boolean,
+    ExpressionKind_Nil,
     ExpressionKind_Negation,
     ExpressionKind_Grouping,
     ExpressionKind_Addition,
@@ -170,13 +170,14 @@ enum
     ExpressionKind_Exponentiation,
 };
 
-// TODO: make it more compact
+typedef struct Expression Expression;
 struct Expression
 {
     ExpressionKind kind;
     union
     {
-        Value value;
+        double number;
+        bool boolean;
         struct
         {
             Expression *operand;
@@ -189,9 +190,23 @@ struct Expression
     } as;
 };
 
+#define expression_make_number(value) ((Expression){.kind = ExpressionKind_Number, .as = {.number = (value)}})
+#define expression_make_boolean(value) ((Expression){.kind = ExpressionKind_Boolean, .as = {.boolean = (value)}})
+#define expression_make_nil() ((Expression){.kind = ExpressionKind_Nil, .as = {.number = 0}})
+#define expression_make_negation(expression) ((Expression){.kind = ExpressionKind_Negation, .as = {.unary = {.operand = (expression)}}})
+#define expression_make_grouping(expression) ((Expression){.kind = ExpressionKind_Grouping, .as = {.unary = {.operand = (expression)}}})
+#define expression_make_addition(left_operand, right_operand) ((Expression){.kind = ExpressionKind_Addition, .as = {.binary = {.left = (left_operand), .right = (right_operand)}}})
+#define expression_make_subtraction(left_operand, right_operand) ((Expression){.kind = ExpressionKind_Subtraction, .as = {.binary = {.left = (left_operand), .right = (right_operand)}}})
+#define expression_make_multiplication(left_operand, right_operand) ((Expression){.kind = ExpressionKind_Multiplication, .as = {.binary = {.left = (left_operand), .right = (right_operand)}}})
+#define expression_make_division(left_operand, right_operand) ((Expression){.kind = ExpressionKind_Division, .as = {.binary = {.left = (left_operand), .right = (right_operand)}}})
+#define expression_make_exponentiation(left_operand, right_operand) ((Expression){.kind = ExpressionKind_Exponentiation, .as = {.binary = {.left = (left_operand), .right = (right_operand)}}})
+
+#define expression_as_number(expression) ((expression).as.number)
+#define expression_as_boolean(expression) ((expression).as.boolean)
 #define expression_as_value(expression) ((expression).as.value)
 #define expression_as_negation(expression) ((expression).as.unary)
 #define expression_as_grouping(expression) ((expression).as.unary)
+#define expression_as_binary(expression) ((expression).as.binary)
 #define expression_as_addition(expression) ((expression).as.binary)
 #define expression_as_subtraction(expression) ((expression).as.binary)
 #define expression_as_multiplication(expression) ((expression).as.binary)
@@ -199,10 +214,6 @@ struct Expression
 #define expression_as_exponentiation(expression) ((expression).as.binary)
 
 Expression *expression_allocate(Expression expr);
-Expression *expression_allocate_value(Value value);
-Expression *expression_allocate_grouping(Expression *expr);
-Expression *expression_allocate_negation(Expression *operand);
-Expression *expression_allocate_binary(ExpressionKind kind, Expression *left_operand, Expression *right_operand);
 void expression_print(Expression *expression);
 void expression_print_tree(Expression *expression, int indent);
 void expression_free(Expression *expression);
@@ -288,12 +299,12 @@ enum
     OpCode_Nil,
     OpCode_True,
     OpCode_False,
+    OpCode_Negation,
     OpCode_Addition,
     OpCode_Subtraction,
     OpCode_Multiplication,
     OpCode_Division,
     OpCode_Exponentiation,
-    OpCode_Negation,
 
     OpCode_Return
 };

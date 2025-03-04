@@ -54,8 +54,6 @@ InterpreterResult virtual_machine_interpret(VirtualMachine *vm)
             (int)(vm->ip - vm->bytecode->instructions.items));
 #endif
 
-        // TODO: Handle instruction OpCode_True, OpCode_False, OpCode_Nil
-
         uint8_t instruction = READ_BYTE_THEN_INCREMENT();
         switch (instruction)
         {
@@ -69,6 +67,21 @@ InterpreterResult virtual_machine_interpret(VirtualMachine *vm)
         {
             Value constant = READ_CONSTANT_3BYTE();
             stack_value_push(&vm->stack_value, constant);
+            break;
+        }
+        case OpCode_True:
+        {
+            stack_value_push(&vm->stack_value, value_make_boolean(true));
+            break;
+        }
+        case OpCode_False:
+        {
+            stack_value_push(&vm->stack_value, value_make_boolean(false));
+            break;
+        }
+        case OpCode_Nil:
+        {
+            stack_value_push(&vm->stack_value, value_make_nil());
             break;
         }
         case OpCode_Negation:
