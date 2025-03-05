@@ -57,6 +57,10 @@ InterpreterResult virtual_machine_interpret(VirtualMachine *vm)
         uint8_t instruction = READ_BYTE_THEN_INCREMENT();
         switch (instruction)
         {
+        default:
+        {
+            assert(false && "Unsupported OpCode. Handle the OpCode by adding a if statement.");
+        }
         case OpCode_Constant:
         {
             Value constant = READ_CONSTANT();
@@ -97,6 +101,14 @@ InterpreterResult virtual_machine_interpret(VirtualMachine *vm)
             Value value_negated = value_make_number(-(number));
 
             stack_value_push(&vm->stack_value, value_negated);
+            break;
+        }
+        case OpCode_Not:
+        {
+            bool result = value_negate_logically(stack_value_pop(&vm->stack_value));
+            Value value = value_make_boolean(result);
+
+            stack_value_push(&vm->stack_value, value);
             break;
         }
         case OpCode_Addition:

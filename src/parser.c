@@ -1,16 +1,6 @@
 #include "kriolu.h"
 
-// TODO:
-// [x] Change parser init function to receive source code and
-//    initialize lexer.
-// [] Emit bytecode instructions
-// [x] Encapsulate expression allocation function in the expression.c file
-// [x] Refactor parser interface public and private
-// [x] Change ExpresisonAst to Expression
-// [x] Add statement in StatementAstArray
-// [x] Deallocate statement
-// [] Write test
-// [] parser destroy implementation
+// TODO: [] parser destroy implementation
 
 typedef enum
 {
@@ -305,8 +295,16 @@ static Expression *parser_unary_and_literals(Parser *parser)
         Expression negation = expression_make_negation(expression);
 
         bytecode_emit_byte(OpCode_Negation, parser->previous.line_number);
-
         return expression_allocate(negation);
+    }
+
+    if (parser->previous.kind == TOKEN_KA)
+    {
+        Expression *expression = parser_expression(parser, OPERATION_NOT);
+        Expression not = expression_make_not(expression);
+
+        bytecode_emit_byte(OpCode_Not, parser->previous.line_number);
+        return expression_allocate(not);
     }
 
     if (parser->previous.kind == TOKEN_LEFT_PARENTHESIS)

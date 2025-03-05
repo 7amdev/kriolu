@@ -110,6 +110,10 @@ int bytecode_disassemble_instruction(Bytecode *bytecode, int offset)
         return bytecode_debug_instruction_byte("OPCODE_FALSE", (offset + 1));
     if (opcode == OpCode_Nil)
         return bytecode_debug_instruction_byte("OPCODE_NIL", (offset + 1));
+    if (opcode == OpCode_Negation)
+        return bytecode_debug_instruction_byte("OPCODE_NEGATION", (offset + 1));
+    if (opcode == OpCode_Not)
+        return bytecode_debug_instruction_byte("OPCODE_NOT", (offset + 1));
     if (opcode == OpCode_Addition)
         return bytecode_debug_instruction_byte("OPCODE_ADDITION", (offset + 1));
     if (opcode == OpCode_Subtraction)
@@ -125,6 +129,7 @@ int bytecode_disassemble_instruction(Bytecode *bytecode, int offset)
     if (opcode == OpCode_Return)
         return bytecode_debug_instruction_byte("OPCODE_RETURN", (offset + 1));
 
+    assert(false && "Unsupported OpCode. Handle the OpCode by adding a if statement.");
     printf("Unknown OpCode %d\n", opcode);
     return (offset + 1);
 }

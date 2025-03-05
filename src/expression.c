@@ -47,6 +47,14 @@ void expression_print_tree(Expression *expression, int indent)
         expression_print_tree(operand, indent + 1);
         break;
     }
+    case ExpressionKind_Not:
+    {
+        Expression *operand = expression_as_negation(*expression).operand;
+
+        printf("ka:\n");
+        expression_print_tree(operand, indent + 1);
+        break;
+    }
     case ExpressionKind_Grouping:
     {
         Expression *expr = expression_as_negation(*expression).operand;
@@ -88,7 +96,7 @@ void expression_print(Expression *expression)
     }
     case ExpressionKind_Boolean:
     {
-        printf("%s", expression_as_boolean(*expression) == true ? "true" : "false");
+        printf("%s", expression_as_boolean(*expression) == true ? "verdadi" : "falsu");
         break;
     }
     case ExpressionKind_Nil:
@@ -102,6 +110,16 @@ void expression_print(Expression *expression)
 
         printf("(");
         printf("-");
+        expression_print(operand);
+        printf(")");
+        break;
+    }
+    case ExpressionKind_Not:
+    {
+        Expression *operand = expression_as_negation(*expression).operand;
+
+        printf("(");
+        printf("ka ");
         expression_print(operand);
         printf(")");
         break;

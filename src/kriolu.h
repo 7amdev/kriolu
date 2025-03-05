@@ -144,6 +144,8 @@ typedef struct
 #define value_is_number(value) ((value).kind == Value_Number)
 #define value_is_nil(value) ((value).kind == Value_Nil)
 
+bool value_negate_logically(Value value);
+
 void value_array_init(ValueArray *values);
 uint32_t value_array_insert(ValueArray *values, Value value);
 void value_print(Value value);
@@ -162,6 +164,7 @@ enum
     ExpressionKind_Boolean,
     ExpressionKind_Nil,
     ExpressionKind_Negation,
+    ExpressionKind_Not,
     ExpressionKind_Grouping,
     ExpressionKind_Addition,
     ExpressionKind_Subtraction,
@@ -194,6 +197,7 @@ struct Expression
 #define expression_make_boolean(value) ((Expression){.kind = ExpressionKind_Boolean, .as = {.boolean = (value)}})
 #define expression_make_nil() ((Expression){.kind = ExpressionKind_Nil, .as = {.number = 0}})
 #define expression_make_negation(expression) ((Expression){.kind = ExpressionKind_Negation, .as = {.unary = {.operand = (expression)}}})
+#define expression_make_not(expression) ((Expression){.kind = ExpressionKind_Not, .as = {.unary = {.operand = (expression)}}})
 #define expression_make_grouping(expression) ((Expression){.kind = ExpressionKind_Grouping, .as = {.unary = {.operand = (expression)}}})
 #define expression_make_addition(left_operand, right_operand) ((Expression){.kind = ExpressionKind_Addition, .as = {.binary = {.left = (left_operand), .right = (right_operand)}}})
 #define expression_make_subtraction(left_operand, right_operand) ((Expression){.kind = ExpressionKind_Subtraction, .as = {.binary = {.left = (left_operand), .right = (right_operand)}}})
@@ -205,6 +209,7 @@ struct Expression
 #define expression_as_boolean(expression) ((expression).as.boolean)
 #define expression_as_value(expression) ((expression).as.value)
 #define expression_as_negation(expression) ((expression).as.unary)
+#define expression_as_not(expression) ((expression).as.unary)
 #define expression_as_grouping(expression) ((expression).as.unary)
 #define expression_as_binary(expression) ((expression).as.binary)
 #define expression_as_addition(expression) ((expression).as.binary)
@@ -300,6 +305,7 @@ enum
     OpCode_True,
     OpCode_False,
     OpCode_Negation,
+    OpCode_Not,
     OpCode_Addition,
     OpCode_Subtraction,
     OpCode_Multiplication,

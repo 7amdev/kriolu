@@ -1,5 +1,20 @@
 #include "kriolu.h"
 
+bool value_negate_logically(Value value)
+{
+    // return (
+    //     value_is_nil(value) ||
+    //     (value_is_boolean(value) && !value_as_boolean(value)));
+
+    if (value_is_nil(value))
+        return true;
+
+    if (value_is_boolean(value))
+        return !value_as_boolean(value);
+
+    return false;
+}
+
 void value_array_init(ValueArray *values)
 {
     values->items = NULL;
@@ -36,7 +51,7 @@ void value_print(Value value)
     }
     case Value_Boolean:
     {
-        printf("%s", value_as_boolean(value) == true ? "true" : "false");
+        printf("%s", value_as_boolean(value) == true ? "verdadi" : "falsu");
         break;
     }
     case Value_Nil:
