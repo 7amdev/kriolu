@@ -1,7 +1,5 @@
 #include "kriolu.h"
 
-// todo: String interpolation implementation
-
 #define LEXER_MEMORY_POOL_MAX 25
 
 typedef struct
@@ -293,7 +291,6 @@ Token lexer_scan(Lexer *lexer)
         return lexer_make_token(lexer, TOKEN_NUMBER);
     }
 
-    // TODO: add string interpolation
     if (lexer_is_string(*lexer->current))
         return lexer_read_string(lexer);
 

@@ -196,6 +196,46 @@ InterpreterResult virtual_machine_interpret(VirtualMachine *vm)
             stack_value_push(&vm->stack_value, value_power);
             break;
         }
+        case OpCode_Equal_To:
+        {
+            Value b = stack_value_pop(&vm->stack_value);
+            Value a = stack_value_pop(&vm->stack_value);
+            bool is_equal = value_is_equal(a, b);
+            stack_value_push(&vm->stack_value, value_make_boolean(is_equal));
+            break;
+        }
+        case OpCode_Greater_Than:
+        {
+            if (!value_is_number(stack_value_peek(&vm->stack_value, 0)) ||
+                !value_is_number(stack_value_peek(&vm->stack_value, 1)))
+            {
+                virtual_machine_runtime_error(vm, "Operands must be numbers.");
+                return Interpreter_Runtime_Error;
+            }
+
+            Value b = stack_value_pop(&vm->stack_value);
+            Value a = stack_value_pop(&vm->stack_value);
+            bool result = (value_as_number(a) > value_as_number(b));
+
+            stack_value_push(&vm->stack_value, value_make_boolean(result));
+            break;
+        }
+        case OpCode_Less_Than:
+        {
+            if (!value_is_number(stack_value_peek(&vm->stack_value, 0)) ||
+                !value_is_number(stack_value_peek(&vm->stack_value, 1)))
+            {
+                virtual_machine_runtime_error(vm, "Operands must be numbers.");
+                return Interpreter_Runtime_Error;
+            }
+
+            Value b = stack_value_pop(&vm->stack_value);
+            Value a = stack_value_pop(&vm->stack_value);
+            bool result = (value_as_number(a) < value_as_number(b));
+
+            stack_value_push(&vm->stack_value, value_make_boolean(result));
+            break;
+        }
         case OpCode_Return:
         {
             Value constant = stack_value_pop(&vm->stack_value);

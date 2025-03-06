@@ -139,12 +139,14 @@ typedef struct
 
 #define value_as_boolean(value) ((value).as.boolean)
 #define value_as_number(value) ((value).as.number)
+#define value_as_nil(value) ((value).as.number)
 
 #define value_is_boolean(value) ((value).kind == Value_Boolean)
 #define value_is_number(value) ((value).kind == Value_Number)
 #define value_is_nil(value) ((value).kind == Value_Nil)
 
 bool value_negate_logically(Value value);
+bool value_is_equal(Value a, Value b);
 
 void value_array_init(ValueArray *values);
 uint32_t value_array_insert(ValueArray *values, Value value);
@@ -171,6 +173,9 @@ enum
     ExpressionKind_Multiplication,
     ExpressionKind_Division,
     ExpressionKind_Exponentiation,
+    ExpressionKind_Equal_To,
+    ExpressionKind_Greater_Than,
+    ExpressionKind_Less_Than
 };
 
 typedef struct Expression Expression;
@@ -204,6 +209,9 @@ struct Expression
 #define expression_make_multiplication(left_operand, right_operand) ((Expression){.kind = ExpressionKind_Multiplication, .as = {.binary = {.left = (left_operand), .right = (right_operand)}}})
 #define expression_make_division(left_operand, right_operand) ((Expression){.kind = ExpressionKind_Division, .as = {.binary = {.left = (left_operand), .right = (right_operand)}}})
 #define expression_make_exponentiation(left_operand, right_operand) ((Expression){.kind = ExpressionKind_Exponentiation, .as = {.binary = {.left = (left_operand), .right = (right_operand)}}})
+#define expression_make_equal_to(left_operand, right_operand) ((Expression){.kind = ExpressionKind_Equal_To, .as = {.binary = {.left = (left_operand), .right = (right_operand)}}})
+#define expression_make_greater_than(left_operand, right_operand) ((Expression){.kind = ExpressionKind_Greater_Than, .as = {.binary = {.left = (left_operand), .right = (right_operand)}}})
+#define expression_make_less_than(left_operand, right_operand) ((Expression){.kind = ExpressionKind_Less_Than, .as = {.binary = {.left = (left_operand), .right = (right_operand)}}})
 
 #define expression_as_number(expression) ((expression).as.number)
 #define expression_as_boolean(expression) ((expression).as.boolean)
@@ -217,6 +225,9 @@ struct Expression
 #define expression_as_multiplication(expression) ((expression).as.binary)
 #define expression_as_division(expression) ((expression).as.binary)
 #define expression_as_exponentiation(expression) ((expression).as.binary)
+#define expression_as_equal(expression) ((expression).as.binary)
+#define expression_as_greater(expression) ((expression).as.binary)
+#define expression_as_less(expression) ((expression).as.binary)
 
 Expression *expression_allocate(Expression expr);
 void expression_print(Expression *expression);
@@ -310,7 +321,11 @@ enum
     OpCode_Subtraction,
     OpCode_Multiplication,
     OpCode_Division,
+    // TODO: add OpCode_Modulus
     OpCode_Exponentiation,
+    OpCode_Equal_To,
+    OpCode_Greater_Than,
+    OpCode_Less_Than,
 
     OpCode_Return
 };

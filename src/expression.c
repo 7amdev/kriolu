@@ -31,7 +31,7 @@ void expression_print_tree(Expression *expression, int indent)
     }
     case ExpressionKind_Boolean:
     {
-        printf("%s\n", expression_as_boolean(*expression) == true ? "true" : "false");
+        printf("%s\n", expression_as_boolean(*expression) == true ? "verdadi" : "falsu");
         break;
     }
     case ExpressionKind_Nil:
@@ -66,11 +66,30 @@ void expression_print_tree(Expression *expression, int indent)
     case ExpressionKind_Multiplication:
     case ExpressionKind_Division:
     case ExpressionKind_Exponentiation:
+    case ExpressionKind_Equal_To:
+    case ExpressionKind_Greater_Than:
+    case ExpressionKind_Less_Than:
     {
         Expression *left_operand = expression_as_binary(*expression).left;
         Expression *right_operand = expression_as_binary(*expression).right;
 
-        printf("+:\n");
+        if (expression->kind == ExpressionKind_Addition)
+            printf("+:\n");
+        else if (expression->kind == ExpressionKind_Subtraction)
+            printf("-:\n");
+        else if (expression->kind == ExpressionKind_Multiplication)
+            printf("*:\n");
+        else if (expression->kind == ExpressionKind_Division)
+            printf("/:\n");
+        else if (expression->kind == ExpressionKind_Exponentiation)
+            printf("^:\n");
+        else if (expression->kind == ExpressionKind_Equal_To)
+            printf("==:\n");
+        else if (expression->kind == ExpressionKind_Greater_Than)
+            printf(">:\n");
+        else if (expression->kind == ExpressionKind_Less_Than)
+            printf("<:\n");
+
         expression_print_tree(left_operand, indent + 1);
         expression_print_tree(right_operand, indent + 1);
         break;
@@ -85,6 +104,7 @@ void expression_print(Expression *expression)
     {
     default:
     {
+        // TODO: log Node Type name
         assert(false && "Node not supported.");
         break;
     }
@@ -135,6 +155,9 @@ void expression_print(Expression *expression)
     case ExpressionKind_Multiplication:
     case ExpressionKind_Division:
     case ExpressionKind_Exponentiation:
+    case ExpressionKind_Equal_To:
+    case ExpressionKind_Greater_Than:
+    case ExpressionKind_Less_Than:
     {
         Expression *left_operand = expression_as_binary(*expression).left;
         Expression *right_operand = expression_as_binary(*expression).right;
@@ -152,6 +175,12 @@ void expression_print(Expression *expression)
             printf(" / ");
         else if (expression->kind == ExpressionKind_Exponentiation)
             printf(" ^ ");
+        else if (expression->kind == ExpressionKind_Equal_To)
+            printf(" == ");
+        else if (expression->kind == ExpressionKind_Greater_Than)
+            printf(" > ");
+        else if (expression->kind == ExpressionKind_Less_Than)
+            printf(" < ");
 
         expression_print(right_operand);
         printf(")");
@@ -165,8 +194,11 @@ void expression_free(Expression *expression)
 
     switch (expression->kind)
     {
+        // TODO: add default with assertion
+        // TODO: add literal cases
     case ExpressionKind_Negation:
     case ExpressionKind_Grouping:
+    case ExpressionKind_Not:
     {
         Expression *operand = expression_as_negation(*expression).operand;
         expression_free(operand);
@@ -177,6 +209,9 @@ void expression_free(Expression *expression)
     case ExpressionKind_Multiplication:
     case ExpressionKind_Division:
     case ExpressionKind_Exponentiation:
+    case ExpressionKind_Equal_To:
+    case ExpressionKind_Greater_Than:
+    case ExpressionKind_Less_Than:
     {
         Expression *left_operand = expression_as_addition(*expression).left;
         Expression *right_operand = expression_as_addition(*expression).right;

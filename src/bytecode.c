@@ -98,7 +98,6 @@ int bytecode_disassemble_instruction(Bytecode *bytecode, int offset)
     else
         printf("%4d ", bytecode->lines.items[offset]);
 
-    // TODO: handle OpCode_True, OpCode_False, and OpCode_Nil
     OpCode opcode = bytecode->instructions.items[offset];
     if (opcode == OpCode_Constant)
         return bytecode_debug_instruction_2bytes(bytecode, "OPCODE_CONSTANT", (offset + 2));
@@ -126,6 +125,12 @@ int bytecode_disassemble_instruction(Bytecode *bytecode, int offset)
         return bytecode_debug_instruction_byte("OPCODE_EXPONENTIATION", (offset + 1));
     if (opcode == OpCode_Negation)
         return bytecode_debug_instruction_byte("OPCODE_NEGATION", (offset + 1));
+    if (opcode == OpCode_Equal_To)
+        return bytecode_debug_instruction_byte("OPCODE_EQUAL_TO", (offset + 1));
+    if (opcode == OpCode_Greater_Than)
+        return bytecode_debug_instruction_byte("OPCODE_GREATER_THAN", (offset + 1));
+    if (opcode == OpCode_Less_Than)
+        return bytecode_debug_instruction_byte("OPCODE_LESS_THAN", (offset + 1));
     if (opcode == OpCode_Return)
         return bytecode_debug_instruction_byte("OPCODE_RETURN", (offset + 1));
 

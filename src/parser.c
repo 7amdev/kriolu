@@ -316,6 +316,9 @@ static Expression *parser_unary_and_literals(Parser *parser)
         return expression_allocate(grouping);
     }
 
+    // TODO: log token name
+    assert(false && "Unhandled token...");
+
     return NULL;
 }
 
@@ -337,34 +340,96 @@ static Expression *parser_binary(Parser *parser, Expression *left_operand)
     if (operator_kind_previous == TOKEN_MINUS)
     {
         bytecode_emit_byte(OpCode_Addition, parser->previous.line_number);
-        Expression subtraction = expression_make_subtraction(left_operand, right_operand);
 
+        Expression subtraction = expression_make_subtraction(left_operand, right_operand);
         return expression_allocate(subtraction);
     }
 
     if (operator_kind_previous == TOKEN_ASTERISK)
     {
         bytecode_emit_byte(OpCode_Multiplication, parser->previous.line_number);
-        Expression multiplication = expression_make_multiplication(left_operand, right_operand);
 
+        Expression multiplication = expression_make_multiplication(left_operand, right_operand);
         return expression_allocate(multiplication);
     }
 
     if (operator_kind_previous == TOKEN_SLASH)
     {
         bytecode_emit_byte(OpCode_Division, parser->previous.line_number);
-        Expression division = expression_make_division(left_operand, right_operand);
 
+        Expression division = expression_make_division(left_operand, right_operand);
         return expression_allocate(division);
     }
 
     if (operator_kind_previous == TOKEN_CARET)
     {
         bytecode_emit_byte(OpCode_Exponentiation, parser->previous.line_number);
-        Expression exponentiation = expression_make_division(left_operand, right_operand);
 
+        Expression exponentiation = expression_make_division(left_operand, right_operand);
         return expression_allocate(exponentiation);
     }
+
+    if (operator_kind_previous == TOKEN_EQUAL_EQUAL)
+    {
+        bytecode_emit_byte(OpCode_Equal_To, parser->previous.line_number);
+
+        Expression equal_to = expression_make_equal_to(left_operand, right_operand);
+        return expression_allocate(equal_to);
+    }
+
+    if (operator_kind_previous == TOKEN_NOT_EQUAL)
+    {
+        // a != b has the same semantics as !(a == b)
+        //
+        bytecode_emit_byte(OpCode_Equal_To, parser->previous.line_number);
+        bytecode_emit_byte(OpCode_Not, parser->previous.line_number);
+
+        Expression *equal_to = expression_allocate(expression_make_equal_to(left_operand, right_operand));
+        return expression_allocate(expression_make_not(equal_to));
+    }
+
+    if (operator_kind_previous == TOKEN_GREATER)
+    {
+        bytecode_emit_byte(OpCode_Greater_Than, parser->previous.line_number);
+
+        Expression greater_than = expression_make_greater_than(left_operand, right_operand);
+        return expression_allocate(greater_than);
+    }
+
+    if (operator_kind_previous == TOKEN_GREATER_EQUAL)
+    {
+        // a >= b has the same semantics as !(a < b)
+        //
+        bytecode_emit_byte(OpCode_Less_Than, parser->previous.line_number);
+        bytecode_emit_byte(OpCode_Not, parser->previous.line_number);
+
+        Expression *greater_than = expression_allocate(expression_make_greater_than(left_operand, right_operand));
+        Expression greater_than_or_equal_to = expression_make_not(greater_than);
+        return expression_allocate(greater_than_or_equal_to);
+    }
+
+    if (operator_kind_previous == TOKEN_LESS)
+    {
+        bytecode_emit_byte(OpCode_Less_Than, parser->previous.line_number);
+
+        Expression less_than = expression_make_less_than(left_operand, right_operand);
+        return expression_allocate(less_than);
+    }
+
+    if (operator_kind_previous == TOKEN_LESS_EQUAL)
+    {
+        // a <= b has the same semantics as !(a > b)
+        //
+        bytecode_emit_byte(OpCode_Greater_Than, parser->previous.line_number);
+        bytecode_emit_byte(OpCode_Not, parser->previous.line_number);
+
+        Expression *less_than = expression_allocate(expression_make_less_than(left_operand, right_operand));
+        Expression less_than_or_equal_to = expression_make_not(less_than);
+        return expression_allocate(less_than_or_equal_to);
+    }
+
+    // TODO: log token name
+    assert(false && "Unhandled token...");
 
     return NULL;
 }
