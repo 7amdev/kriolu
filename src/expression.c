@@ -39,6 +39,11 @@ void expression_print_tree(Expression *expression, int indent)
         printf("nulo\n");
         break;
     }
+    case ExpressionKind_String:
+    {
+        printf("%s\n", expression_as_string(*expression)->characters);
+        break;
+    }
     case ExpressionKind_Negation:
     {
         Expression *operand = expression_as_negation(*expression).operand;
@@ -122,6 +127,11 @@ void expression_print(Expression *expression)
     case ExpressionKind_Nil:
     {
         printf("nulo");
+        break;
+    }
+    case ExpressionKind_String:
+    {
+        printf("%s", expression_as_string(*expression)->characters);
         break;
     }
     case ExpressionKind_Negation:

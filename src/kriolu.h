@@ -106,6 +106,48 @@ void lexer_debug_dump_tokens(Lexer *lexer);
 void lexer_destroy_static(Lexer *lexer);
 
 //
+// Object
+//
+
+typedef enum
+{
+    ObjectKind_Invalid,
+
+    ObjectKind_String
+} ObjectKind;
+
+typedef struct Object Object;
+struct Object
+{
+    ObjectKind kind;
+
+    // Access next object on the linked list
+    //
+    Object *next;
+};
+
+typedef struct
+{
+    Object object;
+    int length;
+    char *characters;
+} ObjectString;
+
+#define object_cast_to_string(object) ((ObjectString *)object)
+#define string_cast_to_object(string) ((Object *)string)
+
+#define object_get_string_chars(object) (object_cast_to_string(object)->characters)
+
+Object *object_allocate(ObjectKind kind, size_t size);
+void object_init(Object *object, ObjectKind kind);
+void object_clear(Object *object);
+void object_print(Object *object);
+void object_free(Object *object);
+
+ObjectString *object_string_allocate(char *characters, int length);
+void object_string_free(ObjectString *string);
+
+//
 // Value
 //
 
@@ -113,7 +155,8 @@ typedef enum
 {
     Value_Boolean,
     Value_Nil,
-    Value_Number
+    Value_Number,
+    Value_Object
 } ValueKind;
 
 typedef struct
@@ -123,6 +166,7 @@ typedef struct
     {
         bool boolean;
         double number;
+        Object *object;
     } as;
 } Value;
 
@@ -135,18 +179,27 @@ typedef struct
 
 #define value_make_boolean(value) ((Value){.kind = Value_Boolean, .as = {.boolean = value}})
 #define value_make_number(value) ((Value){.kind = Value_Number, .as = {.number = value}})
+#define value_make_object(value) ((Value){.kind = Value_Object, .as = {.object = (Object *)value}})
 #define value_make_nil() ((Value){.kind = Value_Nil, .as = {.number = 0}})
 
 #define value_as_boolean(value) ((value).as.boolean)
 #define value_as_number(value) ((value).as.number)
 #define value_as_nil(value) ((value).as.number)
+#define value_as_object(value) ((value).as.object)
+#define value_as_string(value) ((ObjectString *)value_as_object(value))
 
 #define value_is_boolean(value) ((value).kind == Value_Boolean)
 #define value_is_number(value) ((value).kind == Value_Number)
+#define value_is_object(value) ((value).kind == Value_Object)
 #define value_is_nil(value) ((value).kind == Value_Nil)
+#define value_is_string(value) value_is_object_type(value, ObjectKind_String)
+
+#define value_get_object_type(value) (value_as_object(value)->type)
+#define value_get_string_chars(value) (value_as_string(value)->characters)
 
 bool value_negate_logically(Value value);
 bool value_is_equal(Value a, Value b);
+inline bool value_is_object_type(Value value, ObjectKind object_kind);
 
 void value_array_init(ValueArray *values);
 uint32_t value_array_insert(ValueArray *values, Value value);
@@ -164,6 +217,7 @@ enum
 
     ExpressionKind_Number,
     ExpressionKind_Boolean,
+    ExpressionKind_String,
     ExpressionKind_Nil,
     ExpressionKind_Negation,
     ExpressionKind_Not,
@@ -186,6 +240,7 @@ struct Expression
     {
         double number;
         bool boolean;
+        Object *object;
         struct
         {
             Expression *operand;
@@ -200,6 +255,7 @@ struct Expression
 
 #define expression_make_number(value) ((Expression){.kind = ExpressionKind_Number, .as = {.number = (value)}})
 #define expression_make_boolean(value) ((Expression){.kind = ExpressionKind_Boolean, .as = {.boolean = (value)}})
+#define expression_make_string(value) ((Expression){.kind = ExpressionKind_String, .as = {.object = (Object *)value}})
 #define expression_make_nil() ((Expression){.kind = ExpressionKind_Nil, .as = {.number = 0}})
 #define expression_make_negation(expression) ((Expression){.kind = ExpressionKind_Negation, .as = {.unary = {.operand = (expression)}}})
 #define expression_make_not(expression) ((Expression){.kind = ExpressionKind_Not, .as = {.unary = {.operand = (expression)}}})
@@ -215,6 +271,8 @@ struct Expression
 
 #define expression_as_number(expression) ((expression).as.number)
 #define expression_as_boolean(expression) ((expression).as.boolean)
+#define expression_as_object(expression) ((expression).as.object)
+#define expression_as_string(expression) ((ObjectString *)(expression).as.object)
 #define expression_as_value(expression) ((expression).as.value)
 #define expression_as_negation(expression) ((expression).as.unary)
 #define expression_as_not(expression) ((expression).as.unary)
@@ -412,14 +470,23 @@ typedef struct
 {
     Bytecode *bytecode;
     StackValue stack_value;
-    uint8_t *ip; // Instruction Pointer
+
+    // Instruction Pointer
+    //
+    uint8_t *ip;
+
+    // A linked list of all objects created at runtime
+    //
+    Object *objects;
+
+    // TODO: add a varible to track total bytes allocated
 } VirtualMachine;
 
 extern VirtualMachine g_vm;
 
 #define vm_init(bytecode) virtual_machine_init(&g_vm, bytecode)
 #define vm_interpret() virtual_machine_interpret(&g_vm)
-#define vm_free() virtual_machine_init(&g_vm)
+#define vm_free() virtual_machine_free(&g_vm)
 
 void virtual_machine_init(VirtualMachine *vm, Bytecode *bytecode);
 InterpreterResult virtual_machine_interpret(VirtualMachine *vm);

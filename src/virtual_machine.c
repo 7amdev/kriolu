@@ -12,6 +12,7 @@ void virtual_machine_init(VirtualMachine *vm, Bytecode *bytecode)
     vm->bytecode = bytecode;
     stack_value_reset(&vm->stack_value);
     vm->ip = vm->bytecode->instructions.items;
+    vm->objects = NULL;
 }
 
 void virtual_machine_runtime_error(VirtualMachine *vm, const char *format, ...)
@@ -113,19 +114,39 @@ InterpreterResult virtual_machine_interpret(VirtualMachine *vm)
         }
         case OpCode_Addition:
         {
-            if (!value_is_number(stack_value_peek(&vm->stack_value, 0)) ||
-                !value_is_number(stack_value_peek(&vm->stack_value, 1)))
+            if (value_is_number(stack_value_peek(&vm->stack_value, 0)) &&
+                value_is_number(stack_value_peek(&vm->stack_value, 1)))
             {
-                virtual_machine_runtime_error(vm, "Operands must be numbers.");
+                Value b = stack_value_pop(&vm->stack_value);
+                Value a = stack_value_pop(&vm->stack_value);
+                double sum = value_as_number(a) + value_as_number(b);
+                Value value_sum = value_make_number(sum);
+
+                stack_value_push(&vm->stack_value, value_sum);
+            }
+            else if (value_is_string(stack_value_peek(&vm->stack_value, 0)) &&
+                     value_is_string(stack_value_peek(&vm->stack_value, 1)))
+            {
+                Value b = stack_value_pop(&vm->stack_value);
+                Value a = stack_value_pop(&vm->stack_value);
+                ObjectString *string_a = value_as_string(a);
+                ObjectString *string_b = value_as_string(b);
+
+                int length = string_a->length + string_b->length;
+                char *string = malloc(sizeof(char) * length + 1);
+                memcpy(string, string_a->characters, string_a->length);
+                memcpy(string + string_a->length, string_b->characters, string_b->length);
+                string[length] = '\0';
+
+                ObjectString *result = object_string_allocate(string, length);
+                stack_value_push(&vm->stack_value, value_make_object(result));
+            }
+            else
+            {
+                virtual_machine_runtime_error(vm, "Operands must be 2(two) numbers or 2(two) strings.");
                 return Interpreter_Runtime_Error;
             }
 
-            Value b = stack_value_pop(&vm->stack_value);
-            Value a = stack_value_pop(&vm->stack_value);
-            double sum = value_as_number(a) + value_as_number(b);
-            Value value_sum = value_make_number(sum);
-
-            stack_value_push(&vm->stack_value, value_sum);
             break;
         }
         case OpCode_Subtraction:
@@ -255,5 +276,11 @@ InterpreterResult virtual_machine_interpret(VirtualMachine *vm)
 
 void virtual_machine_free(VirtualMachine *vm)
 {
-    assert(false && "To Be Done");
+    Object *object = vm->objects;
+    while (object != NULL)
+    {
+        Object *next = object->next;
+        object_free(object);
+        object = next;
+    }
 }

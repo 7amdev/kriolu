@@ -287,6 +287,24 @@ static Expression *parser_unary_and_literals(Parser *parser)
         return expression_allocate(nil);
     }
 
+    if (parser->previous.kind == TOKEN_STRING)
+    {
+        // TODO: Where to put this code? Should I create a type ArrayChar
+        //
+        int length = parser->previous.length - 2;
+        char *characters = (char *)malloc(sizeof(char) * length + 1);
+        assert(characters);
+        memcpy(characters, parser->previous.start + 1, length);
+        characters[length] = '\0';
+
+        ObjectString *string = object_string_allocate(characters, length);
+        Value v_string = value_make_object(string);
+        Expression e_string = expression_make_string(string);
+
+        bytecode_emit_constant(v_string, parser->previous.line_number);
+        return expression_allocate(e_string);
+    }
+
     // Unary
     //
     if (parser->previous.kind == TOKEN_MINUS)
