@@ -72,23 +72,25 @@ int main(int argc, const char *argv[])
         parser_init(&parser, source_code);
 
         bytecode_emitter_begin();
+        // NOTE: should parse return a linked list of objects create? we then use
+        //       the linked-list to initialize virtual machine.
         StatementArray *statements = parser_parse(&parser);
         bytecode = bytecode_emitter_end();
 
         vm_init(&bytecode);
         vm_interpret();
 
-        // bytecode_disassemble(&bytecode, "Test");
+        bytecode_disassemble(&bytecode, "Test");
         bytecode_free(&bytecode);
 
         printf("\n");
-        for (int i = 0; i < statements->count; i++)
-        {
-            expression_print(statements->items[i].expression);
-            printf("\n");
-            expression_print_tree(statements->items[i].expression, 0);
-            expression_free(statements->items[i].expression);
-        }
+        // for (int i = 0; i < statements->count; i++)
+        // {
+        //     expression_print(statements->items[i].expression);
+        //     printf("\n");
+        //     expression_print_tree(statements->items[i].expression, 0);
+        //     expression_free(statements->items[i].expression);
+        // }
 
         vm_free();
     }

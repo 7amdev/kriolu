@@ -15,6 +15,8 @@ static Token lexer_advance_then_make_token(Lexer *lexer, TokenKind kind);
 static bool lexer_advance_if_match(Lexer *lexer, char expected, int offset);
 static char lexer_peek(Lexer *lexer);
 static Token lexer_make_token(Lexer *lexer, TokenKind kind);
+static Token lexer_make_error_and_advance(Lexer *lexer, const char *format, ...);
+static Token lexer_read_string(Lexer *lexer);
 static bool lexer_is_eof(char c);
 static bool lexer_is_digit(char c);
 static bool lexer_is_letter_or_underscore(char c);
@@ -25,7 +27,6 @@ static bool lexer_is_string(char c);
 // TODO: static bool lexer_is_uppercase_letter(char c);
 // TODO: static bool lexer_is_lowercase_letter(char c);
 static TokenKind lexer_keyword_kind(Token token, char const *keyword, int check_start_position, TokenKind return_kind);
-static Token lexer_error(Lexer *lexer, const char *message);
 
 Lexer *lexer_create_static()
 {
@@ -50,56 +51,6 @@ void lexer_init(Lexer *lexer, const char *source_code)
     lexer->current = source_code;
     lexer->line_number = 1;
     lexer->string_interpolation_count = 0;
-}
-
-static Token lexer_read_string(Lexer *lexer)
-{
-    TokenKind token_kind = TOKEN_STRING;
-
-    for (;;)
-    {
-        lexer_advance(lexer);
-
-        if (*lexer->current == '"')
-            break;
-
-        if (lexer_is_eof(*lexer->current))
-            return lexer_error(lexer, "Expected '\"' character, instead found EOF.");
-
-        if (lexer_is_new_line(*lexer->current))
-            lexer->line_number += 1;
-
-        if (*lexer->current == '%')
-        {
-            if (lexer->current[1] != '{')
-                return lexer_error(lexer, "Expected '{' character, instead found 'xx'");
-
-            if (lexer->string_interpolation_count >= STRING_INTERPOLATION_MAX)
-                return lexer_error(lexer, "You've reached the maximum number of interpolation nesting.");
-
-            token_kind = TOKEN_STRING_INTERPOLATION;
-            lexer->string_nested_interpolation[lexer->string_interpolation_count] = 1;
-            lexer->string_interpolation_count += 1;
-
-            // Consume '%' character
-            //
-            lexer_advance(lexer);
-            break;
-        }
-    }
-
-    // On Parser
-    // ex: "Hello %{World}!"
-    // <string_interpolation>   "Hello %{
-    // <identifier>             World
-    // <string>                 }!"
-    //
-    // do {
-    //     literal(); // Process "Hello ${
-    //     expression(praser);
-    // } while(parser_match_then_advance(parser, string_interpolation));
-
-    return lexer_advance_then_make_token(lexer, token_kind);
 }
 
 Token lexer_scan(Lexer *lexer)
@@ -146,17 +97,8 @@ Token lexer_scan(Lexer *lexer)
     if (*lexer->current == ')')
         return lexer_advance_then_make_token(lexer, TOKEN_RIGHT_PARENTHESIS);
 
-    // TODO: increment nested interpolation count?
     if (*lexer->current == '{')
-    {
-        // if (lexer->string_interpolation_count > 0)
-        // {
-        //     int current_interpolation = lexer->string_interpolation_count - 1;
-        //     lexer->string_nested_interpolation[current_interpolation] += 1;
-        // }
-
         return lexer_advance_then_make_token(lexer, TOKEN_LEFT_BRACE);
-    }
 
     if (*lexer->current == '}')
     {
@@ -408,7 +350,7 @@ Token lexer_scan(Lexer *lexer)
         return token;
     }
 
-    return lexer_error(lexer, "Unexpected Caracter.");
+    return lexer_make_error_and_advance(lexer, "'%c' : Lexer doesn't recognize this character.", *lexer->current);
 }
 
 void lexer_debug_print_token(Token token, const char *format)
@@ -682,6 +624,7 @@ static Token lexer_make_token(Lexer *lexer, TokenKind kind)
 
     return token;
 }
+
 static Token lexer_advance_then_make_token(Lexer *lexer, TokenKind kind)
 {
     // Order matters!
@@ -690,6 +633,45 @@ static Token lexer_advance_then_make_token(Lexer *lexer, TokenKind kind)
     lexer_advance(lexer);
     Token token = lexer_make_token(lexer, kind);
     return token;
+}
+
+static Token lexer_read_string(Lexer *lexer)
+{
+    TokenKind token_kind = TOKEN_STRING;
+
+    for (;;)
+    {
+        lexer_advance(lexer);
+
+        if (*lexer->current == '"')
+            break;
+
+        if (lexer_is_eof(*lexer->current))
+            return lexer_make_error_and_advance(lexer, "Expected '\"' character, instead found EOF.");
+
+        if (lexer_is_new_line(*lexer->current))
+            lexer->line_number += 1;
+
+        if (*lexer->current == '%')
+        {
+            if (lexer->current[1] != '{')
+                return lexer_make_error_and_advance(lexer, "Expected '{' character, instead found '%c'", lexer->current[1]);
+
+            if (lexer->string_interpolation_count >= STRING_INTERPOLATION_MAX)
+                return lexer_make_error_and_advance(lexer, "You've reached the maximum number of interpolation nesting.");
+
+            token_kind = TOKEN_STRING_INTERPOLATION;
+            lexer->string_nested_interpolation[lexer->string_interpolation_count] = 1;
+            lexer->string_interpolation_count += 1;
+
+            // Consume '%' character
+            //
+            lexer_advance(lexer);
+            break;
+        }
+    }
+
+    return lexer_advance_then_make_token(lexer, token_kind);
 }
 
 static bool lexer_is_eof(char c)
@@ -761,13 +743,19 @@ static TokenKind lexer_keyword_kind(Token token, char const *keyword, int check_
     return return_kind;
 }
 
-static Token lexer_error(Lexer *lexer, const char *message)
+static Token lexer_make_error_and_advance(Lexer *lexer, const char *format, ...)
 {
-    // TODO: use vargs and vprintf to support custom messages
+    va_list args;
+    va_start(args, format);
+    char buffer[1024];
+    vsnprintf(buffer, 1024, format, args);
+    va_end(args);
+
+    lexer_advance(lexer);
     return (Token){
         .kind = TOKEN_ERROR,
-        .start = message,
-        .length = (int)strlen(message),
+        .start = buffer,
+        .length = (int)strlen(buffer),
         .line_number = lexer->line_number};
 }
 

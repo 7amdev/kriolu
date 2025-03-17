@@ -21,6 +21,10 @@ void object_init(Object *object, ObjectKind kind)
     //
     // object.next -> object_1
     // g_vm.objects -> object.next -> object_1.next -> NULL
+    //
+    // TODO: change g_vm.objects to g_objects declared in object.c
+    //       to maintain encapsulation
+    //
     object->next = g_vm.objects;
     g_vm.objects = object;
 }
@@ -53,13 +57,15 @@ void object_free(Object *object)
     case ObjectKind_String:
     {
         // TODO: update virtual machine's bytes allocated variable
-        object_string_free((ObjectString *)object);
+        object_free_string((ObjectString *)object);
         break;
     }
     }
 }
 
-ObjectString *object_string_allocate(char *characters, int length)
+// TODO: change the parameters to: object_allocate_string(String string)
+//
+ObjectString *object_allocate_string(char *characters, int length)
 {
     // 1. Copy string from source file to heap
     //
@@ -86,7 +92,7 @@ ObjectString *object_string_allocate(char *characters, int length)
     return string;
 }
 
-void object_string_free(ObjectString *string)
+void object_free_string(ObjectString *string)
 {
     free(string->characters);
     string->characters = NULL;

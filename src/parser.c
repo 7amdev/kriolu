@@ -43,6 +43,8 @@ void parser_initialize(Parser *parser, const char *source_code, Lexer *lexer)
     parser->panic_mode = false;
     parser->had_error = false;
     parser->lexer = lexer;
+    parser->interpolation_count_nesting = 0;
+    parser->interpolation_count_value_pushed = 0;
     if (lexer == NULL)
     {
         parser->lexer = lexer_create_static();
@@ -80,12 +82,13 @@ static void parser_advance(Parser *parser)
     for (;;)
     {
         parser->current = lexer_scan(parser->lexer);
+        if (parser->current.kind == TOKEN_COMMENT)
+            continue;
 
-        // todo: skip comment token
         if (parser->current.kind != TOKEN_ERROR)
             break;
 
-        parser_error(parser, &parser->current, "Unexpected character!");
+        parser_error(parser, &parser->current, "");
     }
 }
 
@@ -153,11 +156,15 @@ static void parser_error(Parser *parser, Token *token, const char *message)
     {
         fprintf(stderr, " at end");
     }
+    else if (token->kind == TOKEN_ERROR)
+    {
+        fprintf(stderr, " at %.*s\n", token->length, token->start);
+    }
     else
     {
         fprintf(stderr, " at '%.*s'", token->length, token->start);
+        fprintf(stderr, " : '%s'\n", message);
     }
-    fprintf(stderr, " : '%s'\n", message);
 }
 
 static Statement parser_statement(Parser *parser)
@@ -289,20 +296,54 @@ static Expression *parser_unary_and_literals(Parser *parser)
 
     if (parser->previous.kind == TOKEN_STRING)
     {
-        // TODO: Where to put this code? Should I create a type ArrayChar
-        //
-        int length = parser->previous.length - 2;
-        char *characters = (char *)malloc(sizeof(char) * length + 1);
-        assert(characters);
-        memcpy(characters, parser->previous.start + 1, length);
-        characters[length] = '\0';
-
-        ObjectString *string = object_string_allocate(characters, length);
+        String token = string_make_and_copy_characters(parser->previous.start + 1, parser->previous.length - 2);
+        ObjectString *string = object_allocate_string(token.characters, token.length);
         Value v_string = value_make_object(string);
         Expression e_string = expression_make_string(string);
 
         bytecode_emit_constant(v_string, parser->previous.line_number);
         return expression_allocate(e_string);
+    }
+
+    if (parser->previous.kind == TOKEN_STRING_INTERPOLATION)
+    {
+        for (;;)
+        {
+            if (parser->previous.kind != TOKEN_STRING_INTERPOLATION)
+                break;
+
+            String token = string_make_and_copy_characters(parser->previous.start + 1, parser->previous.length - 3);
+            ObjectString *string = object_allocate_string(token.characters, token.length);
+            Value v_string = value_make_object(string);
+            Expression e_string = expression_make_string(string);
+
+            parser->interpolation_count_value_pushed += 1;
+            bytecode_emit_constant(v_string, parser->previous.line_number);
+
+            parser->interpolation_count_nesting += 1;
+            if (parser->current.kind != TOKEN_STRING_INTERPOLATION)
+                parser->interpolation_count_value_pushed += 1;
+            parser_expression(parser, OPERATION_ASSIGNMENT);
+            parser->interpolation_count_nesting -= 1;
+
+            parser_advance(parser);
+        }
+
+        if (*parser->previous.start != '}')
+            parser_error(parser, &parser->previous, "Missing closing '}' in interpolation template.");
+
+        parser->interpolation_count_value_pushed += 1;
+        parser_unary_and_literals(parser);
+
+        if (parser->interpolation_count_nesting == 0)
+        {
+            bytecode_emit_byte(OpCode_Interpolation, parser->previous.line_number);
+            bytecode_emit_byte((uint8_t)parser->interpolation_count_value_pushed, parser->previous.line_number);
+        }
+
+        // TODO: implement string interpolation Ast-Node and return it
+        //
+        return NULL;
     }
 
     // Unary

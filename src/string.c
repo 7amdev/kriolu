@@ -1,0 +1,79 @@
+#include "kriolu.h"
+
+String *string_allocate(const char *characters, int length)
+{
+    String *string = (String *)malloc(sizeof(String));
+    assert(string);
+    string_initialize(string, characters, length);
+    return string;
+}
+
+void string_initialize(String *string, const char *characters, int length)
+{
+    string->characters = (char *)malloc(sizeof(char) * length + 1);
+    assert(string->characters);
+    memcpy(string->characters, characters, length);
+    string->characters[length] = '\0';
+    string->length = length;
+}
+
+String string_make(char *characters, int length)
+{
+    String string = {0};
+    string.characters = characters;
+    string.length = length;
+
+    return string;
+}
+
+String string_make_from_format(const char *format, ...)
+{
+    va_list args;
+    va_start(args, format);
+    char buffer[8092];
+    vsnprintf(buffer, 8092, format, args);
+    va_end(args);
+
+    String string = string_make_and_copy_characters(buffer, strlen(buffer));
+
+    return string;
+}
+
+String string_make_and_copy_characters(const char *characters, int length)
+{
+    String string = {0};
+    string.characters = (char *)malloc(sizeof(char) * length + 1);
+    assert(string.characters);
+    memcpy(string.characters, characters, length);
+    string.characters[length] = '\0';
+    string.length = length;
+
+    // TODO: add to Object linked-list for garbage collector ???
+
+    return string;
+}
+
+String string_copy(String other)
+{
+    String string = {0};
+    string.characters = (char *)malloc(sizeof(char) * other.length + 1);
+    assert(string.characters);
+    memcpy(string.characters, other.characters, other.length);
+    string.characters[other.length] = '\0';
+    string.length = other.length;
+
+    return string;
+}
+
+String string_concatenate(String a, String b)
+{
+    String string = {0};
+    string.length = a.length + b.length;
+    string.characters = (char *)malloc(sizeof(char) * string.length + 1);
+    assert(string.characters);
+    memcpy(string.characters, a.characters, a.length);
+    memcpy(string.characters + a.length, b.characters, b.length);
+    string.characters[string.length] = '\0';
+
+    return string;
+}

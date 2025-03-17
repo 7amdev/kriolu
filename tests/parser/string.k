@@ -1,5 +1,12 @@
-"Alfredo " + "Monteiro";
-"Hello world!";
-"Alfredo" == "Alfredo";
-"alfredo" == "Alfredo";
-"Monteir" == "Alfredo";
+(1 + 2) * 3; 
+"Alfredo %{"Jorge"";
+// "Alfredo %{"Jorge %{1987 + 7}"}";
+// "Alfredo %{"Jorge %{1987 + 7} Santos"}";
+// "Alfredo %{"Jorge %{1987 + 7} Santos %{"Monteiro"}"}";
+// "Alfredo %{"Jorge %{1987 + 3} Santos %{"Monteiro"} Correia"}";
+// "Alfredo %{"Jorge %{1987 + 3} Santos %{"Monteiro"} Correia"} love";
+// "Alfredo " + "Monteiro";
+// "Hello world!";
+// "Alfredo" == "Alfredo";
+// "alfredo" == "Alfredo";
+// "Monteir" == "Alfredo";

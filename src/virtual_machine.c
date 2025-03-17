@@ -1,5 +1,4 @@
 #include "kriolu.h"
-#include <stdarg.h>
 
 //
 // Globals
@@ -12,7 +11,7 @@ void virtual_machine_init(VirtualMachine *vm, Bytecode *bytecode)
     vm->bytecode = bytecode;
     stack_value_reset(&vm->stack_value);
     vm->ip = vm->bytecode->instructions.items;
-    vm->objects = NULL;
+    vm->objects = NULL; // TODO: remove this??
 }
 
 void virtual_machine_runtime_error(VirtualMachine *vm, const char *format, ...)
@@ -112,6 +111,23 @@ InterpreterResult virtual_machine_interpret(VirtualMachine *vm)
             stack_value_push(&vm->stack_value, value);
             break;
         }
+        case OpCode_Interpolation:
+        {
+            // How pop value should a make to retrieve all the values necessary
+            // to join.
+            //
+            uint8_t total_pop_from_stack = READ_BYTE_THEN_INCREMENT();
+
+            // TODO: missing implementation
+            //       1) pop values from the stack
+            //       2) convert any integer to string
+            //       3) compute the total size and allocate the memory
+            //       4) copy
+            //       5) push to stack
+            //
+            assert(false && "TODO: missing implementation");
+            break;
+        }
         case OpCode_Addition:
         {
             if (value_is_number(stack_value_peek(&vm->stack_value, 0)) &&
@@ -129,16 +145,21 @@ InterpreterResult virtual_machine_interpret(VirtualMachine *vm)
             {
                 Value b = stack_value_pop(&vm->stack_value);
                 Value a = stack_value_pop(&vm->stack_value);
-                ObjectString *string_a = value_as_string(a);
-                ObjectString *string_b = value_as_string(b);
+                ObjectString *os_a = value_as_string(a);
+                ObjectString *os_b = value_as_string(b);
+                String s_a = string_make(os_a->characters, os_a->length);
+                String s_b = string_make(os_b->characters, os_b->length);
 
-                int length = string_a->length + string_b->length;
-                char *string = malloc(sizeof(char) * length + 1);
-                memcpy(string, string_a->characters, string_a->length);
-                memcpy(string + string_a->length, string_b->characters, string_b->length);
-                string[length] = '\0';
+                String final = string_concatenate(s_a, s_b);
 
-                ObjectString *result = object_string_allocate(string, length);
+                // int length = string_a->length + string_b->length;
+                // char *string = malloc(sizeof(char) * length + 1);
+                // memcpy(string, string_a->characters, string_a->length);
+                // memcpy(string + string_a->length, string_b->characters, string_b->length);
+                // string[length] = '\0';
+
+                // ObjectString *result = object_allocate_string(string, length);
+                ObjectString *result = object_allocate_string(final.characters, final.length);
                 stack_value_push(&vm->stack_value, value_make_object(result));
             }
             else

@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include <assert.h>
 #include <math.h>
+#include <stdarg.h>
 
 #define DEBUG_LOG_PARSER
 
@@ -106,6 +107,26 @@ void lexer_debug_dump_tokens(Lexer *lexer);
 void lexer_destroy_static(Lexer *lexer);
 
 //
+// String
+//
+
+// String is a sequence of characters
+//
+typedef struct
+{
+    char *characters;
+    int length;
+} String;
+
+String *string_allocate(const char *characters, int length);
+void string_initialize(String *string, const char *characters, int length);
+String string_make(char *characters, int length);
+String string_make_from_format(const char *format, ...);
+String string_make_and_copy_characters(const char *characters, int length);
+String string_copy(String other);
+String string_concatenate(String a, String b);
+
+//
 // Object
 //
 
@@ -129,8 +150,8 @@ struct Object
 typedef struct
 {
     Object object;
-    int length;
     char *characters;
+    int length;
 } ObjectString;
 
 #define object_cast_to_string(object) ((ObjectString *)object)
@@ -144,8 +165,8 @@ void object_clear(Object *object);
 void object_print(Object *object);
 void object_free(Object *object);
 
-ObjectString *object_string_allocate(char *characters, int length);
-void object_string_free(ObjectString *string);
+ObjectString *object_allocate_string(char *characters, int length);
+void object_free_string(ObjectString *string);
 
 //
 // Value
@@ -331,11 +352,13 @@ void statement_array_free(StatementArray *statements);
 
 typedef struct
 {
-    Token current;
-    Token previous;
+    Token current;  // TODO: rename to current_token
+    Token previous; // TODO: rename to previous_token
     Lexer *lexer;
     bool had_error;
     bool panic_mode;
+    int interpolation_count_nesting;
+    int interpolation_count_value_pushed;
 } Parser;
 
 #define parser_init(parser, source_code) parser_initialize(parser, source_code, NULL)
@@ -370,6 +393,7 @@ enum
 
     OpCode_Constant,
     OpCode_Constant_Long,
+    OpCode_Interpolation,
     OpCode_Nil,
     OpCode_True,
     OpCode_False,
@@ -476,7 +500,7 @@ typedef struct
     uint8_t *ip;
 
     // A linked list of all objects created at runtime
-    //
+    // TODO: move this variable to object.c module
     Object *objects;
 
     // TODO: add a varible to track total bytes allocated

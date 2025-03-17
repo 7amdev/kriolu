@@ -65,12 +65,19 @@ static int bytecode_debug_instruction_byte(const char *opcode_text, int ret_offs
 
 static int bytecode_debug_instruction_2bytes(Bytecode *bytecode, const char *opcode_text, int ret_offset_increment)
 {
-    uint8_t value_index = bytecode->instructions.items[ret_offset_increment - 1];
-    Value value = bytecode->values.items[value_index];
+    uint8_t operand = bytecode->instructions.items[ret_offset_increment - 1];
+    Value value = bytecode->values.items[operand];
 
-    printf("%-22s %5d '", opcode_text, value_index);
-    value_print(value);
-    printf("'\n");
+    if (strcmp(opcode_text, "OPCODE_INTERPOLATION") == 0)
+    {
+        printf("%-22s %5s '%d'\n", opcode_text, "**", operand);
+    }
+    else
+    {
+        printf("%-22s %5d '", opcode_text, operand);
+        value_print(value);
+        printf("'\n");
+    }
 
     return ret_offset_increment;
 }
@@ -101,6 +108,8 @@ int bytecode_disassemble_instruction(Bytecode *bytecode, int offset)
     OpCode opcode = bytecode->instructions.items[offset];
     if (opcode == OpCode_Constant)
         return bytecode_debug_instruction_2bytes(bytecode, "OPCODE_CONSTANT", (offset + 2));
+    if (opcode == OpCode_Interpolation)
+        return bytecode_debug_instruction_2bytes(bytecode, "OPCODE_INTERPOLATION", (offset + 2));
     if (opcode == OpCode_Constant_Long)
         return bytecode_debug_instruction_4bytes(bytecode, "OPCODE_CONSTANT_LONG", (offset + 4));
     if (opcode == OpCode_True)
