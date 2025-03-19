@@ -63,40 +63,43 @@ void object_free(Object *object)
     }
 }
 
-// TODO: change the parameters to: object_allocate_string(String string)
-//
-ObjectString *object_allocate_string(char *characters, int length)
+ObjectString *object_allocate_string(char *characters, int length, uint32_t hash)
 {
-    // 1. Copy string from source file to heap
-    //
-    // 2. Allocate Object with ObjectString type size and initialize
-    //    its type to ObjectKind_String
-    //
-    // 3. Cast Object to ObjectString and set member character pointing to the string
-    //    allocated in the heap
-    //
-    // TODO: Where to put this code? Should a create a type ArrayChar
-    //       char *characters = malloc(sizeof(char) * length + 1);
-    //       assert(characters);
-    //       memcpy(characters, start, length);
-    //       characters[length] = '\0';
-
     ObjectString *string = calloc(1, sizeof(ObjectString));
     assert(string);
 
     object_init((Object *)string, ObjectKind_String);
     assert(string->object.kind == ObjectKind_String);
     string->characters = characters;
+    string->hash = hash;
     string->length = length;
 
+    hash_table_set_value(&g_vm.strings, string, value_make_nil());
+
     return string;
+}
+
+ObjectString *object_copy_string(char *characters, int length)
+{
+    ObjectString *object_string = NULL;
+    String string = string_make(characters, length);
+    uint32_t hash = string_hash(string);
+    object_string = hash_table_get_key(&g_vm.strings, string, hash);
+
+    if (object_string == NULL)
+    {
+        String token = string_copy(string);
+        uint32_t token_hash = string_hash(token);
+        object_string = object_allocate_string(token.characters, token.length, token_hash);
+    }
+
+    return object_string;
 }
 
 void object_free_string(ObjectString *string)
 {
     free(string->characters);
+    free(string);
     string->characters = NULL;
     string->length = 0;
-    free(string);
-    // object_clear(&string->object);
 }

@@ -110,7 +110,7 @@ void lexer_destroy_static(Lexer *lexer);
 // String
 //
 
-// String is a sequence of characters
+// String is a sequence of characters.
 //
 typedef struct
 {
@@ -118,13 +118,23 @@ typedef struct
     int length;
 } String;
 
+// sizeof("Hello") -> 6: it counts the character '\0', so
+// the -1 at the end.
+//
+#define string_make_from_literal(string) \
+    (String){.characters = (char *)string, .length = sizeof(string) - 1}
+#define string_make_from_array(string) \
+    (String) { .characters = (char *)string, .length = strlen(string) }
+
 String *string_allocate(const char *characters, int length);
-void string_initialize(String *string, const char *characters, int length);
-String string_make(char *characters, int length);
+String string_make(const char *characters, int length);
 String string_make_from_format(const char *format, ...);
 String string_make_and_copy_characters(const char *characters, int length);
+void string_initialize(String *string, const char *characters, int length);
 String string_copy(String other);
 String string_concatenate(String a, String b);
+uint32_t string_hash(String string);
+bool string_equal(String a, String b);
 
 //
 // Object
@@ -150,8 +160,13 @@ struct Object
 typedef struct
 {
     Object object;
+
+    // String
+    //
     char *characters;
     int length;
+
+    uint32_t hash;
 } ObjectString;
 
 #define object_cast_to_string(object) ((ObjectString *)object)
@@ -165,7 +180,8 @@ void object_clear(Object *object);
 void object_print(Object *object);
 void object_free(Object *object);
 
-ObjectString *object_allocate_string(char *characters, int length);
+ObjectString *object_allocate_string(char *characters, int length, uint32_t hash);
+ObjectString *object_copy_string(char *characters, int length);
 void object_free_string(ObjectString *string);
 
 //
@@ -478,6 +494,45 @@ void stack_value_trace(StackValue *stack);
 void stack_free(StackValue *stack);
 
 //
+// HashTable
+//
+// HashTable:
+//     Associates a set of Keys to a set of Values.
+//     Each Key/Value pair is an Entry in the Table.
+//     Constant time lookup.
+//
+//  HashTable
+// key  | Value
+// ---------------
+// 1248   "Hello"  -> Entry  <- *entries
+// 4323    9892    -> Entry
+//
+// Entries: [{1248, "Hello"}, {4323, 9892}, ...]
+//           ---------------  ------------
+//                Entry           Entry
+
+typedef struct
+{
+    ObjectString *key;
+    Value value;
+} Entry;
+
+typedef struct
+{
+    Entry *entries;
+    int count;
+    int capacity;
+} HashTable;
+
+void hash_table_init(HashTable *table);
+void hash_table_copy(HashTable *from, HashTable *to); // tableAddAll
+bool hash_table_set_value(HashTable *table, ObjectString *key, Value value);
+bool hash_table_get_value(HashTable *table, ObjectString *key, Value *value_out);
+ObjectString *hash_table_get_key(HashTable *table, String string, uint32_t hash);
+bool hash_table_delete(HashTable *table, ObjectString *key);
+void hash_table_free(HashTable *table);
+
+//
 // Virtual Machine
 //
 
@@ -502,6 +557,10 @@ typedef struct
     // A linked list of all objects created at runtime
     // TODO: move this variable to object.c module
     Object *objects;
+
+    // Stores all unique strings allocated during runtime
+    //
+    HashTable strings;
 
     // TODO: add a varible to track total bytes allocated
 } VirtualMachine;

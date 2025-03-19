@@ -17,10 +17,10 @@ void string_initialize(String *string, const char *characters, int length)
     string->length = length;
 }
 
-String string_make(char *characters, int length)
+String string_make(const char *characters, int length)
 {
     String string = {0};
-    string.characters = characters;
+    string.characters = (char *)characters;
     string.length = length;
 
     return string;
@@ -76,4 +76,24 @@ String string_concatenate(String a, String b)
     string.characters[string.length] = '\0';
 
     return string;
+}
+
+uint32_t string_hash(String string)
+{
+    uint32_t hash = 2166136261u;
+    for (int i = 0; i < string.length; i++)
+    {
+        hash ^= (uint8_t)string.characters[i]; // XOR
+        hash *= 16777619;
+    }
+
+    return hash;
+}
+
+bool string_equal(String a, String b)
+{
+    if (a.length != b.length)
+        return false;
+
+    return memcmp(a.characters, b.characters, a.length) == 0;
 }

@@ -12,6 +12,7 @@ void virtual_machine_init(VirtualMachine *vm, Bytecode *bytecode)
     stack_value_reset(&vm->stack_value);
     vm->ip = vm->bytecode->instructions.items;
     vm->objects = NULL; // TODO: remove this??
+    hash_table_init(&vm->strings);
 }
 
 void virtual_machine_runtime_error(VirtualMachine *vm, const char *format, ...)
@@ -151,15 +152,9 @@ InterpreterResult virtual_machine_interpret(VirtualMachine *vm)
                 String s_b = string_make(os_b->characters, os_b->length);
 
                 String final = string_concatenate(s_a, s_b);
+                uint32_t final_hash = string_hash(final);
 
-                // int length = string_a->length + string_b->length;
-                // char *string = malloc(sizeof(char) * length + 1);
-                // memcpy(string, string_a->characters, string_a->length);
-                // memcpy(string + string_a->length, string_b->characters, string_b->length);
-                // string[length] = '\0';
-
-                // ObjectString *result = object_allocate_string(string, length);
-                ObjectString *result = object_allocate_string(final.characters, final.length);
+                ObjectString *result = object_allocate_string(final.characters, final.length, final_hash);
                 stack_value_push(&vm->stack_value, value_make_object(result));
             }
             else
@@ -304,4 +299,5 @@ void virtual_machine_free(VirtualMachine *vm)
         object_free(object);
         object = next;
     }
+    hash_table_free(&vm->strings);
 }
