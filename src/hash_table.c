@@ -124,12 +124,12 @@ static Entry hash_table_make_tombstone()
     return tombstone;
 }
 
-static hash_table_is_an_empty_entry(Entry *entry)
+static bool hash_table_is_an_empty_entry(Entry *entry)
 {
     return (entry->key == NULL && value_is_nil(entry->value));
 }
 
-static hash_table_is_a_tombstone_entry(Entry *entry)
+static bool hash_table_is_a_tombstone_entry(Entry *entry)
 {
     return (
         entry->key == NULL &&
@@ -137,10 +137,39 @@ static hash_table_is_a_tombstone_entry(Entry *entry)
         value_as_boolean(entry->value) == true);
 }
 
+static bool hash_table_is_hash_collision(ObjectString *a, ObjectString *b)
+{
+    return (a->length == b->length &&
+            a->hash == b->hash &&
+            memcmp(a->characters, b->characters, a->length) != 0);
+}
+
+static bool hash_table_is_key_collision(Entry *entries, ObjectString *key, int capacity)
+{
+    uint32_t index = key->hash % capacity;
+    Entry *entry = &entries[index];
+
+    if (hash_table_is_an_empty_entry(entry))
+        return false;
+    if (hash_table_is_a_tombstone_entry(entry))
+        return false;
+
+    return (
+        entry->key->length != key->length ||
+        entry->key->hash != key->hash ||
+        memcmp(entry->key->characters, key->characters, entry->key->length) != 0);
+}
+
+// return: entry-found | entry-empty | entry-tombstone
 // get_entry_by_key
 //     uint32_t index = key->hash % capacity;
 //     Entry *entry = &entries[index];
-//     return entry->key == key ? entry : NULL;
+//
+//     if (entry->key == key)  return entry;
+//     if (is_empty_entry)     return entry;
+//     if (is_tombstone_entry) return entry;
+//     if (is_key_collision)
+//         return hash_table_probing(entries, key, capacity);
 //
 static Entry *hash_table_find_entry(Entry *entries, ObjectString *key, int capacity)
 {
@@ -148,7 +177,7 @@ static Entry *hash_table_find_entry(Entry *entries, ObjectString *key, int capac
     // we know we’ve reached the end of a sequence and that the
     // entry isn’t present when we hit an empty bucket.
     //
-    // It’s like the probe sequence is a list of entries and an
+    // The probe sequence is a list of entries and an
     // empty entry terminates that list.
 
     uint32_t index = key->hash % capacity;
@@ -156,13 +185,13 @@ static Entry *hash_table_find_entry(Entry *entries, ObjectString *key, int capac
     for (;;)
     {
         Entry *entry = &entries[index];
+        if (hash_table_is_a_tombstone_entry(entry))
+            tombstone = entry;
+
         if (entry->key == key)
             return entry;
         if (hash_table_is_an_empty_entry(entry))
             return tombstone != NULL ? tombstone : entry;
-
-        if (hash_table_is_a_tombstone_entry(entry))
-            tombstone = entry;
 
         index = (index + 1) % capacity;
 

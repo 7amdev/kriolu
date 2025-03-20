@@ -97,3 +97,11 @@ bool string_equal(String a, String b)
 
     return memcmp(a.characters, b.characters, a.length) == 0;
 }
+
+void string_free(String *string)
+{
+    free(string->characters);
+    free(string);
+    string->characters = NULL;
+    string->length = 0;
+}

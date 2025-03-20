@@ -296,16 +296,21 @@ static Expression *parser_unary_and_literals(Parser *parser)
 
     if (parser->previous.kind == TOKEN_STRING)
     {
-        // TODO: refactor this
-        String t = string_make(parser->previous.start + 1, parser->previous.length - 2);
-        uint32_t t_hash = string_hash(t);
-        ObjectString *found = hash_table_get_key(&g_vm.strings, t, t_hash);
+        // Check if the source_string already exists in the global string
+        // database in the virtual machine. If it does, reuse it, if not
+        // allocate a new one and store it in the global string database for
+        // future reference.
+        //
+        String source_string = string_make(parser->previous.start + 1, parser->previous.length - 2);
+        uint32_t hash = string_hash(source_string);
+        ObjectString *string = hash_table_get_key(&g_vm.strings, source_string, hash);
 
-        // if (found != NULL) {
-        String token = string_make_and_copy_characters(parser->previous.start + 1, parser->previous.length - 2);
-        uint32_t token_hash = string_hash(token);
-        ObjectString *string = object_allocate_string(token.characters, token.length, token_hash);
-        // }
+        if (string == NULL)
+        {
+            source_string = string_make_and_copy_characters(parser->previous.start + 1, parser->previous.length - 2);
+            hash = string_hash(source_string);
+            string = object_allocate_string(source_string.characters, source_string.length, hash);
+        }
 
         Value v_string = value_make_object(string);
         Expression e_string = expression_make_string(string);
@@ -321,12 +326,24 @@ static Expression *parser_unary_and_literals(Parser *parser)
             if (parser->previous.kind != TOKEN_STRING_INTERPOLATION)
                 break;
 
-            String token = string_make_and_copy_characters(parser->previous.start + 1, parser->previous.length - 3);
-            uint32_t token_hash = string_hash(token);
-            ObjectString *string = object_allocate_string(token.characters, token.length, token_hash);
+            String source_string = string_make(parser->previous.start + 1, parser->previous.length - 2);
+            uint32_t hash = string_hash(source_string);
+            ObjectString *string = hash_table_get_key(&g_vm.strings, source_string, hash);
+
+            if (string == NULL)
+            {
+                source_string = string_make_and_copy_characters(parser->previous.start + 1, parser->previous.length - 2);
+                hash = string_hash(source_string);
+                string = object_allocate_string(source_string.characters, source_string.length, hash);
+            }
+            // String token = string_make_and_copy_characters(parser->previous.start + 1, parser->previous.length - 3);
+            // uint32_t token_hash = string_hash(token);
+            // ObjectString *string = object_allocate_string(token.characters, token.length, token_hash);
             Value v_string = value_make_object(string);
             Expression e_string = expression_make_string(string);
 
+            // Tracks on many values have it pushed to the stack on runtime.
+            //
             parser->interpolation_count_value_pushed += 1;
             bytecode_emit_constant(v_string, parser->previous.line_number);
 

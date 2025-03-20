@@ -135,6 +135,7 @@ String string_copy(String other);
 String string_concatenate(String a, String b);
 uint32_t string_hash(String string);
 bool string_equal(String a, String b);
+void string_free(String *string);
 
 //
 // Object
@@ -181,7 +182,6 @@ void object_print(Object *object);
 void object_free(Object *object);
 
 ObjectString *object_allocate_string(char *characters, int length, uint32_t hash);
-ObjectString *object_copy_string(char *characters, int length);
 void object_free_string(ObjectString *string);
 
 //

@@ -79,23 +79,6 @@ ObjectString *object_allocate_string(char *characters, int length, uint32_t hash
     return string;
 }
 
-ObjectString *object_copy_string(char *characters, int length)
-{
-    ObjectString *object_string = NULL;
-    String string = string_make(characters, length);
-    uint32_t hash = string_hash(string);
-    object_string = hash_table_get_key(&g_vm.strings, string, hash);
-
-    if (object_string == NULL)
-    {
-        String token = string_copy(string);
-        uint32_t token_hash = string_hash(token);
-        object_string = object_allocate_string(token.characters, token.length, token_hash);
-    }
-
-    return object_string;
-}
-
 void object_free_string(ObjectString *string)
 {
     free(string->characters);

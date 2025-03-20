@@ -152,10 +152,14 @@ InterpreterResult virtual_machine_interpret(VirtualMachine *vm)
                 String s_b = string_make(os_b->characters, os_b->length);
 
                 String final = string_concatenate(s_a, s_b);
-                uint32_t final_hash = string_hash(final);
+                uint32_t hash = string_hash(final);
+                ObjectString *string = hash_table_get_key(&g_vm.strings, final, hash);
+                if (string == NULL)
+                    string = object_allocate_string(final.characters, final.length, hash);
+                else
+                    string_free(&final);
 
-                ObjectString *result = object_allocate_string(final.characters, final.length, final_hash);
-                stack_value_push(&vm->stack_value, value_make_object(result));
+                stack_value_push(&vm->stack_value, value_make_object(string));
             }
             else
             {
