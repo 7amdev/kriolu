@@ -4,6 +4,9 @@
 // HashTable:
 //     Associates a set of Keys to a set of Values.
 //     Each Key/Value pair is an Entry in the Table.
+//     Tecnically, HashTable is a Dynamic Array with
+//     very sophisticated policies on reading, writing, and
+//     delete elements.
 //     Constant time lookup.
 //
 // HashTable core:
@@ -11,11 +14,18 @@
 
 #include "kriolu.h"
 
+// This guarantees that there'll always be an empty entry
+// in the entries array, which prevents inifinite loop
+// when probing/search for a specific entry.
+//
 #define TABLE_MAX_LOAD 0.75
 
 static Entry *hash_table_find_entry(Entry *entries, ObjectString *key, int capacity);
+static Entry *hash_table_find_entry_by_key(Entry *entries, ObjectString *key, int capacity);
 static void hash_table_adjust_capacity(HashTable *table, int capacity);
 static Entry hash_table_make_tombstone();
+static bool hash_table_is_an_empty_entry(Entry *entry);
+static bool hash_table_is_a_tombstone_entry(Entry *entry);
 
 void hash_table_init(HashTable *table)
 {
@@ -44,14 +54,15 @@ bool hash_table_set_value(HashTable *table, ObjectString *key, Value value)
         hash_table_adjust_capacity(table, capacity);
     }
 
-    Entry *entry = hash_table_find_entry(table->entries, key, table->capacity);
-    bool is_new_key = (entry->key == NULL);
-    if (is_new_key && value_is_nil(entry->value))
+    // Entry *entry = hash_table_find_entry(table->entries, key, table->capacity);
+    Entry *entry = hash_table_find_entry_by_key(table->entries, key, table->capacity);
+    if (hash_table_is_an_empty_entry(entry))
         table->count += 1;
 
     entry->key = key;
     entry->value = value;
 
+    bool is_new_key = (entry->key == NULL);
     return is_new_key;
 }
 
@@ -60,7 +71,8 @@ bool hash_table_get_value(HashTable *table, ObjectString *key, Value *value_out)
     if (table->count == 0)
         return false;
 
-    Entry *entry = hash_table_find_entry(table->entries, key, table->capacity);
+    // Entry *entry = hash_table_find_entry(table->entries, key, table->capacity);
+    Entry *entry = hash_table_find_entry_by_key(table->entries, key, table->capacity);
     if (entry->key == NULL)
         return false;
 
@@ -96,15 +108,14 @@ bool hash_table_delete(HashTable *table, ObjectString *key)
     if (table->count == 0)
         return false;
 
-    Entry *entry = hash_table_find_entry(table->entries, key, table->capacity);
-    if (entry->key == NULL)
+    // Entry *entry = hash_table_find_entry(table->entries, key, table->capacity);
+    Entry *entry = hash_table_find_entry_by_key(table->entries, key, table->capacity);
+
+    if (hash_table_is_a_tombstone_entry(entry) ||
+        hash_table_is_an_empty_entry(entry))
         return false;
 
-    // Place a tombstone in the slot
-    //
     *entry = hash_table_make_tombstone();
-    // entry->key = NULL;
-    // entry->value = value_make_boolean(true);
     return true;
 }
 
@@ -144,69 +155,82 @@ static bool hash_table_is_hash_collision(ObjectString *a, ObjectString *b)
             memcmp(a->characters, b->characters, a->length) != 0);
 }
 
-static bool hash_table_is_key_collision(Entry *entries, ObjectString *key, int capacity)
+static bool hash_table_is_key_collision(Entry *entry, ObjectString *key)
 {
-    uint32_t index = key->hash % capacity;
-    Entry *entry = &entries[index];
-
-    if (hash_table_is_an_empty_entry(entry))
-        return false;
-    if (hash_table_is_a_tombstone_entry(entry))
-        return false;
-
     return (
         entry->key->length != key->length ||
         entry->key->hash != key->hash ||
         memcmp(entry->key->characters, key->characters, entry->key->length) != 0);
 }
 
-// return: entry-found | entry-empty | entry-tombstone
-// get_entry_by_key
-//     uint32_t index = key->hash % capacity;
-//     Entry *entry = &entries[index];
+// Probing is a sequence of non-empty entries terminated by an empty entry.
+// We know we’ve reached the end of a sequence and that the
+// when we hit an empty bucket.
 //
-//     if (entry->key == key)  return entry;
-//     if (is_empty_entry)     return entry;
-//     if (is_tombstone_entry) return entry;
-//     if (is_key_collision)
-//         return hash_table_probing(entries, key, capacity);
+// Return: entry-found | entry-empty | entry-tombstone
 //
+static Entry *hash_table_probing(Entry *entries, ObjectString *key, int capacity)
+{
+    uint32_t index = key->hash % capacity;
+    Entry *entry = &entries[index];
+    Entry *tombstone = NULL;
+
+    for (;;)
+    {
+        if (hash_table_is_an_empty_entry(entry))
+            return tombstone != NULL ? tombstone : entry;
+
+        if (hash_table_is_a_tombstone_entry(entry))
+            tombstone = entry;
+
+        // This is possible because string deduplication is implemented, otherwise
+        // key characters must be equal.
+        //
+        if (entry->key == key)
+            return entry;
+
+        index = (index + 1) % capacity;
+    }
+}
+
+static Entry *hash_table_find_entry_by_key(Entry *entries, ObjectString *key, int capacity)
+{
+    uint32_t index = key->hash % capacity;
+    Entry *entry = &entries[index];
+
+    if (entry->key == key)
+        return entry;
+
+    if (hash_table_is_a_tombstone_entry(entry))
+        return entry;
+
+    if (hash_table_is_an_empty_entry(entry))
+        return entry;
+
+    if (hash_table_is_key_collision(entry, key))
+        return hash_table_probing(entries, key, capacity);
+
+    assert(false && "Error: invalid index. Provide a valid Key or check if entries capacity is valid!");
+    return NULL;
+}
+
 static Entry *hash_table_find_entry(Entry *entries, ObjectString *key, int capacity)
 {
-    // When we’re walking a probe sequence to find an entry,
-    // we know we’ve reached the end of a sequence and that the
-    // entry isn’t present when we hit an empty bucket.
-    //
-    // The probe sequence is a list of entries and an
-    // empty entry terminates that list.
-
     uint32_t index = key->hash % capacity;
     Entry *tombstone = NULL;
     for (;;)
     {
         Entry *entry = &entries[index];
-        if (hash_table_is_a_tombstone_entry(entry))
-            tombstone = entry;
-
-        if (entry->key == key)
-            return entry;
         if (hash_table_is_an_empty_entry(entry))
             return tombstone != NULL ? tombstone : entry;
 
-        index = (index + 1) % capacity;
+        if (entry->key == key)
+            return entry;
 
-        // if (entry->key == NULL)
-        // {
-        //     if (value_is_nil(entry->value))
-        //     {
-        //         return tombstone != NULL ? tombstone : entry;
-        //     }
-        //     else
-        //     {
-        //         if (tombstone == NULL)
-        //             tombstone = entry;
-        //     }
-        // }
+        if (hash_table_is_a_tombstone_entry(entry))
+            tombstone = entry;
+
+        index = (index + 1) % capacity;
     }
 }
 
@@ -234,7 +258,8 @@ static void hash_table_adjust_capacity(HashTable *table, int capacity)
         if (entry->key == NULL)
             continue;
 
-        Entry *dest = hash_table_find_entry(entries, entry->key, capacity);
+        // Entry *dest = hash_table_find_entry(entries, entry->key, capacity);
+        Entry *dest = hash_table_find_entry_by_key(entries, entry->key, capacity);
         dest->key = entry->key;
         dest->value = entry->value;
         table->count += 1;

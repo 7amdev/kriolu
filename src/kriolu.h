@@ -75,7 +75,7 @@ typedef enum
 typedef struct
 {
     TokenKind kind;
-    const char *start;
+    const char* start;
     int length;
     int line_number;
 } Token;
@@ -88,8 +88,8 @@ typedef struct
 
 typedef struct
 {
-    const char *start;
-    const char *current;
+    const char* start;
+    const char* current;
     int line_number;
 
     int string_nested_interpolation[STRING_INTERPOLATION_MAX];
@@ -99,12 +99,12 @@ typedef struct
 
 #define l_debug_print_token(token) lexer_debug_print_token(token, "%s ")
 
-Lexer *lexer_create_static();
-void lexer_init(Lexer *lexer, const char *source_code);
-Token lexer_scan(Lexer *lexer);
-void lexer_debug_print_token(Token token, const char *format);
-void lexer_debug_dump_tokens(Lexer *lexer);
-void lexer_destroy_static(Lexer *lexer);
+Lexer* lexer_create_static();
+void lexer_init(Lexer* lexer, const char* source_code);
+Token lexer_scan(Lexer* lexer);
+void lexer_debug_print_token(Token token, const char* format);
+void lexer_debug_dump_tokens(Lexer* lexer);
+void lexer_destroy_static(Lexer* lexer);
 
 //
 // String
@@ -114,7 +114,7 @@ void lexer_destroy_static(Lexer *lexer);
 //
 typedef struct
 {
-    char *characters;
+    char* characters;
     int length;
 } String;
 
@@ -126,16 +126,16 @@ typedef struct
 #define string_make_from_array(string) \
     (String) { .characters = (char *)string, .length = strlen(string) }
 
-String *string_allocate(const char *characters, int length);
-String string_make(const char *characters, int length);
-String string_make_from_format(const char *format, ...);
-String string_make_and_copy_characters(const char *characters, int length);
-void string_initialize(String *string, const char *characters, int length);
+String* string_allocate(const char* characters, int length);
+String string_make(const char* characters, int length);
+String string_make_from_format(const char* format, ...);
+String string_make_and_copy_characters(const char* characters, int length);
+void string_initialize(String* string, const char* characters, int length);
 String string_copy(String other);
 String string_concatenate(String a, String b);
 uint32_t string_hash(String string);
 bool string_equal(String a, String b);
-void string_free(String *string);
+void string_free(String* string);
 
 //
 // Object
@@ -155,7 +155,7 @@ struct Object
 
     // Access next object on the linked list
     //
-    Object *next;
+    Object* next;
 };
 
 typedef struct
@@ -164,7 +164,7 @@ typedef struct
 
     // String
     //
-    char *characters;
+    char* characters;
     int length;
 
     uint32_t hash;
@@ -175,14 +175,17 @@ typedef struct
 
 #define object_get_string_chars(object) (object_cast_to_string(object)->characters)
 
-Object *object_allocate(ObjectKind kind, size_t size);
-void object_init(Object *object, ObjectKind kind);
-void object_clear(Object *object);
-void object_print(Object *object);
-void object_free(Object *object);
+Object* object_allocate(ObjectKind kind, size_t size);
+void object_init(Object* object, ObjectKind kind);
+void object_clear(Object* object);
+void object_print(Object* object);
+void object_free(Object* object);
 
-ObjectString *object_allocate_string(char *characters, int length, uint32_t hash);
-void object_free_string(ObjectString *string);
+// TODO: object_allocate_string(VirtualMachine *vm, char* characters, int length, uint32_t hash);
+// TODO: #define object_allocate_s(characters, length, hash) object_allocate_string(&g_vm.stings, characters, length, hash)
+
+ObjectString* object_allocate_string(char* characters, int length, uint32_t hash);
+void object_free_string(ObjectString* string);
 
 //
 // Value
@@ -193,7 +196,9 @@ typedef enum
     Value_Boolean,
     Value_Nil,
     Value_Number,
-    Value_Object
+    Value_Object,
+
+    Value_Count
 } ValueKind;
 
 typedef struct
@@ -203,13 +208,13 @@ typedef struct
     {
         bool boolean;
         double number;
-        Object *object;
+        Object* object;
     } as;
 } Value;
 
 typedef struct
 {
-    Value *items;
+    Value* items;
     int count;
     int capacity;
 } ValueArray;
@@ -217,6 +222,7 @@ typedef struct
 #define value_make_boolean(value) ((Value){.kind = Value_Boolean, .as = {.boolean = value}})
 #define value_make_number(value) ((Value){.kind = Value_Number, .as = {.number = value}})
 #define value_make_object(value) ((Value){.kind = Value_Object, .as = {.object = (Object *)value}})
+#define value_make_object_string(value) ((Value){.kind = Value_Object, .as = {.object = (Object *)value}})
 #define value_make_nil() ((Value){.kind = Value_Nil, .as = {.number = 0}})
 
 #define value_as_boolean(value) ((value).as.boolean)
@@ -238,10 +244,10 @@ bool value_negate_logically(Value value);
 bool value_is_equal(Value a, Value b);
 inline bool value_is_object_type(Value value, ObjectKind object_kind);
 
-void value_array_init(ValueArray *values);
-uint32_t value_array_insert(ValueArray *values, Value value);
+void value_array_init(ValueArray* values);
+uint32_t value_array_insert(ValueArray* values, Value value);
 void value_print(Value value);
-void value_array_free(ValueArray *values);
+void value_array_free(ValueArray* values);
 
 //
 // Abstract Syntax Tree
@@ -277,15 +283,15 @@ struct Expression
     {
         double number;
         bool boolean;
-        Object *object;
+        Object* object;
         struct
         {
-            Expression *operand;
+            Expression* operand;
         } unary;
         struct
         {
-            Expression *left;
-            Expression *right;
+            Expression* left;
+            Expression* right;
         } binary;
     } as;
 };
@@ -324,10 +330,10 @@ struct Expression
 #define expression_as_greater(expression) ((expression).as.binary)
 #define expression_as_less(expression) ((expression).as.binary)
 
-Expression *expression_allocate(Expression expr);
-void expression_print(Expression *expression);
-void expression_print_tree(Expression *expression, int indent);
-void expression_free(Expression *expression);
+Expression* expression_allocate(Expression expr);
+void expression_print(Expression* expression);
+void expression_print_tree(Expression* expression, int indent);
+void expression_free(Expression* expression);
 
 typedef uint8_t StatementKind;
 enum
@@ -347,20 +353,20 @@ struct Statement
     StatementKind kind;
     union
     {
-        Expression *expression;
+        Expression* expression;
     };
 };
 
 typedef struct
 {
-    Statement *items;
+    Statement* items;
     uint32_t count;
     uint32_t capacity;
 } StatementArray;
 
-StatementArray *statement_array_allocate();
-uint32_t statement_array_insert(StatementArray *statements, Statement statement);
-void statement_array_free(StatementArray *statements);
+StatementArray* statement_array_allocate();
+uint32_t statement_array_insert(StatementArray* statements, Statement statement);
+void statement_array_free(StatementArray* statements);
 
 //
 // Parser
@@ -370,7 +376,7 @@ typedef struct
 {
     Token current;  // TODO: rename to current_token
     Token previous; // TODO: rename to previous_token
-    Lexer *lexer;
+    Lexer* lexer;
     bool had_error;
     bool panic_mode;
     int interpolation_count_nesting;
@@ -379,8 +385,8 @@ typedef struct
 
 #define parser_init(parser, source_code) parser_initialize(parser, source_code, NULL)
 
-void parser_initialize(Parser *parser, const char *source_code, Lexer *lexer);
-StatementArray *parser_parse(Parser *parser);
+void parser_initialize(Parser* parser, const char* source_code, Lexer* lexer);
+StatementArray* parser_parse(Parser* parser);
 
 //
 // Line Number
@@ -388,15 +394,15 @@ StatementArray *parser_parse(Parser *parser);
 
 typedef struct
 {
-    int *items;
+    int* items;
     int count;
     int capacity;
 } LineNumberArray;
 
-void line_array_init(LineNumberArray *lines);
-int line_array_insert(LineNumberArray *lines, int line);
-int line_array_insert_3x(LineNumberArray *lines, int line);
-void line_array_free(LineNumberArray *lines);
+void line_array_init(LineNumberArray* lines);
+int line_array_insert(LineNumberArray* lines, int line);
+int line_array_insert_3x(LineNumberArray* lines, int line);
+void line_array_free(LineNumberArray* lines);
 
 //
 // Instruction
@@ -430,15 +436,15 @@ enum
 
 typedef struct
 {
-    uint8_t *items;
+    uint8_t* items;
     int count;
     int capacity;
 } InstructionArray;
 
-void instruction_array_init(InstructionArray *instructions);
-int instruction_array_insert(InstructionArray *instructions, uint8_t item);
-int instruction_array_insert_u24(InstructionArray *instructions, uint8_t byte1, uint8_t byte2, uint8_t byte3);
-void instruction_array_free(InstructionArray *instructions);
+void instruction_array_init(InstructionArray* instructions);
+int instruction_array_insert(InstructionArray* instructions, uint8_t item);
+int instruction_array_insert_u24(InstructionArray* instructions, uint8_t byte1, uint8_t byte2, uint8_t byte3);
+void instruction_array_free(InstructionArray* instructions);
 
 //
 // Bytecode
@@ -462,14 +468,14 @@ extern Bytecode g_bytecode;
 #define bytecode_write_operand_u8(bytecode, operand, line_number) bytecode_write_byte(bytecode, operand, line_number)
 #define bytecode_write_operand_u24(bytecode, byte1, byte2, byte3, line_number) bytecode_write_instruction_u24(bytecode, byte1, byte2, byte3, line_number)
 
-void bytecode_init(Bytecode *bytecode);
-int bytecode_write_byte(Bytecode *bytecode, uint8_t data, int line_number);
-int bytecode_write_constant(Bytecode *bytecode, Value value, int line_number);
-void bytecode_disassemble(Bytecode *bytecode, const char *name);
-int bytecode_disassemble_instruction(Bytecode *bytecode, int offset);
+void bytecode_init(Bytecode* bytecode);
+int bytecode_write_byte(Bytecode* bytecode, uint8_t data, int line_number);
+int bytecode_write_constant(Bytecode* bytecode, Value value, int line_number);
+void bytecode_disassemble(Bytecode* bytecode, const char* name);
+int bytecode_disassemble_instruction(Bytecode* bytecode, int offset);
 void bytecode_emitter_begin();
 Bytecode bytecode_emitter_end();
-void bytecode_free(Bytecode *bytecode);
+void bytecode_free(Bytecode* bytecode);
 
 //
 // Value Stack
@@ -480,18 +486,18 @@ void bytecode_free(Bytecode *bytecode);
 typedef struct
 {
     Value items[STACK_MAX];
-    Value *top;
+    Value* top;
 } StackValue;
 
-StackValue *stack_value_create(void);
-void stack_value_reset(StackValue *stack);
-Value stack_value_push(StackValue *stack, Value value);
-Value stack_value_pop(StackValue *stack);
-Value stack_value_peek(StackValue *stack, int offset);
-bool stack_value_is_full(StackValue *stack);
-bool stack_value_is_empty(StackValue *stack);
-void stack_value_trace(StackValue *stack);
-void stack_free(StackValue *stack);
+StackValue* stack_value_create(void);
+void stack_value_reset(StackValue* stack);
+Value stack_value_push(StackValue* stack, Value value);
+Value stack_value_pop(StackValue* stack);
+Value stack_value_peek(StackValue* stack, int offset);
+bool stack_value_is_full(StackValue* stack);
+bool stack_value_is_empty(StackValue* stack);
+void stack_value_trace(StackValue* stack);
+void stack_free(StackValue* stack);
 
 //
 // HashTable
@@ -513,24 +519,24 @@ void stack_free(StackValue *stack);
 
 typedef struct
 {
-    ObjectString *key;
+    ObjectString* key;
     Value value;
 } Entry;
 
 typedef struct
 {
-    Entry *entries;
+    Entry* entries;
     int count;
     int capacity;
 } HashTable;
 
-void hash_table_init(HashTable *table);
-void hash_table_copy(HashTable *from, HashTable *to); // tableAddAll
-bool hash_table_set_value(HashTable *table, ObjectString *key, Value value);
-bool hash_table_get_value(HashTable *table, ObjectString *key, Value *value_out);
-ObjectString *hash_table_get_key(HashTable *table, String string, uint32_t hash);
-bool hash_table_delete(HashTable *table, ObjectString *key);
-void hash_table_free(HashTable *table);
+void hash_table_init(HashTable* table);
+void hash_table_copy(HashTable* from, HashTable* to); // tableAddAll
+bool hash_table_set_value(HashTable* table, ObjectString* key, Value value);
+bool hash_table_get_value(HashTable* table, ObjectString* key, Value* value_out);
+ObjectString* hash_table_get_key(HashTable* table, String string, uint32_t hash);
+bool hash_table_delete(HashTable* table, ObjectString* key);
+void hash_table_free(HashTable* table);
 
 //
 // Virtual Machine
@@ -547,16 +553,16 @@ typedef enum
 
 typedef struct
 {
-    Bytecode *bytecode;
+    Bytecode* bytecode;
     StackValue stack_value;
 
     // Instruction Pointer
     //
-    uint8_t *ip;
+    uint8_t* ip;
 
     // A linked list of all objects created at runtime
     // TODO: move this variable to object.c module
-    Object *objects;
+    Object* objects;
 
     // Stores all unique strings allocated during runtime
     //
@@ -571,8 +577,8 @@ extern VirtualMachine g_vm;
 #define vm_interpret() virtual_machine_interpret(&g_vm)
 #define vm_free() virtual_machine_free(&g_vm)
 
-void virtual_machine_init(VirtualMachine *vm, Bytecode *bytecode);
-InterpreterResult virtual_machine_interpret(VirtualMachine *vm);
-void virtual_machine_free(VirtualMachine *vm);
+void virtual_machine_init(VirtualMachine* vm, Bytecode* bytecode);
+InterpreterResult virtual_machine_interpret(VirtualMachine* vm);
+void virtual_machine_free(VirtualMachine* vm);
 
 #endif
