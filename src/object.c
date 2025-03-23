@@ -1,17 +1,15 @@
 #include "kriolu.h"
 
-Object *object_allocate(ObjectKind kind, size_t size)
+Object* object_allocate(ObjectKind kind, size_t size)
 {
-    Object *object = (Object *)calloc(1, sizeof(Object));
+    Object* object = (Object*)calloc(1, sizeof(Object));
     assert(object);
 
     object_init(object, kind);
     return object;
 }
 
-// TODO: add Object *next as a parameter to be initialized
-//
-void object_init(Object *object, ObjectKind kind)
+void object_init(Object* object, ObjectKind kind)
 {
     object->kind = kind;
 
@@ -29,18 +27,18 @@ void object_init(Object *object, ObjectKind kind)
     g_vm.objects = object;
 }
 
-void object_clear(Object *object)
+void object_clear(Object* object)
 {
     object->kind = ObjectKind_Invalid;
 }
 
-void object_print(Object *object)
+void object_print(Object* object)
 {
     switch (object->kind)
     {
     case ObjectKind_String:
     {
-        ObjectString *string = ((ObjectString *)object);
+        ObjectString* string = ((ObjectString*)object);
         printf("%.10s", string->characters);
         if (string->length > 10)
             printf("...");
@@ -50,25 +48,25 @@ void object_print(Object *object)
     }
 }
 
-void object_free(Object *object)
+void object_free(Object* object)
 {
     switch (object->kind)
     {
     case ObjectKind_String:
     {
         // TODO: update virtual machine's bytes allocated variable
-        object_free_string((ObjectString *)object);
+        object_free_string((ObjectString*)object);
         break;
     }
     }
 }
 
-ObjectString *object_allocate_string(char *characters, int length, uint32_t hash)
+ObjectString* object_allocate_string(char* characters, int length, uint32_t hash)
 {
-    ObjectString *string = calloc(1, sizeof(ObjectString));
+    ObjectString* string = calloc(1, sizeof(ObjectString));
     assert(string);
 
-    object_init((Object *)string, ObjectKind_String);
+    object_init((Object*)string, ObjectKind_String);
     assert(string->object.kind == ObjectKind_String);
     string->characters = characters;
     string->hash = hash;
@@ -79,7 +77,7 @@ ObjectString *object_allocate_string(char *characters, int length, uint32_t hash
     return string;
 }
 
-void object_free_string(ObjectString *string)
+void object_free_string(ObjectString* string)
 {
     free(string->characters);
     free(string);
