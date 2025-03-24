@@ -140,6 +140,9 @@ void string_free(String* string);
 //
 // Object
 //
+// TODO: Move HashTable forward declaration to the top of the file 
+typedef struct HashTable HashTable;
+typedef struct Object Object;
 
 typedef enum
 {
@@ -148,7 +151,6 @@ typedef enum
     ObjectKind_String
 } ObjectKind;
 
-typedef struct Object Object;
 struct Object
 {
     ObjectKind kind;
@@ -181,10 +183,10 @@ void object_clear(Object* object);
 void object_print(Object* object);
 void object_free(Object* object);
 
-// TODO: object_allocate_string(VirtualMachine *vm, char* characters, int length, uint32_t hash);
-// TODO: #define object_allocate_s(characters, length, hash) object_allocate_string(&g_vm.stings, characters, length, hash)
+#define object_create_and_intern_string(characters, length, hash) object_allocate_and_intern_string(&g_vm.strings, characters, length, hash)
 
 ObjectString* object_allocate_string(char* characters, int length, uint32_t hash);
+ObjectString* object_allocate_and_intern_string(HashTable* table, char* characters, int length, uint32_t hash);
 void object_free_string(ObjectString* string);
 
 //
@@ -523,12 +525,12 @@ typedef struct
     Value value;
 } Entry;
 
-typedef struct
+struct HashTable
 {
     Entry* entries;
     int count;
     int capacity;
-} HashTable;
+};
 
 void hash_table_init(HashTable* table);
 void hash_table_copy(HashTable* from, HashTable* to); // tableAddAll

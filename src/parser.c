@@ -21,25 +21,25 @@ typedef enum
     OPERATION_MAX
 } OrderOfOperation;
 
-static void parser_advance(Parser *parser);
-static void parser_consume(Parser *parser, TokenKind kind, const char *error_message);
-static bool parser_match_then_advance(Parser *parser, TokenKind kind);
-static void parser_synchronize(Parser *parser);
-static void parser_error(Parser *parser, Token *token, const char *message);
-static Statement parser_statement(Parser *parser);
-static Statement parser_expression_statement(Parser *parser);
-static Expression *parser_expression(Parser *parser, OrderOfOperation operator_precedence_previous);
-static Expression *parser_unary_and_literals(parser);
-static Expression *parser_binary(Parser *parser, Expression *left_operand);
+static void parser_advance(Parser* parser);
+static void parser_consume(Parser* parser, TokenKind kind, const char* error_message);
+static bool parser_match_then_advance(Parser* parser, TokenKind kind);
+static void parser_synchronize(Parser* parser);
+static void parser_error(Parser* parser, Token* token, const char* message);
+static Statement parser_statement(Parser* parser);
+static Statement parser_expression_statement(Parser* parser);
+static Expression* parser_expression(Parser* parser, OrderOfOperation operator_precedence_previous);
+static Expression* parser_unary_and_literals(parser);
+static Expression* parser_binary(Parser* parser, Expression* left_operand);
 
 //
 // Globals
 //
 
-void parser_initialize(Parser *parser, const char *source_code, Lexer *lexer)
+void parser_initialize(Parser* parser, const char* source_code, Lexer* lexer)
 {
-    parser->current = (Token){0};  // token_error
-    parser->previous = (Token){0}; // token_error
+    parser->current = (Token){ 0 };  // token_error
+    parser->previous = (Token){ 0 }; // token_error
     parser->panic_mode = false;
     parser->had_error = false;
     parser->lexer = lexer;
@@ -54,9 +54,9 @@ void parser_initialize(Parser *parser, const char *source_code, Lexer *lexer)
     }
 }
 
-StatementArray *parser_parse(Parser *parser)
+StatementArray* parser_parse(Parser* parser)
 {
-    StatementArray *statements = statement_array_allocate();
+    StatementArray* statements = statement_array_allocate();
     parser_advance(parser);
 
     for (;;)
@@ -75,7 +75,7 @@ StatementArray *parser_parse(Parser *parser)
     return statements;
 }
 
-static void parser_advance(Parser *parser)
+static void parser_advance(Parser* parser)
 {
     parser->previous = parser->current;
 
@@ -92,7 +92,7 @@ static void parser_advance(Parser *parser)
     }
 }
 
-static bool parser_match_then_advance(Parser *parser, TokenKind kind)
+static bool parser_match_then_advance(Parser* parser, TokenKind kind)
 {
 
     if (parser->current.kind == kind)
@@ -104,7 +104,7 @@ static bool parser_match_then_advance(Parser *parser, TokenKind kind)
     return false;
 }
 
-static void parser_consume(Parser *parser, TokenKind kind, const char *error_message)
+static void parser_consume(Parser* parser, TokenKind kind, const char* error_message)
 {
     if (parser->current.kind == kind)
     {
@@ -115,7 +115,7 @@ static void parser_consume(Parser *parser, TokenKind kind, const char *error_mes
     parser_error(parser, &parser->previous, error_message);
 }
 
-static void parser_synchronize(Parser *parser)
+static void parser_synchronize(Parser* parser)
 {
     parser->panic_mode = false;
 
@@ -143,7 +143,7 @@ static void parser_synchronize(Parser *parser)
     }
 }
 
-static void parser_error(Parser *parser, Token *token, const char *message)
+static void parser_error(Parser* parser, Token* token, const char* message)
 {
     if (parser->panic_mode)
         return;
@@ -155,19 +155,17 @@ static void parser_error(Parser *parser, Token *token, const char *message)
     if (token->kind == TOKEN_EOF)
     {
         fprintf(stderr, " at end");
-    }
-    else if (token->kind == TOKEN_ERROR)
+    } else if (token->kind == TOKEN_ERROR)
     {
         fprintf(stderr, " at %.*s\n", token->length, token->start);
-    }
-    else
+    } else
     {
         fprintf(stderr, " at '%.*s'", token->length, token->start);
         fprintf(stderr, " : '%s'\n", message);
     }
 }
 
-static Statement parser_statement(Parser *parser)
+static Statement parser_statement(Parser* parser)
 {
     // DECLARATIONS: introduces new identifiers
     //   klassi, mimoria, funson
@@ -185,15 +183,15 @@ static Statement parser_statement(Parser *parser)
     return expression_statement;
 }
 
-static Statement parser_expression_statement(Parser *parser)
+static Statement parser_expression_statement(Parser* parser)
 {
 
-    Expression *expression = parser_expression(parser, OPERATION_ASSIGNMENT);
+    Expression* expression = parser_expression(parser, OPERATION_ASSIGNMENT);
     parser_consume(parser, TOKEN_SEMICOLON, "Expect ';' after expression.");
 
     Statement statement = (Statement){
         .kind = StatementKind_Expression,
-        .expression = expression};
+        .expression = expression };
 
     return statement;
 }
@@ -234,12 +232,12 @@ static OrderOfOperation parser_operator_precedence(TokenKind kind)
     }
 }
 
-static Expression *parser_expression(Parser *parser, OrderOfOperation operator_precedence_previous)
+static Expression* parser_expression(Parser* parser, OrderOfOperation operator_precedence_previous)
 {
     parser_advance(parser);
 
-    Expression *left_operand = parser_unary_and_literals(parser);
-    Expression *expression = left_operand;
+    Expression* left_operand = parser_unary_and_literals(parser);
+    Expression* expression = left_operand;
 
     TokenKind operator_kind_current = parser->current.kind;
     OrderOfOperation operator_precedence_current = parser_operator_precedence(operator_kind_current);
@@ -255,7 +253,7 @@ static Expression *parser_expression(Parser *parser, OrderOfOperation operator_p
     return expression;
 }
 
-static Expression *parser_unary_and_literals(Parser *parser)
+static Expression* parser_unary_and_literals(Parser* parser)
 {
     // Literals
     //
@@ -303,13 +301,14 @@ static Expression *parser_unary_and_literals(Parser *parser)
         //
         String source_string = string_make(parser->previous.start + 1, parser->previous.length - 2);
         uint32_t hash = string_hash(source_string);
-        ObjectString *string = hash_table_get_key(&g_vm.strings, source_string, hash);
+        ObjectString* string = hash_table_get_key(&g_vm.strings, source_string, hash);
 
         if (string == NULL)
         {
             source_string = string_make_and_copy_characters(parser->previous.start + 1, parser->previous.length - 2);
             hash = string_hash(source_string);
-            string = object_allocate_string(source_string.characters, source_string.length, hash);
+            // string = object_allocate_string(source_string.characters, source_string.length, hash);
+            string = object_create_and_intern_string(source_string.characters, source_string.length, hash);
         }
 
         Value v_string = value_make_object(string);
@@ -328,13 +327,14 @@ static Expression *parser_unary_and_literals(Parser *parser)
 
             String source_string = string_make(parser->previous.start + 1, parser->previous.length - 2);
             uint32_t hash = string_hash(source_string);
-            ObjectString *string = hash_table_get_key(&g_vm.strings, source_string, hash);
+            ObjectString* string = hash_table_get_key(&g_vm.strings, source_string, hash);
 
             if (string == NULL)
             {
                 source_string = string_make_and_copy_characters(parser->previous.start + 1, parser->previous.length - 2);
                 hash = string_hash(source_string);
-                string = object_allocate_string(source_string.characters, source_string.length, hash);
+                // string = object_allocate_string(source_string.characters, source_string.length, hash);
+                string = object_create_and_intern_string(source_string.characters, source_string.length, hash);
             }
             // String token = string_make_and_copy_characters(parser->previous.start + 1, parser->previous.length - 3);
             // uint32_t token_hash = string_hash(token);
@@ -377,7 +377,7 @@ static Expression *parser_unary_and_literals(Parser *parser)
     //
     if (parser->previous.kind == TOKEN_MINUS)
     {
-        Expression *expression = parser_expression(parser, OPERATION_NEGATE);
+        Expression* expression = parser_expression(parser, OPERATION_NEGATE);
         Expression negation = expression_make_negation(expression);
 
         bytecode_emit_byte(OpCode_Negation, parser->previous.line_number);
@@ -386,7 +386,7 @@ static Expression *parser_unary_and_literals(Parser *parser)
 
     if (parser->previous.kind == TOKEN_KA)
     {
-        Expression *expression = parser_expression(parser, OPERATION_NOT);
+        Expression* expression = parser_expression(parser, OPERATION_NOT);
         Expression not = expression_make_not(expression);
 
         bytecode_emit_byte(OpCode_Not, parser->previous.line_number);
@@ -395,7 +395,7 @@ static Expression *parser_unary_and_literals(Parser *parser)
 
     if (parser->previous.kind == TOKEN_LEFT_PARENTHESIS)
     {
-        Expression *expression = parser_expression(parser, OPERATION_ASSIGNMENT);
+        Expression* expression = parser_expression(parser, OPERATION_ASSIGNMENT);
         Expression grouping = expression_make_grouping(expression);
 
         parser_consume(parser, TOKEN_RIGHT_PARENTHESIS, "Expected ')' after expression.");
@@ -408,12 +408,12 @@ static Expression *parser_unary_and_literals(Parser *parser)
     return NULL;
 }
 
-static Expression *parser_binary(Parser *parser, Expression *left_operand)
+static Expression* parser_binary(Parser* parser, Expression* left_operand)
 {
     TokenKind operator_kind_previous = parser->previous.kind;
     OrderOfOperation operator_precedence_previous = parser_operator_precedence(operator_kind_previous);
 
-    Expression *right_operand = parser_expression(parser, operator_precedence_previous);
+    Expression* right_operand = parser_expression(parser, operator_precedence_previous);
 
     if (operator_kind_previous == TOKEN_PLUS)
     {
@@ -470,7 +470,7 @@ static Expression *parser_binary(Parser *parser, Expression *left_operand)
         bytecode_emit_byte(OpCode_Equal_To, parser->previous.line_number);
         bytecode_emit_byte(OpCode_Not, parser->previous.line_number);
 
-        Expression *equal_to = expression_allocate(expression_make_equal_to(left_operand, right_operand));
+        Expression* equal_to = expression_allocate(expression_make_equal_to(left_operand, right_operand));
         return expression_allocate(expression_make_not(equal_to));
     }
 
@@ -489,7 +489,7 @@ static Expression *parser_binary(Parser *parser, Expression *left_operand)
         bytecode_emit_byte(OpCode_Less_Than, parser->previous.line_number);
         bytecode_emit_byte(OpCode_Not, parser->previous.line_number);
 
-        Expression *greater_than = expression_allocate(expression_make_greater_than(left_operand, right_operand));
+        Expression* greater_than = expression_allocate(expression_make_greater_than(left_operand, right_operand));
         Expression greater_than_or_equal_to = expression_make_not(greater_than);
         return expression_allocate(greater_than_or_equal_to);
     }
@@ -509,7 +509,7 @@ static Expression *parser_binary(Parser *parser, Expression *left_operand)
         bytecode_emit_byte(OpCode_Greater_Than, parser->previous.line_number);
         bytecode_emit_byte(OpCode_Not, parser->previous.line_number);
 
-        Expression *less_than = expression_allocate(expression_make_less_than(left_operand, right_operand));
+        Expression* less_than = expression_allocate(expression_make_less_than(left_operand, right_operand));
         Expression less_than_or_equal_to = expression_make_not(less_than);
         return expression_allocate(less_than_or_equal_to);
     }

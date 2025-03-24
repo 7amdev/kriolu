@@ -6,7 +6,7 @@
 
 VirtualMachine g_vm;
 
-void virtual_machine_init(VirtualMachine *vm, Bytecode *bytecode)
+void virtual_machine_init(VirtualMachine* vm, Bytecode* bytecode)
 {
     vm->bytecode = bytecode;
     stack_value_reset(&vm->stack_value);
@@ -15,7 +15,7 @@ void virtual_machine_init(VirtualMachine *vm, Bytecode *bytecode)
     hash_table_init(&vm->strings);
 }
 
-void virtual_machine_runtime_error(VirtualMachine *vm, const char *format, ...)
+void virtual_machine_runtime_error(VirtualMachine* vm, const char* format, ...)
 {
     va_list args;
     va_start(args, format);
@@ -29,7 +29,7 @@ void virtual_machine_runtime_error(VirtualMachine *vm, const char *format, ...)
     stack_value_reset(&vm->stack_value);
 }
 
-InterpreterResult virtual_machine_interpret(VirtualMachine *vm)
+InterpreterResult virtual_machine_interpret(VirtualMachine* vm)
 {
     assert(vm->bytecode->instructions.items != NULL);
     assert(vm->ip == vm->bytecode->instructions.items);
@@ -140,28 +140,27 @@ InterpreterResult virtual_machine_interpret(VirtualMachine *vm)
                 Value value_sum = value_make_number(sum);
 
                 stack_value_push(&vm->stack_value, value_sum);
-            }
-            else if (value_is_string(stack_value_peek(&vm->stack_value, 0)) &&
-                     value_is_string(stack_value_peek(&vm->stack_value, 1)))
+            } else if (value_is_string(stack_value_peek(&vm->stack_value, 0)) &&
+                      value_is_string(stack_value_peek(&vm->stack_value, 1)))
             {
                 Value b = stack_value_pop(&vm->stack_value);
                 Value a = stack_value_pop(&vm->stack_value);
-                ObjectString *os_a = value_as_string(a);
-                ObjectString *os_b = value_as_string(b);
+                ObjectString* os_a = value_as_string(a);
+                ObjectString* os_b = value_as_string(b);
                 String s_a = string_make(os_a->characters, os_a->length);
                 String s_b = string_make(os_b->characters, os_b->length);
 
                 String final = string_concatenate(s_a, s_b);
                 uint32_t hash = string_hash(final);
-                ObjectString *string = hash_table_get_key(&g_vm.strings, final, hash);
+                ObjectString* string = hash_table_get_key(&g_vm.strings, final, hash);
                 if (string == NULL)
-                    string = object_allocate_string(final.characters, final.length, hash);
+                    // string = object_allocate_string(final.characters, final.length, hash);
+                    string = object_create_and_intern_string(final.characters, final.length, hash);
                 else
                     string_free(&final);
 
                 stack_value_push(&vm->stack_value, value_make_object(string));
-            }
-            else
+            } else
             {
                 virtual_machine_runtime_error(vm, "Operands must be 2(two) numbers or 2(two) strings.");
                 return Interpreter_Runtime_Error;
@@ -294,12 +293,12 @@ InterpreterResult virtual_machine_interpret(VirtualMachine *vm)
 #undef READ_CONSTANT_3BYTE
 }
 
-void virtual_machine_free(VirtualMachine *vm)
+void virtual_machine_free(VirtualMachine* vm)
 {
-    Object *object = vm->objects;
+    Object* object = vm->objects;
     while (object != NULL)
     {
-        Object *next = object->next;
+        Object* next = object->next;
         object_free(object);
         object = next;
     }

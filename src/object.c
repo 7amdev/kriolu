@@ -72,8 +72,16 @@ ObjectString* object_allocate_string(char* characters, int length, uint32_t hash
     string->hash = hash;
     string->length = length;
 
-    hash_table_set_value(&g_vm.strings, string, value_make_nil());
+    // hash_table_set_value(&g_vm.strings, string, value_make_nil());
 
+    return string;
+}
+
+ObjectString* object_allocate_and_intern_string(HashTable* table, char* characters, int length, uint32_t hash)
+{
+    ObjectString* string = object_allocate_string(characters, length, hash);
+    assert(string);
+    hash_table_set_value(table, string, value_make_nil());
     return string;
 }
 
