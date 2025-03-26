@@ -3,7 +3,8 @@
 #include <time.h>
 #include "kriolu.h"
 
-#define N 10
+void print_value(Value value);
+char* value_convert_to_text(Value value);
 
 double get_seconds(void) {
     struct timespec tp = { 0 };
@@ -12,13 +13,84 @@ double get_seconds(void) {
     return (double)tp.tv_sec + (double)tp.tv_nsec * 1e-9;
 }
 
-// #define PROFILE_BEGIN() 
+
+
+//
+// Profiler
+//
+
 #define PROFILE_END(label, begin) printf("%s: %lf seconds\n", (label), get_seconds() - (begin))
-#define PROFILE(label) for (                                                                \
-                         struct t { int i; double begin; } local = {0, get_seconds()};      \
-                         local.i < 1;                                                       \
-                         ++local.i, PROFILE_END(label, local.begin)                         \
-                       )
+#define PROFILE_BEGIN(label) for (                                                                \
+    struct t { int i; double begin; } local = {0, get_seconds()};      \
+    local.i < 1;                                                       \
+    ++local.i, PROFILE_END(label, local.begin)                         \
+)
+
+
+//
+// Logger
+//
+
+typedef enum {
+    TextColor_Black,
+    TextColor_Green,
+    TextColor_Red,
+    TextColor_Yellow,
+    TextColor_White,
+
+    TextColor_Count
+} TextColor;
+
+void _log(char* prefix, TextColor color, char* format, ...) {
+    va_list args;
+    va_start(args, format);
+    char buffer[8092] = { 0 };
+    vsnprintf(buffer, 8092, format, args);
+    va_end(args);
+
+    static char* text_color_table[] = {
+        [TextColor_Black] = "\x1b[30m",
+        [TextColor_Red] = "\x1b[31m",
+        [TextColor_Green] = "\x1b[32m",
+        [TextColor_Yellow] = "\x1b[33m",
+        [TextColor_White] = "\x1b[97m",
+    };
+
+    char log_msg[8092] = { 0 };
+    sprintf(log_msg, "%s%s %s \033[0m", text_color_table[color], prefix, buffer);
+
+    printf("%s", log_msg);
+}
+
+#define log_trace(format, ...) _log("Trace: ", TextColor_White, format, __VA_ARGS__)
+#define log_error(format, ...) _log("Error: ", TextColor_Red, format, __VA_ARGS__)
+#define log_success(format, ...) _log("Success: ", TextColor_Green, format, __VA_ARGS__)
+#define log_warning(format, ...) _log("Warning: ", TextColor_Yellow, format, __VA_ARGS__)
+
+#ifdef _WIN32
+#define debugger_break() __debugbreak();
+#elif __linux__
+#define debugger_break() __builtin_debugtrap();
+#elif __APPLE__
+#define debugger_break() __builtin_trap();
+#endif
+
+#define assert_that(expression, format, ...)    \
+{                                               \
+    if (!(expression))                          \
+    {                                           \
+        log_error(format, __VA_ARGS__);         \
+        debugger_break();                       \
+    }                                           \
+}
+
+//
+// Main
+//
+
+void init_keys(ObjectString** keys);
+
+#define N 16
 
 VirtualMachine g_vm;
 
@@ -31,7 +103,6 @@ enum ValueType {
     Val_Max
 };
 
-void print_value(Value value);
 
 int main(void) {
     HashTable hash_table;
@@ -72,7 +143,7 @@ int main(void) {
     // }
 
 
-    // Randomly init values with different kinds 
+    // Generate Random values with different types 
     //
     for (int i = 0; i < N; i++)
     {
@@ -92,15 +163,50 @@ int main(void) {
         }
 
         values[i] = value;
-        printf("Type: (%d, %s) \n", value_type, value_table[value_type]);
+    }
+    // assert_that(hash_table.capacity == N, "Expected %d generated values, bu instead got %d.", N, hash_table.count);
+
+    int count = 0;
+    PROFILE_BEGIN("==== Insert New Values")
+    {
+        for (int i = 0; i < N; i++) {
+            bool is_new = hash_table_set_value(&hash_table, keys[i], values[i]);
+            if (is_new) count += 1;;
+        }
+
+    }
+    assert_that(count == hash_table.count, "Expected %d new inserts, but instead got %d.\n", N, count);
+
+    for (int i = 0; i < N; i++) {
+        ObjectString* key = keys[i];
+        Value value = { 0 };
+
+        bool found = hash_table_get_value(&hash_table, key, &value);
+        bool is_equal = value_is_equal(values[i], value);
+        assert_that(found, "Expected value '%s' for key '%s', but got nothing.", value_convert_to_text(values[i]), key->characters);
+        assert_that(is_equal, "Expected value '%s' for key '%s', but instead got '%s'.", value_convert_to_text(values[i]), key->characters, value_convert_to_text(value));
     }
 
-    PROFILE("HashTable: Insert New Values")
+    for (int i = 0; i < N; i++) {
+        String string = string_make_from_format("key_%d", i);
+        ObjectString* key = object_allocate_string(string.characters, string.length, string_hash(string));
+        keys[i] = key;
+    }
+    for (int i = 0; i < N; i++) {
+        ObjectString* key = keys[i];
+        Value value = { 0 };
+        // Generate an ObjectString 'key_0' and see if entry->key == key?
+        // Probably not because we dont have deduplication.
+        bool found = hash_table_get_value(&hash_table, key, &value);
+        bool is_equal = value_is_equal(values[i], value);
+        assert_that(found, "Expected value '%s' for key '%s', but got nothing.", value_convert_to_text(values[i]), key->characters);
+        assert_that(is_equal, "Expected value '%s' for key '%s', but instead got '%s'.", value_convert_to_text(values[i]), key->characters, value_convert_to_text(value));
+    }
+
+    PROFILE_BEGIN("HashTable: Update Values")
     {
         // TODO: add assertion
-        // TODO: assert that hash-table is adjusting capacity.
         for (int i = 0; i < N; i++) {
-
             bool is_new = hash_table_set_value(&hash_table, keys[i], values[i]);
             if (is_new) printf("New: ");
             else printf("Replaced a value: ");
@@ -108,19 +214,7 @@ int main(void) {
         }
     }
 
-    PROFILE("HashTable: Update Values")
-    {
-        // TODO: add assertion
-        for (int i = 0; i < N; i++) {
-
-            bool is_new = hash_table_set_value(&hash_table, keys[i], values[i]);
-            if (is_new) printf("New: ");
-            else printf("Replaced a value: ");
-            print_value(values[i]);
-        }
-    }
-
-    PROFILE("HashTable: Retrieve Values")
+    PROFILE_BEGIN("HashTable: Retrieve Values")
     {
         // TODO: add assertion
         for (int i = 0; i < N; i++) {
@@ -135,7 +229,7 @@ int main(void) {
     }
 
     // TODO: delete
-    PROFILE("HashTable: Delete Values") {}
+    PROFILE_BEGIN("HashTable: Delete Values") {}
 
     // printf("=== Keys\n");
     // for (int i = 0; i < N; i++) {
@@ -144,6 +238,40 @@ int main(void) {
     // }
 
     return 0;
+}
+
+void init_keys(ObjectString** keys) {
+    for (int i = 0; i < N; i++) {
+        String string = string_make_from_format("key_%d", i);
+        ObjectString* key = object_allocate_string(string.characters, string.length, string_hash(string));
+        keys[i] = key;
+    }
+}
+
+char* value_convert_to_text(Value value) {
+    char* value_text_buffer = (char*)calloc(8190, sizeof(char));
+    assert(value_text_buffer);
+
+    switch (value.kind)
+    {
+    default: sprintf(value_text_buffer, "Value Kind is not supported"); break;
+    case Value_Boolean: {
+        sprintf(value_text_buffer, "%s", value_as_boolean(value) ? "true" : "false");
+    } break;
+    case Value_Number: {
+        sprintf(value_text_buffer, "%lf", value_as_number(value));
+    } break;
+    case Value_Nil: {
+        sprintf(value_text_buffer, "nil");
+    } break;
+    case Value_Object: {
+        if (value_is_string(value)) {
+            sprintf(value_text_buffer, "%s", value_as_string(value)->characters);
+        }
+    } break;
+    }
+
+    return value_text_buffer;
 }
 
 void print_value(Value value) {

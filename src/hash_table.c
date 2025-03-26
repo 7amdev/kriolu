@@ -48,8 +48,7 @@ void hash_table_copy(HashTable* from, HashTable* to)
 
 bool hash_table_set_value(HashTable* table, ObjectString* key, Value value)
 {
-    if (table->count + 1 > table->capacity * TABLE_MAX_LOAD)
-    {
+    if (table->count + 1 > table->capacity * TABLE_MAX_LOAD) {
         int capacity = table->capacity < 8 ? 8 : 2 * table->capacity;
         hash_table_adjust_capacity(table, capacity);
     }
@@ -73,8 +72,8 @@ bool hash_table_get_value(HashTable* table, ObjectString* key, Value* value_out)
 
     // Entry *entry = hash_table_find_entry(table->entries, key, table->capacity);
     Entry* entry = hash_table_find_entry_by_key(table->entries, key, table->capacity);
-    if (entry->key == NULL)
-        return false;
+    if (entry == NULL) return false;
+    if (entry->key == NULL) return false;
 
     *value_out = entry->value;
     return true;
@@ -172,11 +171,11 @@ static bool hash_table_is_key_collision(Entry* entry, ObjectString* key)
 static Entry* hash_table_probing(Entry* entries, ObjectString* key, int capacity)
 {
     uint32_t index = key->hash % capacity;
-    Entry* entry = &entries[index];
     Entry* tombstone = NULL;
 
     for (;;)
     {
+        Entry* entry = &entries[index];
         if (hash_table_is_an_empty_entry(entry))
             return tombstone != NULL ? tombstone : entry;
 
@@ -210,7 +209,6 @@ static Entry* hash_table_find_entry_by_key(Entry* entries, ObjectString* key, in
     if (hash_table_is_key_collision(entry, key))
         return hash_table_probing(entries, key, capacity);
 
-    assert(false && "Error: invalid index. Provide a valid Key or check if entries capacity is valid!");
     return NULL;
 }
 
