@@ -22,8 +22,10 @@
 
 static Entry* hash_table_find_entry(Entry* entries, ObjectString* key, int capacity);
 static Entry* hash_table_find_entry_by_key(Entry* entries, ObjectString* key, int capacity);
+static Entry* hash_table_probing(Entry* entries, ObjectString* key, int capacity);
 static void hash_table_adjust_capacity(HashTable* table, int capacity);
 static Entry hash_table_make_tombstone();
+static Entry hash_table_make_empty_entry();
 static bool hash_table_is_an_empty_entry(Entry* entry);
 static bool hash_table_is_a_tombstone_entry(Entry* entry);
 
@@ -125,6 +127,14 @@ void hash_table_free(HashTable* table)
     hash_table_init(table);
 }
 
+static Entry hash_table_make_empty_entry() {
+    Entry entry = { 0 };
+    entry.key = NULL;
+    entry.value = value_make_nil();
+
+    return entry;
+}
+
 static Entry hash_table_make_tombstone()
 {
     Entry tombstone;
@@ -162,6 +172,26 @@ static bool hash_table_is_key_collision(Entry* entry, ObjectString* key)
         memcmp(entry->key->characters, key->characters, entry->key->length) != 0);
 }
 
+static Entry* hash_table_find_entry_by_key(Entry* entries, ObjectString* key, int capacity)
+{
+    uint32_t index = key->hash % capacity;
+    Entry* entry = &entries[index];
+
+    if (entry->key == key)
+        return entry;
+
+    if (hash_table_is_a_tombstone_entry(entry))
+        return entry;
+
+    if (hash_table_is_an_empty_entry(entry))
+        return entry;
+
+    if (hash_table_is_key_collision(entry, key))
+        return hash_table_probing(entries, key, capacity);
+
+    return NULL;
+}
+
 // Probing is a sequence of non-empty entries terminated by an empty entry.
 // We know we’ve reached the end of a sequence and that the
 // when we hit an empty bucket.
@@ -192,26 +222,6 @@ static Entry* hash_table_probing(Entry* entries, ObjectString* key, int capacity
     }
 }
 
-static Entry* hash_table_find_entry_by_key(Entry* entries, ObjectString* key, int capacity)
-{
-    uint32_t index = key->hash % capacity;
-    Entry* entry = &entries[index];
-
-    if (entry->key == key)
-        return entry;
-
-    if (hash_table_is_a_tombstone_entry(entry))
-        return entry;
-
-    if (hash_table_is_an_empty_entry(entry))
-        return entry;
-
-    if (hash_table_is_key_collision(entry, key))
-        return hash_table_probing(entries, key, capacity);
-
-    return NULL;
-}
-
 static Entry* hash_table_find_entry(Entry* entries, ObjectString* key, int capacity)
 {
     uint32_t index = key->hash % capacity;
@@ -238,10 +248,8 @@ static void hash_table_adjust_capacity(HashTable* table, int capacity)
     //
     Entry* entries = (Entry*)realloc(NULL, sizeof(Entry) * capacity);
     assert(entries);
-    for (int i = 0; i < capacity; i++)
-    {
-        entries[i].key = NULL;
-        entries[i].value = value_make_nil();
+    for (int i = 0; i < capacity; i++) {
+        entries[i] = hash_table_make_empty_entry();
     }
 
     // Copy entry values from "table->entries" to the new allocated "entries" variable.

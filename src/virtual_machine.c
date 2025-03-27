@@ -141,7 +141,7 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm)
 
                 stack_value_push(&vm->stack_value, value_sum);
             } else if (value_is_string(stack_value_peek(&vm->stack_value, 0)) &&
-                      value_is_string(stack_value_peek(&vm->stack_value, 1)))
+                       value_is_string(stack_value_peek(&vm->stack_value, 1)))
             {
                 Value b = stack_value_pop(&vm->stack_value);
                 Value a = stack_value_pop(&vm->stack_value);
@@ -153,13 +153,18 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm)
                 String final = string_concatenate(s_a, s_b);
                 uint32_t hash = string_hash(final);
                 ObjectString* string = hash_table_get_key(&g_vm.strings, final, hash);
-                if (string == NULL)
-                    // string = object_allocate_string(final.characters, final.length, hash);
-                    string = object_create_and_intern_string(final.characters, final.length, hash);
-                else
-                    string_free(&final);
+                bool found_string_in_database = (string != NULL);
+                if (found_string_in_database) string_free(&final);
 
+                string = object_create_and_intern_string(final.characters, final.length, hash);
                 stack_value_push(&vm->stack_value, value_make_object(string));
+
+                // if (string == NULL)
+                //     // string = object_allocate_string(final.characters, final.length, hash);
+                //     string = object_create_and_intern_string(final.characters, final.length, hash);
+                // else
+                //     string_free(&final);
+                // stack_value_push(&vm->stack_value, value_make_object(string));
             } else
             {
                 virtual_machine_runtime_error(vm, "Operands must be 2(two) numbers or 2(two) strings.");

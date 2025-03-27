@@ -85,6 +85,14 @@ ObjectString* object_allocate_and_intern_string(HashTable* table, char* characte
     return string;
 }
 
+String object_to_string(ObjectString* object_string) {
+    String string = { 0 };
+    string.characters = object_string->characters;
+    string.length = object_string->length;
+
+    return string;
+
+}
 void object_free_string(ObjectString* string)
 {
     free(string->characters);

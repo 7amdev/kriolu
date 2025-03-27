@@ -187,6 +187,7 @@ void object_free(Object* object);
 
 ObjectString* object_allocate_string(char* characters, int length, uint32_t hash);
 ObjectString* object_allocate_and_intern_string(HashTable* table, char* characters, int length, uint32_t hash);
+String object_to_string(ObjectString* object_string);
 void object_free_string(ObjectString* string);
 
 //
