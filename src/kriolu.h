@@ -245,8 +245,9 @@ typedef struct
 
 bool value_negate_logically(Value value);
 bool value_is_equal(Value a, Value b);
-inline bool value_is_object_type(Value value, ObjectKind object_kind);
-
+inline bool value_is_object_type(Value value, ObjectKind object_kind) {
+    return value_is_object(value) && value_as_object(value)->kind == object_kind;
+}
 void value_array_init(ValueArray* values);
 uint32_t value_array_insert(ValueArray* values, Value value);
 void value_print(Value value);
@@ -344,6 +345,7 @@ enum
     StatementKind_Invalid,
 
     StatementKind_Expression,
+    StatementKind_Print,
     StatementKind_Block,
     StatementKind_Return,
     StatementKind_Si,
@@ -433,6 +435,9 @@ enum
     OpCode_Equal_To,
     OpCode_Greater_Than,
     OpCode_Less_Than,
+
+    OpCode_Print,
+    OpCode_Pop,
 
     OpCode_Return
 };
@@ -576,12 +581,12 @@ typedef struct
 
 extern VirtualMachine g_vm;
 
-#define vm_init(bytecode) virtual_machine_init(&g_vm, bytecode)
-#define vm_interpret() virtual_machine_interpret(&g_vm)
+#define vm_init() virtual_machine_init(&g_vm)
+#define vm_interpret(bytecode) virtual_machine_interpret(&g_vm, bytecode)
 #define vm_free() virtual_machine_free(&g_vm)
 
-void virtual_machine_init(VirtualMachine* vm, Bytecode* bytecode);
-InterpreterResult virtual_machine_interpret(VirtualMachine* vm);
+void virtual_machine_init(VirtualMachine* vm);
+InterpreterResult virtual_machine_interpret(VirtualMachine* vm, Bytecode* bytecode);
 void virtual_machine_free(VirtualMachine* vm);
 
 #endif

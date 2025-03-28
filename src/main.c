@@ -10,13 +10,13 @@
     } while (0)
 
 void print_usage();
-int file_read(const char *file_path, char **buffer_out);
-bool filename_ends_with(const char *filename, const char *extension);
+int file_read(const char* file_path, char** buffer_out);
+bool filename_ends_with(const char* filename, const char* extension);
 void token_print(Token token);
 
-int main(int argc, const char *argv[])
+int main(int argc, const char* argv[])
 {
-    const char *source_code = NULL;
+    const char* source_code = NULL;
 
     if (argc < 2)
     {
@@ -44,12 +44,10 @@ int main(int argc, const char *argv[])
         if (strcmp(argv[i], "-lexer") == 0)
         {
             is_flag_lexer = true;
-        }
-        else if (strcmp(argv[i], "-parser") == 0)
+        } else if (strcmp(argv[i], "-parser") == 0)
         {
             is_flag_parser = true;
-        }
-        else if (strcmp(argv[i], "-bytecode") == 0)
+        } else if (strcmp(argv[i], "-bytecode") == 0)
         {
             is_flag_bytecode = true;
         }
@@ -64,23 +62,20 @@ int main(int argc, const char *argv[])
 
     if (is_flag_parser)
     {
-        // Lexer lexer;
         Parser parser;
         Bytecode bytecode;
 
-        // lexer_init(&lexer, source_code);
         parser_init(&parser, source_code);
+        vm_init();
 
         bytecode_emitter_begin();
-        // NOTE: should parse return a linked list of objects create? we then use
-        //       the linked-list to initialize virtual machine.
-        StatementArray *statements = parser_parse(&parser);
+        StatementArray* statements = parser_parse(&parser);
         bytecode = bytecode_emitter_end();
 
-        vm_init(&bytecode);
-        vm_interpret();
+        vm_interpret(&bytecode);
 
-        bytecode_disassemble(&bytecode, "Test");
+        printf("\n");
+        bytecode_disassemble(&bytecode, "Bytecodes");
         bytecode_free(&bytecode);
 
         printf("\n");
@@ -104,7 +99,7 @@ int main(int argc, const char *argv[])
 
         parser_init(&parser, source_code);
         bytecode_emitter_begin();
-        StatementArray *statements = parser_parse(&parser);
+        StatementArray* statements = parser_parse(&parser);
         bytecode = bytecode_emitter_end();
 
         bytecode_disassemble(&bytecode, "Bytecode");
@@ -114,10 +109,10 @@ int main(int argc, const char *argv[])
     return 0;
 }
 
-int file_read(const char *file_path, char **buffer_out)
+int file_read(const char* file_path, char** buffer_out)
 {
     int result = 0;
-    FILE *file = fopen(file_path, "rb");
+    FILE* file = fopen(file_path, "rb");
     if (file == NULL)
     {
         fprintf(stderr, "Error: Could not open file \"%s\".\n", file_path);
@@ -161,7 +156,7 @@ defer:
     return result;
 }
 
-bool filename_ends_with(const char *filename, const char *extension)
+bool filename_ends_with(const char* filename, const char* extension)
 {
     int filename_length = strlen(filename);
     int extension_length = strlen(extension);

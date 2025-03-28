@@ -21,22 +21,23 @@ bool value_is_equal(Value a, Value b)
     if (value_is_boolean(a)) return (value_as_boolean(a) == value_as_boolean(b));
     if (value_is_number(a))  return value_as_number(a) == value_as_number(b);
     if (value_is_nil(a))     return true;
-    if (value_is_string(a)) {
-        ObjectString* string_a = value_as_string(a);
-        ObjectString* string_b = value_as_string(b);
-        return (
-            string_a->length == string_b->length &&
-            memcmp(value_get_string_chars(a), value_get_string_chars(b), string_a->length) == 0
-            );
-    }
+    if (value_is_object(a))  return value_as_object(a) == value_as_object(b);
+    // if (value_is_string(a)) {
+    //     ObjectString* string_a = value_as_string(a);
+    //     ObjectString* string_b = value_as_string(b);
+    //     return (
+    //         string_a->length == string_b->length &&
+    //         memcmp(value_get_string_chars(a), value_get_string_chars(b), string_a->length) == 0
+    //         );
+    // }
 
     return false;
 }
 
-inline bool value_is_object_type(Value value, ObjectKind object_kind)
-{
-    return value_is_object(value) && value_as_object(value)->kind == object_kind;
-}
+// inline bool value_is_object_type(Value value, ObjectKind object_kind)
+// {
+//     return value_is_object(value) && value_as_object(value)->kind == object_kind;
+// }
 
 void value_array_init(ValueArray* values)
 {

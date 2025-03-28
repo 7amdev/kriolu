@@ -28,6 +28,8 @@ static void parser_synchronize(Parser* parser);
 static void parser_error(Parser* parser, Token* token, const char* message);
 static Statement parser_statement(Parser* parser);
 static Statement parser_expression_statement(Parser* parser);
+static Statement parser_print_instruction(Parser* parser);
+static Statement parser_variabel_declaration(Parser* parser);
 static Expression* parser_expression(Parser* parser, OrderOfOperation operator_precedence_previous);
 static Expression* parser_unary_and_literals(parser);
 static Expression* parser_binary(Parser* parser, Expression* left_operand);
@@ -59,18 +61,14 @@ StatementArray* parser_parse(Parser* parser)
     StatementArray* statements = statement_array_allocate();
     parser_advance(parser);
 
-    for (;;)
-    {
-        if (parser->current.kind == TOKEN_EOF)
-        {
-            // todo: Remove this later. For testing purpose.
-            bytecode_emit_byte(OpCode_Return, parser->current.line_number);
-            break;
-        }
+    for (;;) {
+        if (parser->current.kind == TOKEN_EOF) break;
 
         Statement statement = parser_statement(parser);
         statement_array_insert(statements, statement);
     }
+
+    bytecode_emit_byte(OpCode_Return, parser->current.line_number);
 
     return statements;
 }
@@ -94,14 +92,10 @@ static void parser_advance(Parser* parser)
 
 static bool parser_match_then_advance(Parser* parser, TokenKind kind)
 {
+    if (parser->current.kind != kind) return false;
 
-    if (parser->current.kind == kind)
-    {
-        parser_advance(parser);
-        return true;
-    }
-
-    return false;
+    parser_advance(parser);
+    return true;
 }
 
 static void parser_consume(Parser* parser, TokenKind kind, const char* error_message)
@@ -152,14 +146,11 @@ static void parser_error(Parser* parser, Token* token, const char* message)
     parser->had_error = true;
 
     fprintf(stderr, "[line %d] Error", token->line_number);
-    if (token->kind == TOKEN_EOF)
-    {
+    if (token->kind == TOKEN_EOF) {
         fprintf(stderr, " at end");
-    } else if (token->kind == TOKEN_ERROR)
-    {
+    } else if (token->kind == TOKEN_ERROR) {
         fprintf(stderr, " at %.*s\n", token->length, token->start);
-    } else
-    {
+    } else {
         fprintf(stderr, " at '%.*s'", token->length, token->start);
         fprintf(stderr, " : '%s'\n", message);
     }
@@ -175,23 +166,51 @@ static Statement parser_statement(Parser* parser)
     //   +, -, /, *, call '(', assignment '=', objectGet '.'
     //   variableGet, literals
 
-    Statement expression_statement = parser_expression_statement(parser);
+    Statement statement = { 0 };
+
+    if (parser_match_then_advance(parser, TOKEN_MIMORIA)) {
+        statement = parser_variabel_declaration(parser);
+    } else if (parser_match_then_advance(parser, TOKEN_IMPRIMI)) {
+        statement = parser_print_instruction(parser);
+    } else {
+        statement = parser_expression_statement(parser);
+    }
 
     if (parser->panic_mode)
         parser_synchronize(parser);
 
-    return expression_statement;
+    return statement;
 }
 
 static Statement parser_expression_statement(Parser* parser)
 {
-
     Expression* expression = parser_expression(parser, OPERATION_ASSIGNMENT);
     parser_consume(parser, TOKEN_SEMICOLON, "Expect ';' after expression.");
+    bytecode_emit_byte(OpCode_Pop, parser->previous.line_number);
 
     Statement statement = (Statement){
         .kind = StatementKind_Expression,
         .expression = expression };
+
+    return statement;
+}
+
+static Statement parser_print_instruction(Parser* parser) {
+    Statement statement = { 0 };
+
+    Expression* expression = parser_expression(parser, OPERATION_ASSIGNMENT);
+    parser_consume(parser, TOKEN_SEMICOLON, "Expect ';' after expression.");
+    bytecode_emit_byte(OpCode_Print, parser->previous.line_number);
+
+    statement.kind = StatementKind_Print;
+    statement.expression = expression;
+    return statement;
+}
+
+static Statement parser_variabel_declaration(Parser* parser) {
+    Statement statement = { 0 };
+
+    assert(false && "Missing implementation");
 
     return statement;
 }
@@ -202,12 +221,9 @@ static OrderOfOperation parser_operator_precedence(TokenKind kind)
     {
     default:
         return 0;
-    case TOKEN_EQUAL:
-        return OPERATION_ASSIGNMENT;
-    case TOKEN_OU:
-        return OPERATION_OR;
-    case TOKEN_E:
-        return OPERATION_AND;
+    case TOKEN_EQUAL: return OPERATION_ASSIGNMENT;
+    case TOKEN_OU:    return OPERATION_OR;
+    case TOKEN_E:     return OPERATION_AND;
     case TOKEN_EQUAL_EQUAL:
     case TOKEN_NOT_EQUAL:
         return OPERATION_EQUALITY;
@@ -222,10 +238,8 @@ static OrderOfOperation parser_operator_precedence(TokenKind kind)
     case TOKEN_ASTERISK:
     case TOKEN_SLASH:
         return OPERATION_MULTIPLICATION_AND_DIVISION;
-    case TOKEN_CARET:
-        return OPERATION_EXPONENTIATION;
-    case TOKEN_KA:
-        return OPERATION_NOT;
+    case TOKEN_CARET: return OPERATION_EXPONENTIATION;
+    case TOKEN_KA:    return OPERATION_NOT;
     case TOKEN_DOT:
     case TOKEN_LEFT_PARENTHESIS:
         return OPERATION_GROUPING_CALL_AND_GET;

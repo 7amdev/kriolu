@@ -6,12 +6,10 @@
 
 VirtualMachine g_vm;
 
-void virtual_machine_init(VirtualMachine* vm, Bytecode* bytecode)
-{
-    vm->bytecode = bytecode;
-    stack_value_reset(&vm->stack_value);
-    vm->ip = vm->bytecode->instructions.items;
+void virtual_machine_init(VirtualMachine* vm) {
     vm->objects = NULL; // TODO: remove this??
+
+    stack_value_reset(&vm->stack_value);
     hash_table_init(&vm->strings);
 }
 
@@ -29,10 +27,12 @@ void virtual_machine_runtime_error(VirtualMachine* vm, const char* format, ...)
     stack_value_reset(&vm->stack_value);
 }
 
-InterpreterResult virtual_machine_interpret(VirtualMachine* vm)
+InterpreterResult virtual_machine_interpret(VirtualMachine* vm, Bytecode* bytecode)
 {
+    vm->bytecode = bytecode;
+    vm->ip = vm->bytecode->instructions.items;
+
     assert(vm->bytecode->instructions.items != NULL);
-    assert(vm->ip == vm->bytecode->instructions.items);
 
 #define READ_BYTE_THEN_INCREMENT() (*vm->ip++)
 #define READ_3BYTE_THEN_INCREMENT() (((((*vm->ip++) << 8) | (*vm->ip++)) << 8) | (*vm->ip++))
@@ -82,6 +82,11 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm)
         case OpCode_False:
         {
             stack_value_push(&vm->stack_value, value_make_boolean(false));
+            break;
+        }
+        case OpCode_Pop:
+        {
+            stack_value_pop(&vm->stack_value);
             break;
         }
         case OpCode_Nil:
@@ -281,11 +286,18 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm)
             stack_value_push(&vm->stack_value, value_make_boolean(result));
             break;
         }
+        case OpCode_Print:
+        {
+            Value value = stack_value_pop(&vm->stack_value);
+            value_print(value);
+            printf("\n");
+            break;
+        }
         case OpCode_Return:
         {
-            Value constant = stack_value_pop(&vm->stack_value);
-            value_print(constant); // printf("%g", constant);
-            printf("\n");
+            // Value constant = stack_value_pop(&vm->stack_value);
+            // value_print(constant); // printf("%g", constant);
+            // printf("\n");
 
             return Interpreter_Ok;
         }

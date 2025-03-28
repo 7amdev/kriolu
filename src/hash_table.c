@@ -123,7 +123,7 @@ bool hash_table_delete(HashTable* table, ObjectString* key)
 void hash_table_free(HashTable* table)
 {
     free(table->entries);
-    free(table);
+    // free(table);
     hash_table_init(table);
 }
 
