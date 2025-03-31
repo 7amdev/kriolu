@@ -210,7 +210,29 @@ static Statement parser_print_instruction(Parser* parser) {
 static Statement parser_variabel_declaration(Parser* parser) {
     Statement statement = { 0 };
 
-    assert(false && "Missing implementation");
+    parser_consume(parser, TOKEN_IDENTIFIER, "Expect variable name.");
+
+    ObjectString* object_string = object_create_string_if_not_interned(parser->previous.start, parser->previous.length);
+    Value value_string = value_make_object_string(object_string);
+    uint32_t value_index = bytecode_insert_value(value_string);
+    uint8_t global_index = 0;
+    if (value_index > UINT8_MAX) parser_error(parser, &parser->current, "Too many constants.");
+    else global_index = value_index;
+
+    // Check for assignment
+    // 
+    if (parser_match_then_advance(parser, TOKEN_EQUAL)) {
+        parser_expression(parser, OPERATION_ASSIGNMENT);
+    } else {
+        bytecode_emit_byte(OpCode_Nil, parser->previous.line_number);
+    }
+
+    parser_consume(parser, TOKEN_SEMICOLON, "Expected ';' after expression.");
+
+    // Define Global Varible
+    //
+    bytecode_emit_byte(OpCode_Define_Global, parser->previous.line_number);
+    bytecode_emit_byte(global_index, parser->previous.line_number);
 
     return statement;
 }
@@ -313,17 +335,7 @@ static Expression* parser_unary_and_literals(Parser* parser)
         // allocate a new one and store it in the global string database for
         // future reference.
         //
-        String source_string = string_make(parser->previous.start + 1, parser->previous.length - 2);
-        uint32_t hash = string_hash(source_string);
-        ObjectString* string = hash_table_get_key(&g_vm.strings, source_string, hash);
-
-        if (string == NULL)
-        {
-            source_string = string_make_and_copy_characters(parser->previous.start + 1, parser->previous.length - 2);
-            hash = string_hash(source_string);
-            // string = object_allocate_string(source_string.characters, source_string.length, hash);
-            string = object_create_and_intern_string(source_string.characters, source_string.length, hash);
-        }
+        ObjectString* string = object_create_string_if_not_interned(parser->previous.start + 1, parser->previous.length - 2);
 
         Value v_string = value_make_object(string);
         Expression e_string = expression_make_string(string);
@@ -339,20 +351,7 @@ static Expression* parser_unary_and_literals(Parser* parser)
             if (parser->previous.kind != TOKEN_STRING_INTERPOLATION)
                 break;
 
-            String source_string = string_make(parser->previous.start + 1, parser->previous.length - 2);
-            uint32_t hash = string_hash(source_string);
-            ObjectString* string = hash_table_get_key(&g_vm.strings, source_string, hash);
-
-            if (string == NULL)
-            {
-                source_string = string_make_and_copy_characters(parser->previous.start + 1, parser->previous.length - 2);
-                hash = string_hash(source_string);
-                // string = object_allocate_string(source_string.characters, source_string.length, hash);
-                string = object_create_and_intern_string(source_string.characters, source_string.length, hash);
-            }
-            // String token = string_make_and_copy_characters(parser->previous.start + 1, parser->previous.length - 3);
-            // uint32_t token_hash = string_hash(token);
-            // ObjectString *string = object_allocate_string(token.characters, token.length, token_hash);
+            ObjectString* string = object_create_string_if_not_interned(parser->previous.start + 1, parser->previous.length - 2);
             Value v_string = value_make_object(string);
             Expression e_string = expression_make_string(string);
 

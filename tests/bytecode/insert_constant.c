@@ -5,8 +5,10 @@ int main(void)
     Bytecode bytecode;
     bytecode_init(&bytecode);
 
-    for (int i = 0; i < 260; i++)
-        bytecode_write_constant(&bytecode, i, 123);
+    for (int i = 0; i < 260; i++) {
+        Value value = value_make_number(i);
+        bytecode_write_constant(&bytecode, value, 123);
+    }
 
     bytecode_write_opcode(&bytecode, OpCode_Return, 123);
 

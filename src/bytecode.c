@@ -13,7 +13,7 @@ void bytecode_init(Bytecode* bytecode)
     line_array_init(&bytecode->lines);
 }
 
-static int bytecode_write_value(Bytecode* bytecode, Value value)
+int bytecode_write_value(Bytecode* bytecode, Value value)
 {
     return value_array_insert(&bytecode->values, value);
 }
@@ -117,6 +117,8 @@ int bytecode_disassemble_instruction(Bytecode* bytecode, int offset)
         return bytecode_debug_instruction_byte("OPCODE_FALSE", (offset + 1));
     if (opcode == OpCode_Pop)
         return bytecode_debug_instruction_byte("OPCODE_POP", (offset + 1));
+    if (opcode == OpCode_Define_Global)
+        return bytecode_debug_instruction_byte("OPCODE_DEFINE_GLOBAL", (offset + 1));
     if (opcode == OpCode_Nil)
         return bytecode_debug_instruction_byte("OPCODE_NIL", (offset + 1));
     if (opcode == OpCode_Negation)

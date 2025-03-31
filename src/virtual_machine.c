@@ -10,6 +10,7 @@ void virtual_machine_init(VirtualMachine* vm) {
     vm->objects = NULL; // TODO: remove this??
 
     stack_value_reset(&vm->stack_value);
+    hash_table_init(&vm->globals);
     hash_table_init(&vm->strings);
 }
 
@@ -38,6 +39,7 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm, Bytecode* byteco
 #define READ_3BYTE_THEN_INCREMENT() (((((*vm->ip++) << 8) | (*vm->ip++)) << 8) | (*vm->ip++))
 #define READ_CONSTANT() (vm->bytecode->values.items[READ_BYTE_THEN_INCREMENT()])
 #define READ_CONSTANT_3BYTE() (vm->bytecode->values.items[READ_3BYTE_THEN_INCREMENT()])
+#define READ_STRING() value_as_string(READ_CONSTANT())
 
 #ifdef DEBUG_TRACE_EXECUTION
     printf("                                     Operand  \n");
@@ -86,6 +88,14 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm, Bytecode* byteco
         }
         case OpCode_Pop:
         {
+            stack_value_pop(&vm->stack_value);
+            break;
+        }
+        case OpCode_Define_Global:
+        {
+            ObjectString* variable_name = READ_STRING();
+            Value value = stack_value_peek(&vm->stack_value, 0);
+            hash_table_set_value(&vm->globals, variable_name, value);
             stack_value_pop(&vm->stack_value);
             break;
         }
@@ -308,6 +318,7 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm, Bytecode* byteco
 #undef READ_3BYTE_THEN_INCREMENT
 #undef READ_CONSTANT
 #undef READ_CONSTANT_3BYTE
+#undef READ_STRING
 }
 
 void virtual_machine_free(VirtualMachine* vm)
@@ -319,5 +330,6 @@ void virtual_machine_free(VirtualMachine* vm)
         object_free(object);
         object = next;
     }
+    hash_table_free(&vm->globals);
     hash_table_free(&vm->strings);
 }

@@ -72,7 +72,20 @@ ObjectString* object_allocate_string(char* characters, int length, uint32_t hash
     string->hash = hash;
     string->length = length;
 
-    // hash_table_set_value(&g_vm.strings, string, value_make_nil());
+    return string;
+}
+
+ObjectString* object_allocate_string_if_not_interned(HashTable* table, const char* characters, int length) {
+    assert(characters);
+
+    String source_string = string_make(characters, length);
+    uint32_t hash = string_hash(source_string);
+    ObjectString* string = hash_table_get_key(&g_vm.strings, source_string, hash);
+    if (string == NULL) {
+        source_string = string_make_and_copy_characters(characters, length);
+        hash = string_hash(source_string);
+        string = object_create_and_intern_string(source_string.characters, source_string.length, hash);
+    }
 
     return string;
 }
@@ -84,6 +97,7 @@ ObjectString* object_allocate_and_intern_string(HashTable* table, char* characte
     hash_table_set_value(table, string, value_make_nil());
     return string;
 }
+
 
 String object_to_string(ObjectString* object_string) {
     String string = { 0 };

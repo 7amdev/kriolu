@@ -140,7 +140,6 @@ void string_free(String* string);
 //
 // Object
 //
-// TODO: Move HashTable forward declaration to the top of the file 
 typedef struct HashTable HashTable;
 typedef struct Object Object;
 
@@ -184,8 +183,10 @@ void object_print(Object* object);
 void object_free(Object* object);
 
 #define object_create_and_intern_string(characters, length, hash) object_allocate_and_intern_string(&g_vm.strings, characters, length, hash)
+#define object_create_string_if_not_interned(characters, length) object_allocate_string_if_not_interned(&g_vm.strings, characters, length)
 
 ObjectString* object_allocate_string(char* characters, int length, uint32_t hash);
+ObjectString* object_allocate_string_if_not_interned(HashTable* table, const char* characters, int length);
 ObjectString* object_allocate_and_intern_string(HashTable* table, char* characters, int length, uint32_t hash);
 String object_to_string(ObjectString* object_string);
 void object_free_string(ObjectString* string);
@@ -438,6 +439,7 @@ enum
 
     OpCode_Print,
     OpCode_Pop,
+    OpCode_Define_Global,
 
     OpCode_Return
 };
@@ -469,15 +471,26 @@ typedef struct
 } Bytecode;
 
 extern Bytecode g_bytecode;
+
+// TODO: make the API consistent and simpler
+//
 #define bytecode_emit_byte(data, line) bytecode_write_byte(&g_bytecode, data, line)
 #define bytecode_emit_constant(value, line) bytecode_write_constant(&g_bytecode, value, line)
 
+#define bytecode_insert_value(value) bytecode_write_value(&g_bytecode, value)
 #define bytecode_write_opcode(bytecode, opcode, line_number) bytecode_write_byte(bytecode, opcode, line_number)
 #define bytecode_write_operand_u8(bytecode, operand, line_number) bytecode_write_byte(bytecode, operand, line_number)
 #define bytecode_write_operand_u24(bytecode, byte1, byte2, byte3, line_number) bytecode_write_instruction_u24(bytecode, byte1, byte2, byte3, line_number)
 
 void bytecode_init(Bytecode* bytecode);
+
+// TODO: change name to bytecode_insert_byte_instruction
+//
 int bytecode_write_byte(Bytecode* bytecode, uint8_t data, int line_number);
+
+// TODO: change name to bytecode_insert_value
+//
+int bytecode_write_value(Bytecode* bytecode, Value value);
 int bytecode_write_constant(Bytecode* bytecode, Value value, int line_number);
 void bytecode_disassemble(Bytecode* bytecode, const char* name);
 int bytecode_disassemble_instruction(Bytecode* bytecode, int offset);
@@ -571,6 +584,10 @@ typedef struct
     // A linked list of all objects created at runtime
     // TODO: move this variable to object.c module
     Object* objects;
+
+    // Stores global variables 
+    //
+    HashTable globals;
 
     // Stores all unique strings allocated during runtime
     //
