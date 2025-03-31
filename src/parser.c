@@ -33,6 +33,7 @@ static Statement parser_variabel_declaration(Parser* parser);
 static Expression* parser_expression(Parser* parser, OrderOfOperation operator_precedence_previous);
 static Expression* parser_unary_and_literals(parser);
 static Expression* parser_binary(Parser* parser, Expression* left_operand);
+static uint8_t parser_store_identifier_into_bytecode(Parser* parser, const char* start, int length);
 
 //
 // Globals
@@ -212,12 +213,13 @@ static Statement parser_variabel_declaration(Parser* parser) {
 
     parser_consume(parser, TOKEN_IDENTIFIER, "Expect variable name.");
 
-    ObjectString* object_string = object_create_string_if_not_interned(parser->previous.start, parser->previous.length);
-    Value value_string = value_make_object_string(object_string);
-    uint32_t value_index = bytecode_insert_value(value_string);
-    uint8_t global_index = 0;
-    if (value_index > UINT8_MAX) parser_error(parser, &parser->current, "Too many constants.");
-    else global_index = value_index;
+    uint8_t global_index = parser_store_identifier_into_bytecode(parser, parser->previous.start, parser->previous.length);
+    // ObjectString* object_string = object_create_string_if_not_interned(parser->previous.start, parser->previous.length);
+    // Value value_string = value_make_object_string(object_string);
+    // uint32_t value_index = bytecode_insert_value(value_string);
+    // uint8_t global_index = 0;
+    // if (value_index > UINT8_MAX) parser_error(parser, &parser->current, "Too many constants.");
+    // else global_index = value_index;
 
     // Check for assignment
     // 
@@ -231,10 +233,22 @@ static Statement parser_variabel_declaration(Parser* parser) {
 
     // Define Global Varible
     //
-    bytecode_emit_byte(OpCode_Define_Global, parser->previous.line_number);
-    bytecode_emit_byte(global_index, parser->previous.line_number);
+    bytecode_emit_opcode(OpCode_Define_Global, parser->previous.line_number);
+    bytecode_emit_operand_u8(global_index, parser->previous.line_number);
 
     return statement;
+}
+
+static uint8_t parser_store_identifier_into_bytecode(Parser* parser, const char* start, int length) {
+    ObjectString* object_string = object_create_string_if_not_interned(start, length);
+    Value value_string = value_make_object_string(object_string);
+    int value_index = bytecode_insert_value(value_string);
+    if (value_index > UINT8_MAX) {
+        parser_error(parser, &parser->current, "Too many constants.");
+        return 0;
+    }
+
+    return (uint8_t)value_index;
 }
 
 static OrderOfOperation parser_operator_precedence(TokenKind kind)
@@ -413,6 +427,14 @@ static Expression* parser_unary_and_literals(Parser* parser)
 
         parser_consume(parser, TOKEN_RIGHT_PARENTHESIS, "Expected ')' after expression.");
         return expression_allocate(grouping);
+    }
+
+    if (parser->previous.kind == TOKEN_IDENTIFIER) {
+        uint8_t global_index = parser_store_identifier_into_bytecode(parser, parser->previous.start, parser->previous.length);
+        bytecode_emit_opcode(OpCode_Read_Global, parser->previous.line_number);
+        bytecode_emit_operand_u8(global_index, parser->previous.line_number);
+
+        return NULL;
     }
 
     // TODO: log token name

@@ -99,6 +99,19 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm, Bytecode* byteco
             stack_value_pop(&vm->stack_value);
             break;
         }
+        case OpCode_Read_Global:
+        {
+            ObjectString* variable_name = READ_STRING();
+            Value value;
+
+            if (hash_table_get_value(&vm->globals, variable_name, &value) == false) {
+                virtual_machine_runtime_error(vm, "Undefined variable '%s'.", variable_name->characters);
+                return Interpreter_Runtime_Error;
+            }
+
+            stack_value_push(&vm->stack_value, value);
+            break;
+        }
         case OpCode_Nil:
         {
             stack_value_push(&vm->stack_value, value_make_nil());

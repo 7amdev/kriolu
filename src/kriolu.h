@@ -439,7 +439,9 @@ enum
 
     OpCode_Print,
     OpCode_Pop,
-    OpCode_Define_Global,
+    OpCode_Define_Global, // var x;
+    OpCode_Read_Global,   // print x;
+    OpCode_Assign_Global, // x = 7;
 
     OpCode_Return
 };
@@ -475,6 +477,8 @@ extern Bytecode g_bytecode;
 // TODO: make the API consistent and simpler
 //
 #define bytecode_emit_byte(data, line) bytecode_write_byte(&g_bytecode, data, line)
+#define bytecode_emit_opcode(data, line) bytecode_write_byte(&g_bytecode, data, line)
+#define bytecode_emit_operand_u8(data, line) bytecode_write_byte(&g_bytecode, data, line)
 #define bytecode_emit_constant(value, line) bytecode_write_constant(&g_bytecode, value, line)
 
 #define bytecode_insert_value(value) bytecode_write_value(&g_bytecode, value)
@@ -491,6 +495,7 @@ int bytecode_write_byte(Bytecode* bytecode, uint8_t data, int line_number);
 // TODO: change name to bytecode_insert_value
 //
 int bytecode_write_value(Bytecode* bytecode, Value value);
+int bytecode_write_value_identifier(Bytecode* bytecode, const char* start, int length);
 int bytecode_write_constant(Bytecode* bytecode, Value value, int line_number);
 void bytecode_disassemble(Bytecode* bytecode, const char* name);
 int bytecode_disassemble_instruction(Bytecode* bytecode, int offset);
