@@ -21,55 +21,55 @@
 
 typedef enum
 {
-    TOKEN_ERROR, // TODO: change to token_invalid
-    TOKEN_EOF,
+    Token_Error, // TODO: change to token_invalid
+    Token_Eof,
 
-    TOKEN_LEFT_PARENTHESIS,  // (
-    TOKEN_RIGHT_PARENTHESIS, // )
-    TOKEN_LEFT_BRACE,        // {
-    TOKEN_RIGHT_BRACE,       // }
-    TOKEN_COMMA,
-    TOKEN_DOT,
-    TOKEN_MINUS,
-    TOKEN_PLUS,
-    TOKEN_SEMICOLON,
-    TOKEN_SLASH,
-    TOKEN_ASTERISK,
-    TOKEN_CARET,
+    Token_Left_Parenthesis,  // (
+    Token_Right_Parenthesis, // )
+    Token_Left_Brace,        // {
+    Token_Right_Brace,       // }
+    Token_Comma,
+    Token_Dot,
+    Token_Minus,
+    Token_Plus,
+    Token_Semicolon,
+    Token_Slash,
+    Token_Asterisk,
+    Token_Caret,
 
-    TOKEN_EQUAL,         // =
-    TOKEN_EQUAL_EQUAL,   // ==
-    TOKEN_NOT_EQUAL,     // =/=
-    TOKEN_GREATER,       // >
-    TOKEN_GREATER_EQUAL, // >=
-    TOKEN_LESS,          // <
-    TOKEN_LESS_EQUAL,    // <=
+    Token_Equal,         // =
+    Token_Equal_Equal,   // ==
+    Token_Not_Equal,     // =/=
+    Token_Greater,       // >
+    Token_Greater_Equal, // >=
+    Token_Less,          // <
+    Token_Less_Equal,    // <=
 
-    TOKEN_IDENTIFIER,
-    TOKEN_STRING,
-    TOKEN_STRING_INTERPOLATION,
-    TOKEN_NUMBER,
+    Token_Identifier,
+    Token_String,
+    Token_String_Interpolation,
+    Token_Number,
 
-    TOKEN_E,  // logic operator AND
-    TOKEN_OU, // logic operator OR
-    TOKEN_KA, // logic operator NOT
-    TOKEN_KLASI,
-    TOKEN_SI,
-    TOKEN_SINOU,
-    TOKEN_FALSU,
-    TOKEN_VERDADI,
-    TOKEN_DI,
-    TOKEN_FUNSON,
-    TOKEN_NULO,
-    TOKEN_IMPRIMI,
-    TOKEN_DIVOLVI,
-    TOKEN_SUPER,
-    TOKEN_KELI,    // this
-    TOKEN_MIMORIA, // variable
-    TOKEN_TIMENTI,
-    TOKEN_TI,
+    Token_E,  // logic operator AND
+    Token_Ou, // LOGIC OPERATOR or
+    Token_Ka, // LOGIC OPERATOR not
+    Token_Klasi,
+    Token_Si,
+    Token_Sinou,
+    Token_Falsu,
+    Token_Verdadi,
+    Token_Di,
+    Token_Funson,
+    Token_Nulo,
+    Token_Imprimi,
+    Token_Divolvi,
+    Token_Super,
+    Token_Keli,    // THIS
+    Token_Mimoria, // VARIABLE
+    Token_Timenti,
+    Token_Ti,
 
-    TOKEN_COMMENT
+    Token_Comment
 } TokenKind;
 
 typedef struct
