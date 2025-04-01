@@ -380,8 +380,8 @@ void statement_array_free(StatementArray* statements);
 
 typedef struct
 {
-    Token current;  // TODO: rename to current_token
-    Token previous; // TODO: rename to previous_token
+    Token token_current;
+    Token token_previous;
     Lexer* lexer;
     bool had_error;
     bool panic_mode;

@@ -41,8 +41,8 @@ static uint8_t parser_store_identifier_into_bytecode(Parser* parser, const char*
 
 void parser_initialize(Parser* parser, const char* source_code, Lexer* lexer)
 {
-    parser->current = (Token){ 0 };  // token_error
-    parser->previous = (Token){ 0 }; // token_error
+    parser->token_current = (Token){ 0 };  // token_error
+    parser->token_previous = (Token){ 0 }; // token_error
     parser->panic_mode = false;
     parser->had_error = false;
     parser->lexer = lexer;
@@ -63,37 +63,37 @@ StatementArray* parser_parse(Parser* parser)
     parser_advance(parser);
 
     for (;;) {
-        if (parser->current.kind == TOKEN_EOF) break;
+        if (parser->token_current.kind == TOKEN_EOF) break;
 
         Statement statement = parser_statement(parser);
         statement_array_insert(statements, statement);
     }
 
-    bytecode_emit_byte(OpCode_Return, parser->current.line_number);
+    bytecode_emit_byte(OpCode_Return, parser->token_current.line_number);
 
     return statements;
 }
 
 static void parser_advance(Parser* parser)
 {
-    parser->previous = parser->current;
+    parser->token_previous = parser->token_current;
 
     for (;;)
     {
-        parser->current = lexer_scan(parser->lexer);
-        if (parser->current.kind == TOKEN_COMMENT)
+        parser->token_current = lexer_scan(parser->lexer);
+        if (parser->token_current.kind == TOKEN_COMMENT)
             continue;
 
-        if (parser->current.kind != TOKEN_ERROR)
+        if (parser->token_current.kind != TOKEN_ERROR)
             break;
 
-        parser_error(parser, &parser->current, "");
+        parser_error(parser, &parser->token_current, "");
     }
 }
 
 static bool parser_match_then_advance(Parser* parser, TokenKind kind)
 {
-    if (parser->current.kind != kind) return false;
+    if (parser->token_current.kind != kind) return false;
 
     parser_advance(parser);
     return true;
@@ -101,25 +101,25 @@ static bool parser_match_then_advance(Parser* parser, TokenKind kind)
 
 static void parser_consume(Parser* parser, TokenKind kind, const char* error_message)
 {
-    if (parser->current.kind == kind)
+    if (parser->token_current.kind == kind)
     {
         parser_advance(parser);
         return;
     }
 
-    parser_error(parser, &parser->previous, error_message);
+    parser_error(parser, &parser->token_previous, error_message);
 }
 
 static void parser_synchronize(Parser* parser)
 {
     parser->panic_mode = false;
 
-    while (parser->current.kind != TOKEN_EOF)
+    while (parser->token_current.kind != TOKEN_EOF)
     {
-        if (parser->previous.kind == TOKEN_SEMICOLON)
+        if (parser->token_previous.kind == TOKEN_SEMICOLON)
             return;
 
-        switch (parser->current.kind)
+        switch (parser->token_current.kind)
         {
         case TOKEN_KLASI:
         case TOKEN_FUNSON:
@@ -187,7 +187,7 @@ static Statement parser_expression_statement(Parser* parser)
 {
     Expression* expression = parser_expression(parser, OPERATION_ASSIGNMENT);
     parser_consume(parser, TOKEN_SEMICOLON, "Expect ';' after expression.");
-    bytecode_emit_byte(OpCode_Pop, parser->previous.line_number);
+    bytecode_emit_byte(OpCode_Pop, parser->token_previous.line_number);
 
     Statement statement = (Statement){
         .kind = StatementKind_Expression,
@@ -201,7 +201,7 @@ static Statement parser_print_instruction(Parser* parser) {
 
     Expression* expression = parser_expression(parser, OPERATION_ASSIGNMENT);
     parser_consume(parser, TOKEN_SEMICOLON, "Expect ';' after expression.");
-    bytecode_emit_byte(OpCode_Print, parser->previous.line_number);
+    bytecode_emit_byte(OpCode_Print, parser->token_previous.line_number);
 
     statement.kind = StatementKind_Print;
     statement.expression = expression;
@@ -213,12 +213,12 @@ static Statement parser_variabel_declaration(Parser* parser) {
 
     parser_consume(parser, TOKEN_IDENTIFIER, "Expect variable name.");
 
-    uint8_t global_index = parser_store_identifier_into_bytecode(parser, parser->previous.start, parser->previous.length);
-    // ObjectString* object_string = object_create_string_if_not_interned(parser->previous.start, parser->previous.length);
+    uint8_t global_index = parser_store_identifier_into_bytecode(parser, parser->token_previous.start, parser->token_previous.length);
+    // ObjectString* object_string = object_create_string_if_not_interned(parser->token_previous.start, parser->token_previous.length);
     // Value value_string = value_make_object_string(object_string);
     // uint32_t value_index = bytecode_insert_value(value_string);
     // uint8_t global_index = 0;
-    // if (value_index > UINT8_MAX) parser_error(parser, &parser->current, "Too many constants.");
+    // if (value_index > UINT8_MAX) parser_error(parser, &parser->token_current, "Too many constants.");
     // else global_index = value_index;
 
     // Check for assignment
@@ -226,15 +226,15 @@ static Statement parser_variabel_declaration(Parser* parser) {
     if (parser_match_then_advance(parser, TOKEN_EQUAL)) {
         parser_expression(parser, OPERATION_ASSIGNMENT);
     } else {
-        bytecode_emit_byte(OpCode_Nil, parser->previous.line_number);
+        bytecode_emit_byte(OpCode_Nil, parser->token_previous.line_number);
     }
 
     parser_consume(parser, TOKEN_SEMICOLON, "Expected ';' after expression.");
 
     // Define Global Varible
     //
-    bytecode_emit_opcode(OpCode_Define_Global, parser->previous.line_number);
-    bytecode_emit_operand_u8(global_index, parser->previous.line_number);
+    bytecode_emit_opcode(OpCode_Define_Global, parser->token_previous.line_number);
+    bytecode_emit_operand_u8(global_index, parser->token_previous.line_number);
 
     return statement;
 }
@@ -244,7 +244,7 @@ static uint8_t parser_store_identifier_into_bytecode(Parser* parser, const char*
     Value value_string = value_make_object_string(object_string);
     int value_index = bytecode_insert_value(value_string);
     if (value_index > UINT8_MAX) {
-        parser_error(parser, &parser->current, "Too many constants.");
+        parser_error(parser, &parser->token_current, "Too many constants.");
         return 0;
     }
 
@@ -295,7 +295,7 @@ static Expression* parser_expression(Parser* parser, OrderOfOperation operator_p
     Expression* left_operand = parser_unary_and_literals(parser, can_assign);
     Expression* expression = left_operand;
 
-    TokenKind operator_kind_current = parser->current.kind;
+    TokenKind operator_kind_current = parser->token_current.kind;
     OrderOfOperation operator_precedence_current = parser_operator_precedence(operator_kind_current);
 
     while (operator_precedence_current > operator_precedence_previous)
@@ -303,11 +303,11 @@ static Expression* parser_expression(Parser* parser, OrderOfOperation operator_p
         parser_advance(parser);
         expression = parser_binary(parser, expression);
 
-        operator_precedence_current = parser_operator_precedence(parser->current.kind);
+        operator_precedence_current = parser_operator_precedence(parser->token_current.kind);
     }
 
     if (can_assign && parser_match_then_advance(parser, TOKEN_EQUAL)) {
-        parser_error(parser, &parser->current, "Invalid assignment target.");
+        parser_error(parser, &parser->token_current, "Invalid assignment target.");
     }
 
     return expression;
@@ -317,75 +317,75 @@ static Expression* parser_unary_and_literals(Parser* parser, bool can_assign)
 {
     // Literals
     //
-    if (parser->previous.kind == TOKEN_NUMBER)
+    if (parser->token_previous.kind == TOKEN_NUMBER)
     {
-        double value = strtod(parser->previous.start, NULL);
+        double value = strtod(parser->token_previous.start, NULL);
         Value number = value_make_number(value);
         Expression e_number = expression_make_number(value);
 
-        bytecode_emit_constant(number, parser->previous.line_number);
+        bytecode_emit_constant(number, parser->token_previous.line_number);
 
         return expression_allocate(e_number);
     }
 
-    if (parser->previous.kind == TOKEN_VERDADI)
+    if (parser->token_previous.kind == TOKEN_VERDADI)
     {
         Expression e_true = expression_make_boolean(true);
 
-        bytecode_emit_byte(OpCode_True, parser->previous.line_number);
+        bytecode_emit_byte(OpCode_True, parser->token_previous.line_number);
         return expression_allocate(e_true);
     }
 
-    if (parser->previous.kind == TOKEN_FALSU)
+    if (parser->token_previous.kind == TOKEN_FALSU)
     {
         Expression e_false = expression_make_boolean(false);
 
-        bytecode_emit_byte(OpCode_False, parser->previous.line_number);
+        bytecode_emit_byte(OpCode_False, parser->token_previous.line_number);
         return expression_allocate(e_false);
     }
 
-    if (parser->previous.kind == TOKEN_NULO)
+    if (parser->token_previous.kind == TOKEN_NULO)
     {
         Expression nil = expression_make_nil();
 
-        bytecode_emit_byte(OpCode_Nil, parser->previous.line_number);
+        bytecode_emit_byte(OpCode_Nil, parser->token_previous.line_number);
         return expression_allocate(nil);
     }
 
-    if (parser->previous.kind == TOKEN_STRING)
+    if (parser->token_previous.kind == TOKEN_STRING)
     {
         // Check if the source_string already exists in the global string
         // database in the virtual machine. If it does, reuse it, if not
         // allocate a new one and store it in the global string database for
         // future reference.
         //
-        ObjectString* string = object_create_string_if_not_interned(parser->previous.start + 1, parser->previous.length - 2);
+        ObjectString* string = object_create_string_if_not_interned(parser->token_previous.start + 1, parser->token_previous.length - 2);
 
         Value v_string = value_make_object(string);
         Expression e_string = expression_make_string(string);
 
-        bytecode_emit_constant(v_string, parser->previous.line_number);
+        bytecode_emit_constant(v_string, parser->token_previous.line_number);
         return expression_allocate(e_string);
     }
 
-    if (parser->previous.kind == TOKEN_STRING_INTERPOLATION)
+    if (parser->token_previous.kind == TOKEN_STRING_INTERPOLATION)
     {
         for (;;)
         {
-            if (parser->previous.kind != TOKEN_STRING_INTERPOLATION)
+            if (parser->token_previous.kind != TOKEN_STRING_INTERPOLATION)
                 break;
 
-            ObjectString* string = object_create_string_if_not_interned(parser->previous.start + 1, parser->previous.length - 2);
+            ObjectString* string = object_create_string_if_not_interned(parser->token_previous.start + 1, parser->token_previous.length - 2);
             Value v_string = value_make_object(string);
             Expression e_string = expression_make_string(string);
 
             // Tracks on many values have it pushed to the stack on runtime.
             //
             parser->interpolation_count_value_pushed += 1;
-            bytecode_emit_constant(v_string, parser->previous.line_number);
+            bytecode_emit_constant(v_string, parser->token_previous.line_number);
 
             parser->interpolation_count_nesting += 1;
-            if (parser->current.kind != TOKEN_STRING_INTERPOLATION)
+            if (parser->token_current.kind != TOKEN_STRING_INTERPOLATION)
                 parser->interpolation_count_value_pushed += 1;
             parser_expression(parser, OPERATION_ASSIGNMENT);
             parser->interpolation_count_nesting -= 1;
@@ -393,16 +393,16 @@ static Expression* parser_unary_and_literals(Parser* parser, bool can_assign)
             parser_advance(parser);
         }
 
-        if (*parser->previous.start != '}')
-            parser_error(parser, &parser->previous, "Missing closing '}' in interpolation template.");
+        if (*parser->token_previous.start != '}')
+            parser_error(parser, &parser->token_previous, "Missing closing '}' in interpolation template.");
 
         parser->interpolation_count_value_pushed += 1;
         parser_unary_and_literals(parser, can_assign);
 
         if (parser->interpolation_count_nesting == 0)
         {
-            bytecode_emit_byte(OpCode_Interpolation, parser->previous.line_number);
-            bytecode_emit_byte((uint8_t)parser->interpolation_count_value_pushed, parser->previous.line_number);
+            bytecode_emit_byte(OpCode_Interpolation, parser->token_previous.line_number);
+            bytecode_emit_byte((uint8_t)parser->interpolation_count_value_pushed, parser->token_previous.line_number);
         }
 
         // TODO: implement string interpolation Ast-Node and return it
@@ -412,25 +412,25 @@ static Expression* parser_unary_and_literals(Parser* parser, bool can_assign)
 
     // Unary
     //
-    if (parser->previous.kind == TOKEN_MINUS)
+    if (parser->token_previous.kind == TOKEN_MINUS)
     {
         Expression* expression = parser_expression(parser, OPERATION_NEGATE);
         Expression negation = expression_make_negation(expression);
 
-        bytecode_emit_byte(OpCode_Negation, parser->previous.line_number);
+        bytecode_emit_byte(OpCode_Negation, parser->token_previous.line_number);
         return expression_allocate(negation);
     }
 
-    if (parser->previous.kind == TOKEN_KA)
+    if (parser->token_previous.kind == TOKEN_KA)
     {
         Expression* expression = parser_expression(parser, OPERATION_NOT);
         Expression not = expression_make_not(expression);
 
-        bytecode_emit_byte(OpCode_Not, parser->previous.line_number);
+        bytecode_emit_byte(OpCode_Not, parser->token_previous.line_number);
         return expression_allocate(not);
     }
 
-    if (parser->previous.kind == TOKEN_LEFT_PARENTHESIS)
+    if (parser->token_previous.kind == TOKEN_LEFT_PARENTHESIS)
     {
         Expression* expression = parser_expression(parser, OPERATION_ASSIGNMENT);
         Expression grouping = expression_make_grouping(expression);
@@ -441,16 +441,16 @@ static Expression* parser_unary_and_literals(Parser* parser, bool can_assign)
 
     // Identifier
     //
-    if (parser->previous.kind == TOKEN_IDENTIFIER) {
-        uint8_t global_index = parser_store_identifier_into_bytecode(parser, parser->previous.start, parser->previous.length);
+    if (parser->token_previous.kind == TOKEN_IDENTIFIER) {
+        uint8_t global_index = parser_store_identifier_into_bytecode(parser, parser->token_previous.start, parser->token_previous.length);
 
         if (can_assign && parser_match_then_advance(parser, TOKEN_EQUAL)) {
             parser_expression(parser, OPERATION_ASSIGNMENT);
-            bytecode_emit_opcode(OpCode_Assign_Global, parser->previous.line_number);
-            bytecode_emit_operand_u8(global_index, parser->previous.line_number);
+            bytecode_emit_opcode(OpCode_Assign_Global, parser->token_previous.line_number);
+            bytecode_emit_operand_u8(global_index, parser->token_previous.line_number);
         } else {
-            bytecode_emit_opcode(OpCode_Read_Global, parser->previous.line_number);
-            bytecode_emit_operand_u8(global_index, parser->previous.line_number);
+            bytecode_emit_opcode(OpCode_Read_Global, parser->token_previous.line_number);
+            bytecode_emit_operand_u8(global_index, parser->token_previous.line_number);
         }
 
         return NULL;
@@ -464,14 +464,14 @@ static Expression* parser_unary_and_literals(Parser* parser, bool can_assign)
 
 static Expression* parser_binary(Parser* parser, Expression* left_operand)
 {
-    TokenKind operator_kind_previous = parser->previous.kind;
+    TokenKind operator_kind_previous = parser->token_previous.kind;
     OrderOfOperation operator_precedence_previous = parser_operator_precedence(operator_kind_previous);
 
     Expression* right_operand = parser_expression(parser, operator_precedence_previous);
 
     if (operator_kind_previous == TOKEN_PLUS)
     {
-        bytecode_emit_byte(OpCode_Addition, parser->previous.line_number);
+        bytecode_emit_byte(OpCode_Addition, parser->token_previous.line_number);
 
         Expression addition = expression_make_addition(left_operand, right_operand);
         return expression_allocate(addition);
@@ -479,7 +479,7 @@ static Expression* parser_binary(Parser* parser, Expression* left_operand)
 
     if (operator_kind_previous == TOKEN_MINUS)
     {
-        bytecode_emit_byte(OpCode_Addition, parser->previous.line_number);
+        bytecode_emit_byte(OpCode_Addition, parser->token_previous.line_number);
 
         Expression subtraction = expression_make_subtraction(left_operand, right_operand);
         return expression_allocate(subtraction);
@@ -487,7 +487,7 @@ static Expression* parser_binary(Parser* parser, Expression* left_operand)
 
     if (operator_kind_previous == TOKEN_ASTERISK)
     {
-        bytecode_emit_byte(OpCode_Multiplication, parser->previous.line_number);
+        bytecode_emit_byte(OpCode_Multiplication, parser->token_previous.line_number);
 
         Expression multiplication = expression_make_multiplication(left_operand, right_operand);
         return expression_allocate(multiplication);
@@ -495,7 +495,7 @@ static Expression* parser_binary(Parser* parser, Expression* left_operand)
 
     if (operator_kind_previous == TOKEN_SLASH)
     {
-        bytecode_emit_byte(OpCode_Division, parser->previous.line_number);
+        bytecode_emit_byte(OpCode_Division, parser->token_previous.line_number);
 
         Expression division = expression_make_division(left_operand, right_operand);
         return expression_allocate(division);
@@ -503,7 +503,7 @@ static Expression* parser_binary(Parser* parser, Expression* left_operand)
 
     if (operator_kind_previous == TOKEN_CARET)
     {
-        bytecode_emit_byte(OpCode_Exponentiation, parser->previous.line_number);
+        bytecode_emit_byte(OpCode_Exponentiation, parser->token_previous.line_number);
 
         Expression exponentiation = expression_make_division(left_operand, right_operand);
         return expression_allocate(exponentiation);
@@ -511,7 +511,7 @@ static Expression* parser_binary(Parser* parser, Expression* left_operand)
 
     if (operator_kind_previous == TOKEN_EQUAL_EQUAL)
     {
-        bytecode_emit_byte(OpCode_Equal_To, parser->previous.line_number);
+        bytecode_emit_byte(OpCode_Equal_To, parser->token_previous.line_number);
 
         Expression equal_to = expression_make_equal_to(left_operand, right_operand);
         return expression_allocate(equal_to);
@@ -521,8 +521,8 @@ static Expression* parser_binary(Parser* parser, Expression* left_operand)
     {
         // a != b has the same semantics as !(a == b)
         //
-        bytecode_emit_byte(OpCode_Equal_To, parser->previous.line_number);
-        bytecode_emit_byte(OpCode_Not, parser->previous.line_number);
+        bytecode_emit_byte(OpCode_Equal_To, parser->token_previous.line_number);
+        bytecode_emit_byte(OpCode_Not, parser->token_previous.line_number);
 
         Expression* equal_to = expression_allocate(expression_make_equal_to(left_operand, right_operand));
         return expression_allocate(expression_make_not(equal_to));
@@ -530,7 +530,7 @@ static Expression* parser_binary(Parser* parser, Expression* left_operand)
 
     if (operator_kind_previous == TOKEN_GREATER)
     {
-        bytecode_emit_byte(OpCode_Greater_Than, parser->previous.line_number);
+        bytecode_emit_byte(OpCode_Greater_Than, parser->token_previous.line_number);
 
         Expression greater_than = expression_make_greater_than(left_operand, right_operand);
         return expression_allocate(greater_than);
@@ -540,8 +540,8 @@ static Expression* parser_binary(Parser* parser, Expression* left_operand)
     {
         // a >= b has the same semantics as !(a < b)
         //
-        bytecode_emit_byte(OpCode_Less_Than, parser->previous.line_number);
-        bytecode_emit_byte(OpCode_Not, parser->previous.line_number);
+        bytecode_emit_byte(OpCode_Less_Than, parser->token_previous.line_number);
+        bytecode_emit_byte(OpCode_Not, parser->token_previous.line_number);
 
         Expression* greater_than = expression_allocate(expression_make_greater_than(left_operand, right_operand));
         Expression greater_than_or_equal_to = expression_make_not(greater_than);
@@ -550,7 +550,7 @@ static Expression* parser_binary(Parser* parser, Expression* left_operand)
 
     if (operator_kind_previous == TOKEN_LESS)
     {
-        bytecode_emit_byte(OpCode_Less_Than, parser->previous.line_number);
+        bytecode_emit_byte(OpCode_Less_Than, parser->token_previous.line_number);
 
         Expression less_than = expression_make_less_than(left_operand, right_operand);
         return expression_allocate(less_than);
@@ -560,8 +560,8 @@ static Expression* parser_binary(Parser* parser, Expression* left_operand)
     {
         // a <= b has the same semantics as !(a > b)
         //
-        bytecode_emit_byte(OpCode_Greater_Than, parser->previous.line_number);
-        bytecode_emit_byte(OpCode_Not, parser->previous.line_number);
+        bytecode_emit_byte(OpCode_Greater_Than, parser->token_previous.line_number);
+        bytecode_emit_byte(OpCode_Not, parser->token_previous.line_number);
 
         Expression* less_than = expression_allocate(expression_make_less_than(left_operand, right_operand));
         Expression less_than_or_equal_to = expression_make_not(less_than);
