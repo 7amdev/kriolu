@@ -1,13 +1,13 @@
 #include "kriolu.h"
 
-void instruction_array_init(InstructionArray* instructions)
+void instruction_array_init(ArrayInstruction* instructions)
 {
     instructions->items = NULL;
     instructions->count = 0;
     instructions->capacity = 0;
 }
 
-int instruction_array_insert(InstructionArray* instructions, uint8_t item)
+int instruction_array_insert(ArrayInstruction* instructions, uint8_t item)
 {
     if (instructions->capacity < instructions->count + 1)
     {
@@ -26,7 +26,7 @@ int instruction_array_insert(InstructionArray* instructions, uint8_t item)
     return instructions->count - 1;
 }
 
-int instruction_array_insert_u24(InstructionArray* instructions, uint8_t byte1, uint8_t byte2, uint8_t byte3)
+int instruction_array_insert_u24(ArrayInstruction* instructions, uint8_t byte1, uint8_t byte2, uint8_t byte3)
 {
     instruction_array_insert(instructions, byte3);
     instruction_array_insert(instructions, byte2);
@@ -35,7 +35,7 @@ int instruction_array_insert_u24(InstructionArray* instructions, uint8_t byte1, 
     return instructions->count - 1;
 }
 
-void instruction_array_free(InstructionArray* instructions)
+void instruction_array_free(ArrayInstruction* instructions)
 {
     free(instructions->items);
     instruction_array_init(instructions);

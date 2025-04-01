@@ -39,14 +39,14 @@ bool value_is_equal(Value a, Value b)
 //     return value_is_object(value) && value_as_object(value)->kind == object_kind;
 // }
 
-void value_array_init(ValueArray* values)
+void value_array_init(ArrayValue* values)
 {
     values->items = NULL;
     values->count = 0;
     values->capacity = 0;
 }
 
-uint32_t value_array_insert(ValueArray* values, Value value)
+uint32_t value_array_insert(ArrayValue* values, Value value)
 {
     if (values->capacity < values->count + 1)
     {
@@ -91,7 +91,7 @@ void value_print(Value value)
     }
 }
 
-void value_array_free(ValueArray* values)
+void value_array_free(ArrayValue* values)
 {
     free(values->items);
     value_array_init(values);

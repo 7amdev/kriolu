@@ -221,7 +221,7 @@ typedef struct
     Value* items;
     int count;
     int capacity;
-} ValueArray;
+} ArrayValue;
 
 #define value_make_boolean(value) ((Value){.kind = Value_Boolean, .as = {.boolean = value}})
 #define value_make_number(value) ((Value){.kind = Value_Number, .as = {.number = value}})
@@ -249,10 +249,10 @@ bool value_is_equal(Value a, Value b);
 inline bool value_is_object_type(Value value, ObjectKind object_kind) {
     return value_is_object(value) && value_as_object(value)->kind == object_kind;
 }
-void value_array_init(ValueArray* values);
-uint32_t value_array_insert(ValueArray* values, Value value);
+void value_array_init(ArrayValue* values);
+uint32_t value_array_insert(ArrayValue* values, Value value);
 void value_print(Value value);
-void value_array_free(ValueArray* values);
+void value_array_free(ArrayValue* values);
 
 //
 // Abstract Syntax Tree
@@ -403,12 +403,12 @@ typedef struct
     int* items;
     int count;
     int capacity;
-} LineNumberArray;
+} ArrayLineNumber;
 
-void line_array_init(LineNumberArray* lines);
-int line_array_insert(LineNumberArray* lines, int line);
-int line_array_insert_3x(LineNumberArray* lines, int line);
-void line_array_free(LineNumberArray* lines);
+void line_array_init(ArrayLineNumber* lines);
+int line_array_insert(ArrayLineNumber* lines, int line);
+int line_array_insert_3x(ArrayLineNumber* lines, int line);
+void line_array_free(ArrayLineNumber* lines);
 
 //
 // Instruction
@@ -451,12 +451,12 @@ typedef struct
     uint8_t* items;
     int count;
     int capacity;
-} InstructionArray;
+} ArrayInstruction;
 
-void instruction_array_init(InstructionArray* instructions);
-int instruction_array_insert(InstructionArray* instructions, uint8_t item);
-int instruction_array_insert_u24(InstructionArray* instructions, uint8_t byte1, uint8_t byte2, uint8_t byte3);
-void instruction_array_free(InstructionArray* instructions);
+void instruction_array_init(ArrayInstruction* instructions);
+int instruction_array_insert(ArrayInstruction* instructions, uint8_t item);
+int instruction_array_insert_u24(ArrayInstruction* instructions, uint8_t byte1, uint8_t byte2, uint8_t byte3);
+void instruction_array_free(ArrayInstruction* instructions);
 
 //
 // Bytecode
@@ -467,9 +467,9 @@ void instruction_array_free(InstructionArray* instructions);
 //
 typedef struct
 {
-    InstructionArray instructions;
-    LineNumberArray lines;
-    ValueArray values;
+    ArrayInstruction instructions;
+    ArrayLineNumber lines;
+    ArrayValue values;
 } Bytecode;
 
 extern Bytecode g_bytecode;
