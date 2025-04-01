@@ -118,9 +118,11 @@ int bytecode_disassemble_instruction(Bytecode* bytecode, int offset)
     if (opcode == OpCode_Pop)
         return bytecode_debug_instruction_byte("OPCODE_POP", (offset + 1));
     if (opcode == OpCode_Define_Global)
-        return bytecode_debug_instruction_byte("OPCODE_DEFINE_GLOBAL", (offset + 1));
+        return bytecode_debug_instruction_2bytes(bytecode, "OPCODE_DEFINE_GLOBAL", (offset + 2));
     if (opcode == OpCode_Read_Global)
-        return bytecode_debug_instruction_byte("OPCODE_READ_GLOBAL", (offset + 1));
+        return bytecode_debug_instruction_2bytes(bytecode, "OPCODE_READ_GLOBAL", (offset + 2));
+    if (opcode == OpCode_Assign_Global)
+        return bytecode_debug_instruction_2bytes(bytecode, "OPCODE_ASSIGN_GLOBAL", (offset + 2));
     if (opcode == OpCode_Nil)
         return bytecode_debug_instruction_byte("OPCODE_NIL", (offset + 1));
     if (opcode == OpCode_Negation)

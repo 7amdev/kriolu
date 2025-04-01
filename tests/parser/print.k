@@ -1,3 +1,9 @@
+mimoria a = 1; 
+mimoria b = 2;
+mimoria c = 3;
+mimoria d = 4;
+d = 8;
+a * b = c + d;
 imprimi "Hello World!";
 imprimi 1 + 3;
 imprimi "Alfredo" == "Alfredo";

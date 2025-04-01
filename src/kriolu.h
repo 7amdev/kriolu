@@ -21,7 +21,7 @@
 
 typedef enum
 {
-    TOKEN_ERROR,
+    TOKEN_ERROR, // TODO: change to token_invalid
     TOKEN_EOF,
 
     TOKEN_LEFT_PARENTHESIS,  // (

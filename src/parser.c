@@ -257,9 +257,12 @@ static OrderOfOperation parser_operator_precedence(TokenKind kind)
     {
     default:
         return 0;
-    case TOKEN_EQUAL: return OPERATION_ASSIGNMENT;
-    case TOKEN_OU:    return OPERATION_OR;
-    case TOKEN_E:     return OPERATION_AND;
+    case TOKEN_EQUAL:
+        return OPERATION_ASSIGNMENT;
+    case TOKEN_OU:
+        return OPERATION_OR;
+    case TOKEN_E:
+        return OPERATION_AND;
     case TOKEN_EQUAL_EQUAL:
     case TOKEN_NOT_EQUAL:
         return OPERATION_EQUALITY;
@@ -274,8 +277,10 @@ static OrderOfOperation parser_operator_precedence(TokenKind kind)
     case TOKEN_ASTERISK:
     case TOKEN_SLASH:
         return OPERATION_MULTIPLICATION_AND_DIVISION;
-    case TOKEN_CARET: return OPERATION_EXPONENTIATION;
-    case TOKEN_KA:    return OPERATION_NOT;
+    case TOKEN_CARET:
+        return OPERATION_EXPONENTIATION;
+    case TOKEN_KA:
+        return OPERATION_NOT;
     case TOKEN_DOT:
     case TOKEN_LEFT_PARENTHESIS:
         return OPERATION_GROUPING_CALL_AND_GET;
@@ -286,7 +291,8 @@ static Expression* parser_expression(Parser* parser, OrderOfOperation operator_p
 {
     parser_advance(parser);
 
-    Expression* left_operand = parser_unary_and_literals(parser);
+    bool can_assign = (operator_precedence_previous <= OPERATION_ASSIGNMENT);
+    Expression* left_operand = parser_unary_and_literals(parser, can_assign);
     Expression* expression = left_operand;
 
     TokenKind operator_kind_current = parser->current.kind;
@@ -300,10 +306,14 @@ static Expression* parser_expression(Parser* parser, OrderOfOperation operator_p
         operator_precedence_current = parser_operator_precedence(parser->current.kind);
     }
 
+    if (can_assign && parser_match_then_advance(parser, TOKEN_EQUAL)) {
+        parser_error(parser, &parser->current, "Invalid assignment target.");
+    }
+
     return expression;
 }
 
-static Expression* parser_unary_and_literals(Parser* parser)
+static Expression* parser_unary_and_literals(Parser* parser, bool can_assign)
 {
     // Literals
     //
@@ -387,7 +397,7 @@ static Expression* parser_unary_and_literals(Parser* parser)
             parser_error(parser, &parser->previous, "Missing closing '}' in interpolation template.");
 
         parser->interpolation_count_value_pushed += 1;
-        parser_unary_and_literals(parser);
+        parser_unary_and_literals(parser, can_assign);
 
         if (parser->interpolation_count_nesting == 0)
         {
@@ -429,10 +439,19 @@ static Expression* parser_unary_and_literals(Parser* parser)
         return expression_allocate(grouping);
     }
 
+    // Identifier
+    //
     if (parser->previous.kind == TOKEN_IDENTIFIER) {
         uint8_t global_index = parser_store_identifier_into_bytecode(parser, parser->previous.start, parser->previous.length);
-        bytecode_emit_opcode(OpCode_Read_Global, parser->previous.line_number);
-        bytecode_emit_operand_u8(global_index, parser->previous.line_number);
+
+        if (can_assign && parser_match_then_advance(parser, TOKEN_EQUAL)) {
+            parser_expression(parser, OPERATION_ASSIGNMENT);
+            bytecode_emit_opcode(OpCode_Assign_Global, parser->previous.line_number);
+            bytecode_emit_operand_u8(global_index, parser->previous.line_number);
+        } else {
+            bytecode_emit_opcode(OpCode_Read_Global, parser->previous.line_number);
+            bytecode_emit_operand_u8(global_index, parser->previous.line_number);
+        }
 
         return NULL;
     }
