@@ -12,9 +12,6 @@
 
 #define DEBUG_LOG_PARSER
 
-// todo: change Array, Stack, and Ast naming convention to:
-//       AstExpression, StackValue, ArrayInstruction, ArrayStatement, ...
-
 //
 // Token
 //
@@ -123,6 +120,7 @@ typedef struct
 //
 #define string_make_from_literal(string) \
     (String){.characters = (char *)string, .length = sizeof(string) - 1}
+
 #define string_make_from_array(string) \
     (String) { .characters = (char *)string, .length = strlen(string) }
 
@@ -163,12 +161,12 @@ typedef struct
 {
     Object object;
 
-    // String
+    // String related fields
     //
     char* characters;
     int length;
-
     uint32_t hash;
+
 } ObjectString;
 
 #define object_cast_to_string(object) ((ObjectString *)object)
@@ -368,11 +366,11 @@ typedef struct
     Statement* items;
     uint32_t count;
     uint32_t capacity;
-} StatementArray;
+} ArrayStatement;
 
-StatementArray* statement_array_allocate();
-uint32_t statement_array_insert(StatementArray* statements, Statement statement);
-void statement_array_free(StatementArray* statements);
+ArrayStatement* statement_array_allocate();
+uint32_t statement_array_insert(ArrayStatement* statements, Statement statement);
+void statement_array_free(ArrayStatement* statements);
 
 //
 // Parser
@@ -392,7 +390,7 @@ typedef struct
 #define parser_init(parser, source_code) parser_initialize(parser, source_code, NULL)
 
 void parser_initialize(Parser* parser, const char* source_code, Lexer* lexer);
-StatementArray* parser_parse(Parser* parser);
+ArrayStatement* parser_parse(Parser* parser);
 
 //
 // Line Number
@@ -453,10 +451,10 @@ typedef struct
     int capacity;
 } ArrayInstruction;
 
-void instruction_array_init(ArrayInstruction* instructions);
-int instruction_array_insert(ArrayInstruction* instructions, uint8_t item);
-int instruction_array_insert_u24(ArrayInstruction* instructions, uint8_t byte1, uint8_t byte2, uint8_t byte3);
-void instruction_array_free(ArrayInstruction* instructions);
+void array_instruction_init(ArrayInstruction* instructions);
+int array_instruction_insert(ArrayInstruction* instructions, uint8_t item);
+int array_instruction_insert_u24(ArrayInstruction* instructions, uint8_t byte1, uint8_t byte2, uint8_t byte3);
+void array_instruction_free(ArrayInstruction* instructions);
 
 //
 // Bytecode
@@ -468,35 +466,21 @@ void instruction_array_free(ArrayInstruction* instructions);
 typedef struct
 {
     ArrayInstruction instructions;
-    ArrayLineNumber lines;
     ArrayValue values;
+    ArrayLineNumber lines;
 } Bytecode;
 
 extern Bytecode g_bytecode;
 
-// TODO: make the API consistent and simpler
-//
-#define bytecode_emit_byte(data, line) bytecode_write_byte(&g_bytecode, data, line)
-#define bytecode_emit_opcode(data, line) bytecode_write_byte(&g_bytecode, data, line)
-#define bytecode_emit_operand_u8(data, line) bytecode_write_byte(&g_bytecode, data, line)
-#define bytecode_emit_constant(value, line) bytecode_write_constant(&g_bytecode, value, line)
-
-#define bytecode_insert_value(value) bytecode_write_value(&g_bytecode, value)
-#define bytecode_write_opcode(bytecode, opcode, line_number) bytecode_write_byte(bytecode, opcode, line_number)
-#define bytecode_write_operand_u8(bytecode, operand, line_number) bytecode_write_byte(bytecode, operand, line_number)
-#define bytecode_write_operand_u24(bytecode, byte1, byte2, byte3, line_number) bytecode_write_instruction_u24(bytecode, byte1, byte2, byte3, line_number)
+#define bytecode_emit_instruction_1byte(opcode, line) bytecode_insert_instruction_1byte(&g_bytecode, opcode, line)
+#define bytecode_emit_instruction_2bytes(opcode, operand, line) bytecode_insert_instruction_2bytes(&g_bytecode, opcode, operand, line)
+#define bytecode_emit_constant(value, line) bytecode_insert_instruction_constant(&g_bytecode, value, line)
+#define bytecode_emit_value(value) value_array_insert(&g_bytecode.values, value)
 
 void bytecode_init(Bytecode* bytecode);
-
-// TODO: change name to bytecode_insert_byte_instruction
-//
-int bytecode_write_byte(Bytecode* bytecode, uint8_t data, int line_number);
-
-// TODO: change name to bytecode_insert_value
-//
-int bytecode_write_value(Bytecode* bytecode, Value value);
-int bytecode_write_value_identifier(Bytecode* bytecode, const char* start, int length);
-int bytecode_write_constant(Bytecode* bytecode, Value value, int line_number);
+int bytecode_insert_instruction_1byte(Bytecode* bytecode, OpCode opcode, int line_number);
+int bytecode_insert_instruction_2bytes(Bytecode* bytecode, OpCode opcode, uint8_t operand, int line_number);
+int bytecode_insert_instruction_constant(Bytecode* bytecode, Value value, int line_number);
 void bytecode_disassemble(Bytecode* bytecode, const char* name);
 int bytecode_disassemble_instruction(Bytecode* bytecode, int offset);
 void bytecode_emitter_begin();
@@ -588,15 +572,16 @@ typedef struct
 
     // A linked list of all objects created at runtime
     // TODO: move this variable to object.c module
+    //
     Object* objects;
 
     // Stores global variables 
     //
-    HashTable globals;
+    HashTable globals; // TODO: change name to global_database
 
     // Stores all unique strings allocated during runtime
     //
-    HashTable strings;
+    HashTable strings; // TODO: change name to stting_database
 
     // TODO: add a varible to track total bytes allocated
 } VirtualMachine;

@@ -6,55 +6,75 @@
 
 Bytecode g_bytecode;
 
-void bytecode_init(Bytecode* bytecode)
-{
-    instruction_array_init(&bytecode->instructions);
+void bytecode_init(Bytecode* bytecode) {
+    array_instruction_init(&bytecode->instructions);
     value_array_init(&bytecode->values);
     line_array_init(&bytecode->lines);
 }
 
-int bytecode_write_value(Bytecode* bytecode, Value value) {
-    return value_array_insert(&bytecode->values, value);
+int bytecode_insert_instruction_1byte(Bytecode* bytecode, OpCode opcode, int line_number) {
+    int opcode_index = array_instruction_insert(&bytecode->instructions, opcode);
+    int line_opcode_index = line_array_insert(&bytecode->lines, line_number);
+
+    assert(opcode_index == line_opcode_index);
+    assert(opcode_index == (bytecode->instructions.count - 1));
+
+    return bytecode->instructions.count - 1;
 }
 
+int bytecode_insert_instruction_2bytes(Bytecode* bytecode, OpCode opcode, uint8_t operand, int line_number) {
+    int opcode_index = array_instruction_insert(&bytecode->instructions, opcode);
+    int line_opcode_index = line_array_insert(&bytecode->lines, line_number);
 
-static int bytecode_write_instruction_u24(Bytecode* bytecode, uint8_t byte1, uint8_t byte2, uint8_t byte3, int line_number)
-{
-    int instruction_index = instruction_array_insert_u24(&bytecode->instructions, byte1, byte2, byte3);
+    assert(opcode_index == line_opcode_index);
+
+    int operand_index = array_instruction_insert(&bytecode->instructions, operand);
+    int line_operand_index = line_array_insert(&bytecode->lines, line_number);
+
+    assert(operand_index == line_operand_index);
+    assert(operand_index == (bytecode->instructions.count - 1));
+
+    return bytecode->instructions.count - 1;
+}
+
+static int bytecode_insert_instruction_4bytes(Bytecode* bytecode, OpCode opcode, uint8_t byte1, uint8_t byte2, uint8_t byte3, int line_number) {
+    int opcode_index = array_instruction_insert(&bytecode->instructions, opcode);
+    int line_opcode_index = line_array_insert(&bytecode->lines, line_number);
+
+    assert(opcode_index == line_opcode_index);
+
+    int operand_index = array_instruction_insert_u24(&bytecode->instructions, byte1, byte2, byte3);
     int line_index = line_array_insert_3x(&bytecode->lines, line_number);
-    assert(instruction_index == line_index);
 
-    return instruction_index;
+    assert(operand_index == line_index);
+    assert(operand_index == (bytecode->instructions.count - 1));
+
+    return bytecode->instructions.count - 1;
 }
 
-int bytecode_write_byte(Bytecode* bytecode, uint8_t data, int line_number)
-{
-    int instruction_index = instruction_array_insert(&bytecode->instructions, data);
-    int line_index = line_array_insert(&bytecode->lines, line_number);
-    assert(instruction_index == line_index);
-
-    return instruction_index;
-}
-
-int bytecode_write_constant(Bytecode* bytecode, Value value, int line_number)
-{
-    int value_index = bytecode_write_value(bytecode, value);
+int bytecode_insert_instruction_constant(Bytecode* bytecode, Value value, int line_number) {
+    int value_index = value_array_insert(&bytecode->values, value);
     assert(value_index > -1);
 
-    if (value_index < 256)
-    {
-        bytecode_write_opcode(bytecode, OpCode_Constant, line_number);
-        bytecode_write_operand_u8(bytecode, (uint8_t)value_index, line_number);
-        return bytecode->instructions.count - 1;
+    if (value_index < 256) {
+        return bytecode_insert_instruction_2bytes(
+            bytecode,
+            OpCode_Constant,       // OpCode
+            (uint8_t)value_index,  // Operand
+            line_number
+        );
     }
 
     uint8_t byte1 = (value_index >> 0 & 0xff);
     uint8_t byte2 = (value_index >> 8 & 0xff);
     uint8_t byte3 = (value_index >> 16 & 0xff);
-    bytecode_write_opcode(bytecode, OpCode_Constant_Long, line_number);
-    bytecode_write_operand_u24(bytecode, byte1, byte2, byte3, line_number);
 
-    return bytecode->instructions.count - 1;
+    return bytecode_insert_instruction_4bytes(
+        bytecode,
+        OpCode_Constant,          // OpCode
+        byte1, byte2, byte3,      // Operand
+        line_number
+    );
 }
 
 static int bytecode_debug_instruction_byte(const char* opcode_text, int ret_offset_increment)
@@ -185,11 +205,11 @@ Bytecode bytecode_emitter_end(int line_number)
 
 void bytecode_free(Bytecode* bytecode)
 {
-    instruction_array_free(&bytecode->instructions);
+    array_instruction_free(&bytecode->instructions);
     line_array_free(&bytecode->lines);
     value_array_free(&bytecode->values);
 
-    instruction_array_init(&bytecode->instructions);
+    array_instruction_init(&bytecode->instructions);
     line_array_init(&bytecode->lines);
     value_array_init(&bytecode->values);
 }

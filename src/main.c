@@ -69,7 +69,7 @@ int main(int argc, const char* argv[])
         vm_init();
 
         bytecode_emitter_begin();
-        StatementArray* statements = parser_parse(&parser);
+        ArrayStatement* statements = parser_parse(&parser);
         bytecode = bytecode_emitter_end();
 
         vm_interpret(&bytecode);
@@ -99,7 +99,7 @@ int main(int argc, const char* argv[])
 
         parser_init(&parser, source_code);
         bytecode_emitter_begin();
-        StatementArray* statements = parser_parse(&parser);
+        ArrayStatement* statements = parser_parse(&parser);
         bytecode = bytecode_emitter_end();
 
         bytecode_disassemble(&bytecode, "Bytecode");

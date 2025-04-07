@@ -1,8 +1,8 @@
 #include "kriolu.h"
 
-Expression *expression_allocate(Expression expr)
+Expression* expression_allocate(Expression expr)
 {
-    Expression *expression = (Expression *)calloc(1, sizeof(Expression));
+    Expression* expression = (Expression*)calloc(1, sizeof(Expression));
     assert(expression);
 
     // initialize
@@ -11,7 +11,7 @@ Expression *expression_allocate(Expression expr)
     return expression;
 }
 
-void expression_print_tree(Expression *expression, int indent)
+void expression_print_tree(Expression* expression, int indent)
 {
     for (int i = 0; i < indent; i++)
         printf("  ");
@@ -46,7 +46,7 @@ void expression_print_tree(Expression *expression, int indent)
     }
     case ExpressionKind_Negation:
     {
-        Expression *operand = expression_as_negation(*expression).operand;
+        Expression* operand = expression_as_negation(*expression).operand;
 
         printf("-:\n");
         expression_print_tree(operand, indent + 1);
@@ -54,7 +54,7 @@ void expression_print_tree(Expression *expression, int indent)
     }
     case ExpressionKind_Not:
     {
-        Expression *operand = expression_as_negation(*expression).operand;
+        Expression* operand = expression_as_negation(*expression).operand;
 
         printf("ka:\n");
         expression_print_tree(operand, indent + 1);
@@ -62,7 +62,7 @@ void expression_print_tree(Expression *expression, int indent)
     }
     case ExpressionKind_Grouping:
     {
-        Expression *expr = expression_as_negation(*expression).operand;
+        Expression* expr = expression_as_negation(*expression).operand;
         expression_print_tree(expr, indent + 1);
         break;
     }
@@ -75,8 +75,8 @@ void expression_print_tree(Expression *expression, int indent)
     case ExpressionKind_Greater_Than:
     case ExpressionKind_Less_Than:
     {
-        Expression *left_operand = expression_as_binary(*expression).left;
-        Expression *right_operand = expression_as_binary(*expression).right;
+        Expression* left_operand = expression_as_binary(*expression).left;
+        Expression* right_operand = expression_as_binary(*expression).right;
 
         if (expression->kind == ExpressionKind_Addition)
             printf("+:\n");
@@ -102,7 +102,7 @@ void expression_print_tree(Expression *expression, int indent)
     }
 }
 
-void expression_print(Expression *expression)
+void expression_print(Expression* expression)
 {
 
     switch (expression->kind)
@@ -136,7 +136,7 @@ void expression_print(Expression *expression)
     }
     case ExpressionKind_Negation:
     {
-        Expression *operand = expression_as_negation(*expression).operand;
+        Expression* operand = expression_as_negation(*expression).operand;
 
         printf("(");
         printf("-");
@@ -146,7 +146,7 @@ void expression_print(Expression *expression)
     }
     case ExpressionKind_Not:
     {
-        Expression *operand = expression_as_negation(*expression).operand;
+        Expression* operand = expression_as_negation(*expression).operand;
 
         printf("(");
         printf("ka ");
@@ -156,7 +156,7 @@ void expression_print(Expression *expression)
     }
     case ExpressionKind_Grouping:
     {
-        Expression *expr = expression_as_negation(*expression).operand;
+        Expression* expr = expression_as_negation(*expression).operand;
         expression_print(expr);
         break;
     }
@@ -169,8 +169,8 @@ void expression_print(Expression *expression)
     case ExpressionKind_Greater_Than:
     case ExpressionKind_Less_Than:
     {
-        Expression *left_operand = expression_as_binary(*expression).left;
-        Expression *right_operand = expression_as_binary(*expression).right;
+        Expression* left_operand = expression_as_binary(*expression).left;
+        Expression* right_operand = expression_as_binary(*expression).right;
 
         printf("(");
         expression_print(left_operand);
@@ -199,7 +199,7 @@ void expression_print(Expression *expression)
     }
     }
 }
-void expression_free(Expression *expression)
+void expression_free(Expression* expression)
 {
 
     switch (expression->kind)
@@ -210,7 +210,7 @@ void expression_free(Expression *expression)
     case ExpressionKind_Grouping:
     case ExpressionKind_Not:
     {
-        Expression *operand = expression_as_negation(*expression).operand;
+        Expression* operand = expression_as_negation(*expression).operand;
         expression_free(operand);
         break;
     }
@@ -223,8 +223,8 @@ void expression_free(Expression *expression)
     case ExpressionKind_Greater_Than:
     case ExpressionKind_Less_Than:
     {
-        Expression *left_operand = expression_as_addition(*expression).left;
-        Expression *right_operand = expression_as_addition(*expression).right;
+        Expression* left_operand = expression_as_addition(*expression).left;
+        Expression* right_operand = expression_as_addition(*expression).right;
 
         expression_free(left_operand);
         expression_free(right_operand);
