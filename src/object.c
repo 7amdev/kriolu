@@ -80,7 +80,7 @@ ObjectString* object_allocate_string_if_not_interned(HashTable* table, const cha
 
     String source_string = string_make(characters, length);
     uint32_t hash = string_hash(source_string);
-    ObjectString* string = hash_table_get_key(&g_vm.strings, source_string, hash);
+    ObjectString* string = hash_table_get_key(&g_vm.string_database, source_string, hash);
     if (string == NULL) {
         source_string = string_make_and_copy_characters(characters, length);
         hash = string_hash(source_string);

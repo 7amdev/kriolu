@@ -120,7 +120,7 @@ int main(void) {
 
     srand(time(NULL));
     hash_table_init(&hash_table);
-    // hash_table_init(&g_vm.strings);
+    // hash_table_init(&g_vm.string_database);
 
     // 
     // Initialization

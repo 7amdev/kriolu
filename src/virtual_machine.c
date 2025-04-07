@@ -10,8 +10,8 @@ void virtual_machine_init(VirtualMachine* vm) {
     vm->objects = NULL; // TODO: remove this??
 
     stack_value_reset(&vm->stack_value);
-    hash_table_init(&vm->globals);
-    hash_table_init(&vm->strings);
+    hash_table_init(&vm->global_database);
+    hash_table_init(&vm->string_database);
 }
 
 void virtual_machine_runtime_error(VirtualMachine* vm, const char* format, ...)
@@ -95,7 +95,7 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm, Bytecode* byteco
         {
             ObjectString* variable_name = READ_STRING();
             Value value = stack_value_peek(&vm->stack_value, 0);
-            hash_table_set_value(&vm->globals, variable_name, value);
+            hash_table_set_value(&vm->global_database, variable_name, value);
             stack_value_pop(&vm->stack_value);
             break;
         }
@@ -104,7 +104,7 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm, Bytecode* byteco
             ObjectString* variable_name = READ_STRING();
             Value value;
 
-            if (hash_table_get_value(&vm->globals, variable_name, &value) == false) {
+            if (hash_table_get_value(&vm->global_database, variable_name, &value) == false) {
                 virtual_machine_runtime_error(vm, "Undefined variable '%s'.", variable_name->characters);
                 return Interpreter_Runtime_Error;
             }
@@ -116,9 +116,9 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm, Bytecode* byteco
         {
             ObjectString* variable_name = READ_STRING();
             Value value = stack_value_peek(&vm->stack_value, 0);
-            bool is_new = hash_table_set_value(&vm->globals, variable_name, value);
+            bool is_new = hash_table_set_value(&vm->global_database, variable_name, value);
             if (is_new) {
-                hash_table_delete(&vm->globals, variable_name);
+                hash_table_delete(&vm->global_database, variable_name);
                 virtual_machine_runtime_error(vm, "Undefined variable '%s'.", variable_name->characters);
                 return Interpreter_Runtime_Error;
             }
@@ -192,7 +192,7 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm, Bytecode* byteco
 
                 String final = string_concatenate(s_a, s_b);
                 uint32_t hash = string_hash(final);
-                ObjectString* string = hash_table_get_key(&g_vm.strings, final, hash);
+                ObjectString* string = hash_table_get_key(&g_vm.string_database, final, hash);
                 bool found_string_in_database = (string != NULL);
                 if (found_string_in_database) string_free(&final);
 
@@ -355,6 +355,6 @@ void virtual_machine_free(VirtualMachine* vm)
         object_free(object);
         object = next;
     }
-    hash_table_free(&vm->globals);
-    hash_table_free(&vm->strings);
+    hash_table_free(&vm->global_database);
+    hash_table_free(&vm->string_database);
 }

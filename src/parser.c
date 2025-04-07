@@ -59,14 +59,14 @@ void parser_initialize(Parser* parser, const char* source_code, Lexer* lexer)
 
 ArrayStatement* parser_parse(Parser* parser)
 {
-    ArrayStatement* statements = statement_array_allocate();
+    ArrayStatement* statements = array_statement_allocate();
     parser_advance(parser);
 
     for (;;) {
         if (parser->token_current.kind == Token_Eof) break;
 
         Statement statement = parser_statement(parser);
-        statement_array_insert(statements, statement);
+        array_statement_insert(statements, statement);
     }
 
     bytecode_emit_instruction_1byte(OpCode_Return, parser->token_current.line_number);

@@ -8,13 +8,13 @@ Bytecode g_bytecode;
 
 void bytecode_init(Bytecode* bytecode) {
     array_instruction_init(&bytecode->instructions);
-    value_array_init(&bytecode->values);
-    line_array_init(&bytecode->lines);
+    array_value_init(&bytecode->values);
+    array_line_init(&bytecode->lines);
 }
 
 int bytecode_insert_instruction_1byte(Bytecode* bytecode, OpCode opcode, int line_number) {
     int opcode_index = array_instruction_insert(&bytecode->instructions, opcode);
-    int line_opcode_index = line_array_insert(&bytecode->lines, line_number);
+    int line_opcode_index = array_line_insert(&bytecode->lines, line_number);
 
     assert(opcode_index == line_opcode_index);
     assert(opcode_index == (bytecode->instructions.count - 1));
@@ -24,12 +24,12 @@ int bytecode_insert_instruction_1byte(Bytecode* bytecode, OpCode opcode, int lin
 
 int bytecode_insert_instruction_2bytes(Bytecode* bytecode, OpCode opcode, uint8_t operand, int line_number) {
     int opcode_index = array_instruction_insert(&bytecode->instructions, opcode);
-    int line_opcode_index = line_array_insert(&bytecode->lines, line_number);
+    int line_opcode_index = array_line_insert(&bytecode->lines, line_number);
 
     assert(opcode_index == line_opcode_index);
 
     int operand_index = array_instruction_insert(&bytecode->instructions, operand);
-    int line_operand_index = line_array_insert(&bytecode->lines, line_number);
+    int line_operand_index = array_line_insert(&bytecode->lines, line_number);
 
     assert(operand_index == line_operand_index);
     assert(operand_index == (bytecode->instructions.count - 1));
@@ -39,12 +39,12 @@ int bytecode_insert_instruction_2bytes(Bytecode* bytecode, OpCode opcode, uint8_
 
 static int bytecode_insert_instruction_4bytes(Bytecode* bytecode, OpCode opcode, uint8_t byte1, uint8_t byte2, uint8_t byte3, int line_number) {
     int opcode_index = array_instruction_insert(&bytecode->instructions, opcode);
-    int line_opcode_index = line_array_insert(&bytecode->lines, line_number);
+    int line_opcode_index = array_line_insert(&bytecode->lines, line_number);
 
     assert(opcode_index == line_opcode_index);
 
     int operand_index = array_instruction_insert_u24(&bytecode->instructions, byte1, byte2, byte3);
-    int line_index = line_array_insert_3x(&bytecode->lines, line_number);
+    int line_index = array_line_insert_3x(&bytecode->lines, line_number);
 
     assert(operand_index == line_index);
     assert(operand_index == (bytecode->instructions.count - 1));
@@ -53,7 +53,7 @@ static int bytecode_insert_instruction_4bytes(Bytecode* bytecode, OpCode opcode,
 }
 
 int bytecode_insert_instruction_constant(Bytecode* bytecode, Value value, int line_number) {
-    int value_index = value_array_insert(&bytecode->values, value);
+    int value_index = array_value_insert(&bytecode->values, value);
     assert(value_index > -1);
 
     if (value_index < 256) {
@@ -206,10 +206,10 @@ Bytecode bytecode_emitter_end(int line_number)
 void bytecode_free(Bytecode* bytecode)
 {
     array_instruction_free(&bytecode->instructions);
-    line_array_free(&bytecode->lines);
-    value_array_free(&bytecode->values);
+    array_line_free(&bytecode->lines);
+    array_value_free(&bytecode->values);
 
     array_instruction_init(&bytecode->instructions);
-    line_array_init(&bytecode->lines);
-    value_array_init(&bytecode->values);
+    array_line_init(&bytecode->lines);
+    array_value_init(&bytecode->values);
 }

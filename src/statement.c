@@ -1,6 +1,6 @@
 #include "kriolu.h"
 
-ArrayStatement* statement_array_allocate()
+ArrayStatement* array_statement_allocate()
 {
     ArrayStatement* statements = (ArrayStatement*)calloc(1, sizeof(ArrayStatement));
     assert(statements);
@@ -13,7 +13,7 @@ ArrayStatement* statement_array_allocate()
     return statements;
 }
 
-uint32_t statement_array_insert(ArrayStatement* statements, Statement statement)
+uint32_t array_statement_insert(ArrayStatement* statements, Statement statement)
 {
     if (statements->capacity < statements->count + 1)
     {
@@ -31,6 +31,6 @@ uint32_t statement_array_insert(ArrayStatement* statements, Statement statement)
     return (uint32_t)statements->count - 1;
 }
 
-void statement_array_free(ArrayStatement* statements)
+void array_statement_free(ArrayStatement* statements)
 {
 }

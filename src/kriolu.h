@@ -115,7 +115,7 @@ typedef struct
     int length;
 } String;
 
-// sizeof("Hello") -> 6: it counts the character '\0', so
+// sizeof("Hello") -> 6: it counts the character '\0', hence
 // the -1 at the end.
 //
 #define string_make_from_literal(string) \
@@ -171,7 +171,6 @@ typedef struct
 
 #define object_cast_to_string(object) ((ObjectString *)object)
 #define string_cast_to_object(string) ((Object *)string)
-
 #define object_get_string_chars(object) (object_cast_to_string(object)->characters)
 
 Object* object_allocate(ObjectKind kind, size_t size);
@@ -180,8 +179,8 @@ void object_clear(Object* object);
 void object_print(Object* object);
 void object_free(Object* object);
 
-#define object_create_and_intern_string(characters, length, hash) object_allocate_and_intern_string(&g_vm.strings, characters, length, hash)
-#define object_create_string_if_not_interned(characters, length) object_allocate_string_if_not_interned(&g_vm.strings, characters, length)
+#define object_create_and_intern_string(characters, length, hash) object_allocate_and_intern_string(&g_vm.string_database, characters, length, hash)
+#define object_create_string_if_not_interned(characters, length) object_allocate_string_if_not_interned(&g_vm.string_database, characters, length)
 
 ObjectString* object_allocate_string(char* characters, int length, uint32_t hash);
 ObjectString* object_allocate_string_if_not_interned(HashTable* table, const char* characters, int length);
@@ -244,13 +243,13 @@ typedef struct
 
 bool value_negate_logically(Value value);
 bool value_is_equal(Value a, Value b);
+void value_print(Value value);
 inline bool value_is_object_type(Value value, ObjectKind object_kind) {
     return value_is_object(value) && value_as_object(value)->kind == object_kind;
 }
-void value_array_init(ArrayValue* values);
-uint32_t value_array_insert(ArrayValue* values, Value value);
-void value_print(Value value);
-void value_array_free(ArrayValue* values);
+void array_value_init(ArrayValue* values);
+uint32_t array_value_insert(ArrayValue* values, Value value);
+void array_value_free(ArrayValue* values);
 
 //
 // Abstract Syntax Tree
@@ -368,9 +367,9 @@ typedef struct
     uint32_t capacity;
 } ArrayStatement;
 
-ArrayStatement* statement_array_allocate();
-uint32_t statement_array_insert(ArrayStatement* statements, Statement statement);
-void statement_array_free(ArrayStatement* statements);
+ArrayStatement* array_statement_allocate();
+uint32_t array_statement_insert(ArrayStatement* statements, Statement statement);
+void array_statement_free(ArrayStatement* statements);
 
 //
 // Parser
@@ -403,10 +402,10 @@ typedef struct
     int capacity;
 } ArrayLineNumber;
 
-void line_array_init(ArrayLineNumber* lines);
-int line_array_insert(ArrayLineNumber* lines, int line);
-int line_array_insert_3x(ArrayLineNumber* lines, int line);
-void line_array_free(ArrayLineNumber* lines);
+void array_line_init(ArrayLineNumber* lines);
+int array_line_insert(ArrayLineNumber* lines, int line);
+int array_line_insert_3x(ArrayLineNumber* lines, int line);
+void array_line_free(ArrayLineNumber* lines);
 
 //
 // Instruction
@@ -475,7 +474,7 @@ extern Bytecode g_bytecode;
 #define bytecode_emit_instruction_1byte(opcode, line) bytecode_insert_instruction_1byte(&g_bytecode, opcode, line)
 #define bytecode_emit_instruction_2bytes(opcode, operand, line) bytecode_insert_instruction_2bytes(&g_bytecode, opcode, operand, line)
 #define bytecode_emit_constant(value, line) bytecode_insert_instruction_constant(&g_bytecode, value, line)
-#define bytecode_emit_value(value) value_array_insert(&g_bytecode.values, value)
+#define bytecode_emit_value(value) array_value_insert(&g_bytecode.values, value)
 
 void bytecode_init(Bytecode* bytecode);
 int bytecode_insert_instruction_1byte(Bytecode* bytecode, OpCode opcode, int line_number);
@@ -577,11 +576,11 @@ typedef struct
 
     // Stores global variables 
     //
-    HashTable globals; // TODO: change name to global_database
+    HashTable global_database; // TODO: change name to global_database
 
     // Stores all unique strings allocated during runtime
     //
-    HashTable strings; // TODO: change name to stting_database
+    HashTable string_database; // TODO: change name to stting_database
 
     // TODO: add a varible to track total bytes allocated
 } VirtualMachine;

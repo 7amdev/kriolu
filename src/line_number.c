@@ -1,13 +1,13 @@
 #include "kriolu.h"
 
-void line_array_init(ArrayLineNumber* lines)
+void array_line_init(ArrayLineNumber* lines)
 {
     lines->items = NULL;
     lines->count = 0;
     lines->capacity = 0;
 }
 
-int line_array_insert(ArrayLineNumber* lines, int line)
+int array_line_insert(ArrayLineNumber* lines, int line)
 {
     if (lines->capacity < lines->count + 1)
     {
@@ -30,17 +30,17 @@ int line_array_insert(ArrayLineNumber* lines, int line)
 // number of lines to match the instructions array index, otherwise
 // the debugger print line number functionality will be unaligned.
 //
-int line_array_insert_3x(ArrayLineNumber* lines, int line)
+int array_line_insert_3x(ArrayLineNumber* lines, int line)
 {
-    line_array_insert(lines, line);
-    line_array_insert(lines, line);
-    line_array_insert(lines, line);
+    array_line_insert(lines, line);
+    array_line_insert(lines, line);
+    array_line_insert(lines, line);
 
     return lines->count - 1;
 }
 
-void line_array_free(ArrayLineNumber* lines)
+void array_line_free(ArrayLineNumber* lines)
 {
     free(lines->items);
-    line_array_init(lines);
+    array_line_init(lines);
 }
