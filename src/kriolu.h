@@ -138,6 +138,7 @@ void string_free(String* string);
 //
 // Object
 //
+
 typedef struct HashTable HashTable;
 typedef struct Object Object;
 
@@ -169,24 +170,22 @@ typedef struct
 
 } ObjectString;
 
-#define object_cast_to_string(object) ((ObjectString *)object)
-#define string_cast_to_object(string) ((Object *)string)
-#define object_get_string_chars(object) (object_cast_to_string(object)->characters)
+Object* Object_allocate(ObjectKind kind, size_t size);
+Object* Object_allocate_string(char* characters, int length, uint32_t hash);
+void Object_init(Object* object, ObjectKind kind);
+void Object_clear(Object* object);
+void Object_print(Object* object);
+void Object_free(Object* object);
 
-Object* object_allocate(ObjectKind kind, size_t size);
-void object_init(Object* object, ObjectKind kind);
-void object_clear(Object* object);
-void object_print(Object* object);
-void object_free(Object* object);
+#define ObjectString_AllocateAndIntern(characters, length, hash) ObjectString_allocate_and_intern(&g_vm.string_database, characters, length, hash)
+#define ObjectString_AllocateIfNotInterned(characters, length) ObjectString_allocate_if_not_interned(&g_vm.string_database, characters, length)
 
-#define object_create_and_intern_string(characters, length, hash) object_allocate_and_intern_string(&g_vm.string_database, characters, length, hash)
-#define object_create_string_if_not_interned(characters, length) object_allocate_string_if_not_interned(&g_vm.string_database, characters, length)
-
-ObjectString* object_allocate_string(char* characters, int length, uint32_t hash);
-ObjectString* object_allocate_string_if_not_interned(HashTable* table, const char* characters, int length);
-ObjectString* object_allocate_and_intern_string(HashTable* table, char* characters, int length, uint32_t hash);
-String object_to_string(ObjectString* object_string);
-void object_free_string(ObjectString* string);
+ObjectString* ObjectString_allocate(char* characters, int length, uint32_t hash);
+ObjectString* ObjectString_allocate_if_not_interned(HashTable* table, const char* characters, int length);
+ObjectString* ObjectString_allocate_and_intern(HashTable* table, char* characters, int length, uint32_t hash);
+void ObjectString_init(ObjectString* object_string, char* characters, int length, uint32_t hash);
+String ObjectString_to_string(ObjectString* object_string);
+void ObjectString_free(ObjectString* string);
 
 //
 // Value

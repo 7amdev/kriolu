@@ -1,15 +1,21 @@
 #include "kriolu.h"
 
-Object* object_allocate(ObjectKind kind, size_t size)
+Object* Object_allocate(ObjectKind kind, size_t size)
 {
     Object* object = (Object*)calloc(1, sizeof(Object));
     assert(object);
 
-    object_init(object, kind);
+    Object_init(object, kind);
     return object;
 }
 
-void object_init(Object* object, ObjectKind kind)
+Object* Object_allocate_string(char* characters, int length, uint32_t hash) {
+    ObjectString* object_string = ObjectString_allocate(characters, length, hash);
+    assert(object_string);
+    return (Object*)object_string;
+}
+
+void Object_init(Object* object, ObjectKind kind)
 {
     object->kind = kind;
 
@@ -27,12 +33,12 @@ void object_init(Object* object, ObjectKind kind)
     g_vm.objects = object;
 }
 
-void object_clear(Object* object)
+void Object_clear(Object* object)
 {
     object->kind = ObjectKind_Invalid;
 }
 
-void object_print(Object* object)
+void Object_print(Object* object)
 {
     switch (object->kind)
     {
@@ -48,34 +54,35 @@ void object_print(Object* object)
     }
 }
 
-void object_free(Object* object)
+void Object_free(Object* object)
 {
     switch (object->kind)
     {
     case ObjectKind_String:
     {
         // TODO: update virtual machine's bytes allocated variable
-        object_free_string((ObjectString*)object);
+        ObjectString_free((ObjectString*)object);
         break;
     }
     }
 }
 
-ObjectString* object_allocate_string(char* characters, int length, uint32_t hash)
+//
+// ObjectString
+//
+
+// TODO: move object_string code to object_string.c file
+//
+ObjectString* ObjectString_allocate(char* characters, int length, uint32_t hash)
 {
-    ObjectString* string = calloc(1, sizeof(ObjectString));
-    assert(string);
+    ObjectString* object_string = calloc(1, sizeof(ObjectString));
+    assert(object_string);
+    ObjectString_init(object_string, characters, length, hash);
 
-    object_init((Object*)string, ObjectKind_String);
-    assert(string->object.kind == ObjectKind_String);
-    string->characters = characters;
-    string->hash = hash;
-    string->length = length;
-
-    return string;
+    return object_string;
 }
 
-ObjectString* object_allocate_string_if_not_interned(HashTable* table, const char* characters, int length) {
+ObjectString* ObjectString_allocate_if_not_interned(HashTable* table, const char* characters, int length) {
     assert(characters);
 
     String source_string = string_make(characters, length);
@@ -84,22 +91,29 @@ ObjectString* object_allocate_string_if_not_interned(HashTable* table, const cha
     if (string == NULL) {
         source_string = string_make_and_copy_characters(characters, length);
         hash = string_hash(source_string);
-        string = object_create_and_intern_string(source_string.characters, source_string.length, hash);
+        string = ObjectString_AllocateAndIntern(source_string.characters, source_string.length, hash);
     }
 
     return string;
 }
 
-ObjectString* object_allocate_and_intern_string(HashTable* table, char* characters, int length, uint32_t hash)
+ObjectString* ObjectString_allocate_and_intern(HashTable* table, char* characters, int length, uint32_t hash)
 {
-    ObjectString* string = object_allocate_string(characters, length, hash);
+    ObjectString* string = ObjectString_allocate(characters, length, hash);
     assert(string);
     hash_table_set_value(table, string, value_make_nil());
     return string;
 }
 
+void ObjectString_init(ObjectString* object_string, char* characters, int length, uint32_t hash) {
+    Object_init((Object*)object_string, ObjectKind_String);
+    assert(object_string->object.kind == ObjectKind_String);
+    object_string->characters = characters;
+    object_string->length = length;
+    object_string->hash = hash;
+}
 
-String object_to_string(ObjectString* object_string) {
+String ObjectString_to_string(ObjectString* object_string) {
     String string = { 0 };
     string.characters = object_string->characters;
     string.length = object_string->length;
@@ -107,7 +121,7 @@ String object_to_string(ObjectString* object_string) {
     return string;
 
 }
-void object_free_string(ObjectString* string)
+void ObjectString_free(ObjectString* string)
 {
     free(string->characters);
     free(string);

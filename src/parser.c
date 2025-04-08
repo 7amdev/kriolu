@@ -233,7 +233,7 @@ static Statement parser_variabel_declaration(Parser* parser) {
 }
 
 static uint8_t parser_store_identifier_into_bytecode(Parser* parser, const char* start, int length) {
-    ObjectString* object_string = object_create_string_if_not_interned(start, length);
+    ObjectString* object_string = ObjectString_AllocateIfNotInterned(start, length);
     Value value_string = value_make_object_string(object_string);
     int value_index = bytecode_emit_value(value_string);
     if (value_index > UINT8_MAX) {
@@ -352,7 +352,7 @@ static Expression* parser_unary_and_literals(Parser* parser, bool can_assign)
         // allocate a new one and store it in the global string database for
         // future reference.
         //
-        ObjectString* string = object_create_string_if_not_interned(parser->token_previous.start + 1, parser->token_previous.length - 2);
+        ObjectString* string = ObjectString_AllocateIfNotInterned(parser->token_previous.start + 1, parser->token_previous.length - 2);
 
         Value v_string = value_make_object(string);
         Expression e_string = expression_make_string(string);
@@ -368,7 +368,7 @@ static Expression* parser_unary_and_literals(Parser* parser, bool can_assign)
             if (parser->token_previous.kind != Token_String_Interpolation)
                 break;
 
-            ObjectString* string = object_create_string_if_not_interned(parser->token_previous.start + 1, parser->token_previous.length - 2);
+            ObjectString* string = ObjectString_AllocateIfNotInterned(parser->token_previous.start + 1, parser->token_previous.length - 2);
             Value v_string = value_make_object(string);
             Expression e_string = expression_make_string(string);
 

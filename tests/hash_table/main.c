@@ -236,7 +236,7 @@ int main(void) {
 
     for (int i = 0; i < N; i++) {
         ObjectString* dedup_key = deduplicaton_keys[i];
-        String string_key = object_to_string(dedup_key);
+        String string_key = ObjectString_to_string(dedup_key);
         Value dedup_value = { 0 };
         ObjectString* key_in_database = hash_table_get_key(&keys_db, string_key, string_hash(string_key));
         if (key_in_database != NULL) dedup_key = key_in_database;
@@ -255,7 +255,7 @@ int main(void) {
 void generate_keys(ObjectString** keys) {
     for (int i = 0; i < N; i++) {
         String string = string_make_from_format("key_%d", i);
-        ObjectString* key = object_allocate_string(string.characters, string.length, string_hash(string));
+        ObjectString* key = ObjectString_allocate(string.characters, string.length, string_hash(string));
         keys[i] = key;
     }
 }
@@ -265,7 +265,7 @@ void generate_and_intern_keys(HashTable* table, ObjectString** keys, int len)
     for (int i = 0; i < len; i++)
     {
         String string = string_make_from_format("key_%d", i);
-        ObjectString* key = object_allocate_and_intern_string(table, string.characters, string.length, string_hash(string));
+        ObjectString* key = ObjectString_allocate_and_intern(table, string.characters, string.length, string_hash(string));
         keys[i] = key;
     }
 }
@@ -284,7 +284,7 @@ void generate_random_values(Value* values, int len) {
             value = value_make_nil();
         } else if (value_type == Val_String) {
             String string = string_make_from_format("value_%d", i);
-            ObjectString* object_string = object_allocate_string(string.characters, string.length, string_hash(string));
+            ObjectString* object_string = ObjectString_allocate(string.characters, string.length, string_hash(string));
             value = value_make_object_string(object_string);
         }
 
@@ -295,7 +295,7 @@ void generate_random_values(Value* values, int len) {
 void generate_string_values(Value* values) {
     for (int i = 0; i < N; i++) {
         String string = string_make_from_format("value_%d", i);
-        ObjectString* object_string = object_allocate_string(string.characters, string.length, string_hash(string));
+        ObjectString* object_string = ObjectString_allocate(string.characters, string.length, string_hash(string));
         values[i] = value_make_object_string(object_string);
     }
 }

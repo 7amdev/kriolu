@@ -196,17 +196,9 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm, Bytecode* byteco
                 bool found_string_in_database = (string != NULL);
                 if (found_string_in_database) string_free(&final);
 
-                string = object_create_and_intern_string(final.characters, final.length, hash);
+                string = ObjectString_AllocateAndIntern(final.characters, final.length, hash);
                 stack_value_push(&vm->stack_value, value_make_object(string));
-
-                // if (string == NULL)
-                //     // string = object_allocate_string(final.characters, final.length, hash);
-                //     string = object_create_and_intern_string(final.characters, final.length, hash);
-                // else
-                //     string_free(&final);
-                // stack_value_push(&vm->stack_value, value_make_object(string));
-            } else
-            {
+            } else {
                 virtual_machine_runtime_error(vm, "Operands must be 2(two) numbers or 2(two) strings.");
                 return Interpreter_Runtime_Error;
             }
@@ -352,7 +344,7 @@ void virtual_machine_free(VirtualMachine* vm)
     while (object != NULL)
     {
         Object* next = object->next;
-        object_free(object);
+        Object_free(object);
         object = next;
     }
     hash_table_free(&vm->global_database);

@@ -80,7 +80,7 @@ void value_print(Value value)
     }
     case Value_Object:
     {
-        object_print(value_as_object(value));
+        Object_print(value_as_object(value));
         break;
     }
     }
