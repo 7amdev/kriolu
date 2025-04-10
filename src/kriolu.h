@@ -77,6 +77,8 @@ typedef struct
     int line_number;
 } Token;
 
+bool token_is_identifier_equal(Token* a, Token* b);
+
 //
 // Lexer
 //
@@ -370,6 +372,37 @@ ArrayStatement* array_statement_allocate();
 uint32_t array_statement_insert(ArrayStatement* statements, Statement statement);
 void array_statement_free(ArrayStatement* statements);
 
+
+//
+// Scope
+//
+
+#define UINT8_COUNT (UINT8_MAX + 1)
+
+typedef struct {
+    Token token;       // has to be a identifier
+    int scope_depth;
+} Local;
+
+typedef struct {
+    Local* items;
+    int count;
+    int capacity;
+} StackLocal;
+
+void  StackLocal_init(StackLocal* locals, int capacity);
+Local StackLocal_push(StackLocal* locals, Token token, int scope_depth);
+Local StackLocal_pop(StackLocal* local);
+int   StackLocal_get_local_index_by_token(StackLocal* locals, Token* token);
+bool  StackLocal_is_full(StackLocal* locals);
+
+typedef struct {
+    StackLocal locals;
+    int depth;
+} Scope; // ScopeEmulator 
+
+void scope_init(Scope* scope);
+
 //
 // Parser
 //
@@ -379,8 +412,10 @@ typedef struct
     Token token_current;
     Token token_previous;
     Lexer* lexer;
+    Scope* scope_current;
     bool had_error;
     bool panic_mode;
+
     int interpolation_count_nesting;
     int interpolation_count_value_pushed;
 } Parser;
@@ -593,5 +628,6 @@ extern VirtualMachine g_vm;
 void virtual_machine_init(VirtualMachine* vm);
 InterpreterResult virtual_machine_interpret(VirtualMachine* vm, Bytecode* bytecode);
 void virtual_machine_free(VirtualMachine* vm);
+
 
 #endif

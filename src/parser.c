@@ -28,12 +28,17 @@ static void parser_synchronize(Parser* parser);
 static void parser_error(Parser* parser, Token* token, const char* message);
 static Statement parser_statement(Parser* parser);
 static Statement parser_expression_statement(Parser* parser);
-static Statement parser_print_instruction(Parser* parser);
+static Statement parser_instruction_print(Parser* parser);
+static Statement parser_instruction_block(Parser* parser);
 static Statement parser_variabel_declaration(Parser* parser);
 static Expression* parser_expression(Parser* parser, OrderOfOperation operator_precedence_previous);
 static Expression* parser_unary_and_literals(parser);
 static Expression* parser_binary(Parser* parser, Expression* left_operand);
 static uint8_t parser_store_identifier_into_bytecode(Parser* parser, const char* start, int length);
+static void parser_check_locals_duplicates(Parser* parser, Token* identifier);
+static void parser_end(Parser* parser);
+static void parser_begin_scope(Parser* parser);
+static void parser_end_scope(Parser* parser);
 
 //
 // Globals
@@ -46,13 +51,12 @@ void parser_initialize(Parser* parser, const char* source_code, Lexer* lexer)
     parser->panic_mode = false;
     parser->had_error = false;
     parser->lexer = lexer;
+    parser->scope_current = NULL;
     parser->interpolation_count_nesting = 0;
     parser->interpolation_count_value_pushed = 0;
-    if (lexer == NULL)
-    {
+    if (lexer == NULL) {
         parser->lexer = lexer_create_static();
         assert(parser->lexer);
-
         lexer_init(parser->lexer, source_code);
     }
 }
@@ -60,6 +64,10 @@ void parser_initialize(Parser* parser, const char* source_code, Lexer* lexer)
 ArrayStatement* parser_parse(Parser* parser)
 {
     ArrayStatement* statements = array_statement_allocate();
+    Scope scope_script;
+    scope_init(&scope_script);
+
+    parser->scope_current = &scope_script;
     parser_advance(parser);
 
     for (;;) {
@@ -69,7 +77,7 @@ ArrayStatement* parser_parse(Parser* parser)
         array_statement_insert(statements, statement);
     }
 
-    bytecode_emit_instruction_1byte(OpCode_Return, parser->token_current.line_number);
+    parser_end(parser);
 
     return statements;
 }
@@ -172,7 +180,11 @@ static Statement parser_statement(Parser* parser)
     if (parser_match_then_advance(parser, Token_Mimoria)) {
         statement = parser_variabel_declaration(parser);
     } else if (parser_match_then_advance(parser, Token_Imprimi)) {
-        statement = parser_print_instruction(parser);
+        statement = parser_instruction_print(parser);
+    } else if (parser_match_then_advance(parser, Token_Left_Brace)) {
+        parser_begin_scope(parser);
+        parser_instruction_block(parser);
+        parser_end_scope(parser);
     } else {
         statement = parser_expression_statement(parser);
     }
@@ -196,7 +208,7 @@ static Statement parser_expression_statement(Parser* parser)
     return statement;
 }
 
-static Statement parser_print_instruction(Parser* parser) {
+static Statement parser_instruction_print(Parser* parser) {
     Statement statement = { 0 };
 
     Expression* expression = parser_expression(parser, OPERATION_ASSIGNMENT);
@@ -208,12 +220,41 @@ static Statement parser_print_instruction(Parser* parser) {
     return statement;
 }
 
+static Statement parser_instruction_block(Parser* parser) {
+    Statement statement = { 0 };
+    TokenKind token_kind = parser->token_current.kind;
+
+    while (token_kind != Token_Left_Brace && token_kind != Token_Eof) {
+        parser_statement(parser);
+    }
+
+    parser_consume(parser, Token_Right_Brace, "Expect '}' after block.");
+
+    return statement;
+}
+
+
 static Statement parser_variabel_declaration(Parser* parser) {
     Statement statement = { 0 };
+    uint8_t global_index = 0;
 
     parser_consume(parser, Token_Identifier, "Expect variable name.");
 
-    uint8_t global_index = parser_store_identifier_into_bytecode(parser, parser->token_previous.start, parser->token_previous.length);
+    if (parser->scope_current->depth > 0) {
+        // TODO: print error here, not inside parser_check_loclas...
+        parser_check_locals_duplicates(parser, &parser->token_previous);
+        if (StackLocal_is_full(&parser->scope_current->locals)) {
+            parser_error(parser, &parser->token_previous, "Too many local variables in a scope.");
+        } else {
+            StackLocal_push(
+                &parser->scope_current->locals,
+                parser->token_previous,
+                parser->scope_current->depth
+            );
+        }
+    } else {
+        global_index = parser_store_identifier_into_bytecode(parser, parser->token_previous.start, parser->token_previous.length);
+    }
 
     // Check for assignment
     // 
@@ -243,6 +284,7 @@ static uint8_t parser_store_identifier_into_bytecode(Parser* parser, const char*
 
     return (uint8_t)value_index;
 }
+
 
 static OrderOfOperation parser_operator_precedence(TokenKind kind)
 {
@@ -568,4 +610,39 @@ static Expression* parser_binary(Parser* parser, Expression* left_operand)
     return NULL;
 }
 
+static void parser_check_locals_duplicates(Parser* parser, Token* identifier) {
+    Scope* current_scope = parser->scope_current;
+    for (int i = current_scope->locals.count - 1; i >= 0; i--) {
+        Local* local = &current_scope->locals.items[i];
+        if (local->scope_depth < current_scope->depth && local->scope_depth != -1) {
+            break;
+        }
+
+        if (token_is_identifier_equal(identifier, &local->token)) {
+            parser_error(parser, identifier, "Already a variable with this name in this scope.");
+        }
+    }
+}
+
+static void parser_end(Parser* parser) {
+    bytecode_emit_instruction_1byte(OpCode_Return, parser->token_current.line_number);
+}
+
+static void parser_begin_scope(Parser* parser) {
+    parser->scope_current->depth += 1;
+}
+
+static void parser_end_scope(Parser* parser) {
+    parser->scope_current->depth -= 1;
+
+    for (;;) {
+        StackLocal locals = parser->scope_current->locals;
+
+        if (locals.count <= 0) break;
+        if (locals.items[locals.count - 1].scope_depth <= parser->scope_current->depth) break;
+
+        bytecode_emit_instruction_1byte(OpCode_Pop, parser->token_previous.line_number);
+        StackLocal_pop(&parser->scope_current->locals);
+    }
+}
 // todo: parser destroy implementation
