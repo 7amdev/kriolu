@@ -271,7 +271,13 @@ static Statement parser_variabel_declaration(Parser* parser) {
 
     // Define Global Varible
     //
-    bytecode_emit_instruction_2bytes(OpCode_Define_Global, global_index, parser->token_previous.line_number);
+    if (parser->scope_current->depth == 0) {
+        bytecode_emit_instruction_2bytes(
+            OpCode_Define_Global,
+            global_index,
+            parser->token_previous.line_number
+        );
+    }
 
     return statement;
 }
