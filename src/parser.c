@@ -222,9 +222,12 @@ static Statement parser_instruction_print(Parser* parser) {
 
 static Statement parser_instruction_block(Parser* parser) {
     Statement statement = { 0 };
-    TokenKind token_kind = parser->token_current.kind;
 
-    while (token_kind != Token_Left_Brace && token_kind != Token_Eof) {
+    for (;;) {
+        TokenKind kind = parser->token_current.kind;
+        if (kind == Token_Right_Brace) break;
+        if (kind == Token_Eof)         break;
+
         parser_statement(parser);
     }
 
