@@ -89,6 +89,8 @@ ObjectString* ObjectString_allocate_if_not_interned(HashTable* table, const char
     uint32_t hash = string_hash(source_string);
     ObjectString* string = hash_table_get_key(&g_vm.string_database, source_string, hash);
     if (string == NULL) {
+        // TODO: change name to string_copy(source_string)
+        //
         source_string = string_make_and_copy_characters(characters, length);
         hash = string_hash(source_string);
         string = ObjectString_AllocateAndIntern(source_string.characters, source_string.length, hash);

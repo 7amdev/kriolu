@@ -489,13 +489,26 @@ static Expression* parser_unary_and_literals(Parser* parser, bool can_assign)
     // Identifier
     //
     if (parser->token_previous.kind == Token_Identifier) {
-        uint8_t global_index = parser_store_identifier_into_bytecode(parser, parser->token_previous.start, parser->token_previous.length);
+        // TODO: Support for more than 256 value in a Scope
+        //       The instruction should change from 2 bytes to 4bytes with 3bytes operand 
+        uint8_t opcode_assign = OpCode_Invalid;
+        uint8_t opcode_read = OpCode_Invalid;
+        int operand = StackLocal_get_local_index_by_token(&parser->scope_current->locals, &parser->token_previous);
+        if (operand != -1) {
+            opcode_assign = OpCode_Assign_Local;
+            opcode_read = OpCode_Read_Local;
+        } else {
+            // Default
+            operand = parser_store_identifier_into_bytecode(parser, parser->token_previous.start, parser->token_previous.length);
+            opcode_assign = OpCode_Assign_Global;
+            opcode_read = OpCode_Read_Global;
+        }
 
         if (can_assign && parser_match_then_advance(parser, Token_Equal)) {
             parser_expression(parser, OPERATION_ASSIGNMENT);
-            bytecode_emit_instruction_2bytes(OpCode_Assign_Global, global_index, parser->token_previous.line_number);
+            bytecode_emit_instruction_2bytes(opcode_assign, operand, parser->token_previous.line_number);
         } else {
-            bytecode_emit_instruction_2bytes(OpCode_Read_Global, global_index, parser->token_previous.line_number);
+            bytecode_emit_instruction_2bytes(opcode_read, operand, parser->token_previous.line_number);
         }
 
         return NULL;

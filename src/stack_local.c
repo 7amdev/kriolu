@@ -33,6 +33,13 @@ Local StackLocal_pop(StackLocal* locals) {
 }
 
 int StackLocal_get_local_index_by_token(StackLocal* locals, Token* token) {
+    for (int i = locals->count - 1; i > 0; i--) {
+        Local* local = &locals->items[i];
+        if (token_is_identifier_equal(&local->token, token)) {
+            return i;
+        }
+    }
+
     return -1;
 }
 

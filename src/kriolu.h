@@ -473,6 +473,8 @@ enum
     OpCode_Define_Global, // var x;
     OpCode_Read_Global,   // print x;
     OpCode_Assign_Global, // x = 7;
+    OpCode_Read_Local,   // print x;
+    OpCode_Assign_Local,  // x = 7;
 
     OpCode_Return
 };
