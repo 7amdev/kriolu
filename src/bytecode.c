@@ -101,6 +101,15 @@ static int bytecode_debug_instruction_2bytes(Bytecode* bytecode, const char* opc
     return ret_offset_increment;
 }
 
+static int bytecode_debug_instruction_local(Bytecode* bytecode, const char* opcode_text, int ret_offset_increment)
+{
+    uint8_t operand = bytecode->instructions.items[ret_offset_increment - 1];
+
+    printf("%-22s %5d '", opcode_text, operand);
+    printf("'\n");
+    return ret_offset_increment;
+}
+
 static int bytecode_debug_instruction_4bytes(Bytecode* bytecode, const char* opcode_text, int ret_offset_increment)
 {
     uint8_t operand_byte1 = bytecode->instructions.items[ret_offset_increment - 3];
@@ -143,6 +152,10 @@ int bytecode_disassemble_instruction(Bytecode* bytecode, int offset)
         return bytecode_debug_instruction_2bytes(bytecode, "OPCODE_READ_GLOBAL", (offset + 2));
     if (opcode == OpCode_Assign_Global)
         return bytecode_debug_instruction_2bytes(bytecode, "OPCODE_ASSIGN_GLOBAL", (offset + 2));
+    if (opcode == OpCode_Read_Local)
+        return bytecode_debug_instruction_local(bytecode, "OPCODE_READ_LOCAL", (offset + 2));
+    if (opcode == OpCode_Assign_Local)
+        return bytecode_debug_instruction_local(bytecode, "OPCODE_ASSIGN_LOCAL", (offset + 2));
     if (opcode == OpCode_Nil)
         return bytecode_debug_instruction_byte("OPCODE_NIL", (offset + 1));
     if (opcode == OpCode_Negation)

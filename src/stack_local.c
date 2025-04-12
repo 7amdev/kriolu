@@ -1,6 +1,8 @@
 #include "kriolu.h"
 
 
+// TODO: Change prefix from Stack to Array
+
 void StackLocal_init(StackLocal* locals, int capacity) {
     locals->items = malloc(capacity * sizeof(Local));
     assert(locals->items);
@@ -32,10 +34,11 @@ Local StackLocal_pop(StackLocal* locals) {
     return *local;
 }
 
-int StackLocal_get_local_index_by_token(StackLocal* locals, Token* token) {
+int StackLocal_get_local_index_by_token(StackLocal* locals, Token* token, Local** local_out) {
     for (int i = locals->count - 1; i > 0; i--) {
         Local* local = &locals->items[i];
         if (token_is_identifier_equal(&local->token, token)) {
+            *local_out = local;
             return i;
         }
     }

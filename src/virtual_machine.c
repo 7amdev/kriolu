@@ -54,7 +54,8 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm, Bytecode* byteco
         stack_value_trace(&vm->stack_value);
         bytecode_disassemble_instruction(
             vm->bytecode,
-            (int)(vm->ip - vm->bytecode->instructions.items));
+            (int)(vm->ip - vm->bytecode->instructions.items)
+        );
 #endif
 
         uint8_t instruction = READ_BYTE_THEN_INCREMENT();
@@ -122,6 +123,19 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm, Bytecode* byteco
                 virtual_machine_runtime_error(vm, "Undefined variable '%s'.", variable_name->characters);
                 return Interpreter_Runtime_Error;
             }
+            break;
+        }
+        case OpCode_Read_Local:
+        {
+            uint8_t local_slot_index = READ_BYTE_THEN_INCREMENT();
+            Value local = vm->stack_value.items[local_slot_index];
+            stack_value_push(&vm->stack_value, local);
+            break;
+        }
+        case OpCode_Assign_Local:
+        {
+            uint8_t local_slot_index = READ_BYTE_THEN_INCREMENT();
+            vm->stack_value.items[local_slot_index] = stack_value_peek(&vm->stack_value, 0);
             break;
         }
         case OpCode_Nil:

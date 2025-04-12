@@ -378,6 +378,8 @@ void array_statement_free(ArrayStatement* statements);
 //
 
 #define UINT8_COUNT (UINT8_MAX + 1)
+#define INITIALIZED -1
+
 
 typedef struct {
     Token token;       // has to be a identifier
@@ -393,7 +395,7 @@ typedef struct {
 void  StackLocal_init(StackLocal* locals, int capacity);
 Local StackLocal_push(StackLocal* locals, Token token, int scope_depth);
 Local StackLocal_pop(StackLocal* local);
-int   StackLocal_get_local_index_by_token(StackLocal* locals, Token* token);
+int   StackLocal_get_local_index_by_token(StackLocal* locals, Token* token, Local** local_out);
 bool  StackLocal_is_full(StackLocal* locals);
 
 typedef struct {

@@ -1,8 +1,12 @@
-mimoria a = "Ola";
+mimoria a = "a";
 {
-    mimoria b = "Oi";
-    mimoria c = "hei";
-    mimoria b = "Hei";
-    mimoria d = "Abo";
-    imprimi a;
+    mimoria b = "b";
+    mimoria x = x;
+    mimoria c = "c";
+    mimoria b = "b1";
+    mimoria d = "d";
+    imprimi "a: " + a;
+    imprimi "b: " + b; 
+    imprimi "c: " + c;
+    imprimi "d: " + d;
 }

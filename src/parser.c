@@ -35,7 +35,7 @@ static Expression* parser_expression(Parser* parser, OrderOfOperation operator_p
 static Expression* parser_unary_and_literals(parser);
 static Expression* parser_binary(Parser* parser, Expression* left_operand);
 static uint8_t parser_store_identifier_into_bytecode(Parser* parser, const char* start, int length);
-static void parser_check_locals_duplicates(Parser* parser, Token* identifier);
+static bool parser_check_locals_duplicates(Parser* parser, Token* identifier);
 static void parser_end(Parser* parser);
 static void parser_begin_scope(Parser* parser);
 static void parser_end_scope(Parser* parser);
@@ -236,6 +236,7 @@ static Statement parser_instruction_block(Parser* parser) {
     return statement;
 }
 
+#define block(condition) for (int i = 0;i < 1 && (condition); ++i)
 
 static Statement parser_variabel_declaration(Parser* parser) {
     Statement statement = { 0 };
@@ -243,21 +244,40 @@ static Statement parser_variabel_declaration(Parser* parser) {
 
     parser_consume(parser, Token_Identifier, "Expect variable name.");
 
-    if (parser->scope_current->depth > 0) {
-        // TODO: print error here, not inside parser_check_loclas...
-        parser_check_locals_duplicates(parser, &parser->token_previous);
+    block(parser->scope_current->depth > 0) {
         if (StackLocal_is_full(&parser->scope_current->locals)) {
             parser_error(parser, &parser->token_previous, "Too many local variables in a scope.");
-        } else {
-            StackLocal_push(
-                &parser->scope_current->locals,
-                parser->token_previous,
-                parser->scope_current->depth
-            );
+            break;
         }
-    } else {
-        global_index = parser_store_identifier_into_bytecode(parser, parser->token_previous.start, parser->token_previous.length);
+
+        if (parser_check_locals_duplicates(parser, &parser->token_previous)) {
+            parser_error(parser, &parser->token_previous, "Already a variable with this name in this scope.");
+        }
+
+        StackLocal_push(
+            &parser->scope_current->locals,
+            parser->token_previous,
+            -1 // Mark Local as Uninitialized 
+        );
     }
+
+    if (parser->scope_current->depth == 0)
+        global_index = parser_store_identifier_into_bytecode(parser, parser->token_previous.start, parser->token_previous.length);
+
+    // if (parser->scope_current->depth > 0) {
+    //     parser_check_locals_duplicates(parser, &parser->token_previous);
+    //     if (!StackLocal_is_full(&parser->scope_current->locals)) {
+    //         StackLocal_push(
+    //             &parser->scope_current->locals,
+    //             parser->token_previous,
+    //             parser->scope_current->depth
+    //         );
+    //     } else {
+    //         parser_error(parser, &parser->token_previous, "Too many local variables in a scope.");
+    //     }
+    // } else {
+    //     global_index = parser_store_identifier_into_bytecode(parser, parser->token_previous.start, parser->token_previous.length);
+    // }
 
     // Check for assignment
     // 
@@ -277,6 +297,12 @@ static Statement parser_variabel_declaration(Parser* parser) {
             global_index,
             parser->token_previous.line_number
         );
+    }
+    // Mark local as Initialized
+    //
+    else {
+        Local* local = &parser->scope_current->locals.items[parser->scope_current->locals.count - 1];
+        local->scope_depth = parser->scope_current->depth;
     }
 
     return statement;
@@ -490,10 +516,12 @@ static Expression* parser_unary_and_literals(Parser* parser, bool can_assign)
     //
     if (parser->token_previous.kind == Token_Identifier) {
         // TODO: Support for more than 256 value in a Scope
-        //       The instruction should change from 2 bytes to 4bytes with 3bytes operand 
+
         uint8_t opcode_assign = OpCode_Invalid;
         uint8_t opcode_read = OpCode_Invalid;
-        int operand = StackLocal_get_local_index_by_token(&parser->scope_current->locals, &parser->token_previous);
+        Local* local_found = NULL;
+        int operand = StackLocal_get_local_index_by_token(&parser->scope_current->locals, &parser->token_previous, &local_found);
+
         if (operand != -1) {
             opcode_assign = OpCode_Assign_Local;
             opcode_read = OpCode_Read_Local;
@@ -503,6 +531,9 @@ static Expression* parser_unary_and_literals(Parser* parser, bool can_assign)
             opcode_assign = OpCode_Assign_Global;
             opcode_read = OpCode_Read_Global;
         }
+
+        if (local_found && local_found->scope_depth == -1)
+            parser_error(parser, &parser->token_previous, "Can't read local variable in its own initializer.");
 
         if (can_assign && parser_match_then_advance(parser, Token_Equal)) {
             parser_expression(parser, OPERATION_ASSIGNMENT);
@@ -632,7 +663,7 @@ static Expression* parser_binary(Parser* parser, Expression* left_operand)
     return NULL;
 }
 
-static void parser_check_locals_duplicates(Parser* parser, Token* identifier) {
+static bool parser_check_locals_duplicates(Parser* parser, Token* identifier) {
     Scope* current_scope = parser->scope_current;
     for (int i = current_scope->locals.count - 1; i >= 0; i--) {
         Local* local = &current_scope->locals.items[i];
@@ -640,10 +671,15 @@ static void parser_check_locals_duplicates(Parser* parser, Token* identifier) {
             break;
         }
 
-        if (token_is_identifier_equal(identifier, &local->token)) {
-            parser_error(parser, identifier, "Already a variable with this name in this scope.");
-        }
+        if (token_is_identifier_equal(identifier, &local->token))
+            return true;
+
+        // if (token_is_identifier_equal(identifier, &local->token)) {
+        //     parser_error(parser, identifier, "Already a variable with this name in this scope.");
+        // }
     }
+
+    return false;
 }
 
 static void parser_end(Parser* parser) {
