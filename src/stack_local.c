@@ -28,14 +28,14 @@ Local StackLocal_push(StackLocal* locals, Token token, int scope_depth) {
 Local StackLocal_pop(StackLocal* locals) {
     assert(locals->count > 0 && "Error: StackLocal underflow.");
 
-    Local* local = &locals->items[locals->count];
     locals->count -= 1;
+    Local* local = &locals->items[locals->count];
 
     return *local;
 }
 
 int StackLocal_get_local_index_by_token(StackLocal* locals, Token* token, Local** local_out) {
-    for (int i = locals->count - 1; i > 0; i--) {
+    for (int i = locals->count - 1; i >= 0; i--) {
         Local* local = &locals->items[i];
         if (token_is_identifier_equal(&local->token, token)) {
             *local_out = local;
