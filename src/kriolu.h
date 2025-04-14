@@ -10,6 +10,12 @@
 #include <math.h>
 #include <stdarg.h>
 
+// 
+// Utils
+// 
+
+// #define block(condition) for (int i = 0;i < 1 && (condition); ++i)
+#define block for (int i = 0;i < 1; ++i)
 #define DEBUG_LOG_PARSER
 
 //

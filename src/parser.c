@@ -30,7 +30,7 @@ static Statement parser_statement(Parser* parser);
 static Statement parser_expression_statement(Parser* parser);
 static Statement parser_instruction_print(Parser* parser);
 static Statement parser_instruction_block(Parser* parser);
-static Statement parser_variabel_declaration(Parser* parser);
+static Statement parser_variable_declaration(Parser* parser);
 static Expression* parser_expression(Parser* parser, OrderOfOperation operator_precedence_previous);
 static Expression* parser_unary_and_literals(parser);
 static Expression* parser_binary(Parser* parser, Expression* left_operand);
@@ -178,7 +178,7 @@ static Statement parser_statement(Parser* parser)
     Statement statement = { 0 };
 
     if (parser_match_then_advance(parser, Token_Mimoria)) {
-        statement = parser_variabel_declaration(parser);
+        statement = parser_variable_declaration(parser);
     } else if (parser_match_then_advance(parser, Token_Imprimi)) {
         statement = parser_instruction_print(parser);
     } else if (parser_match_then_advance(parser, Token_Left_Brace)) {
@@ -236,15 +236,16 @@ static Statement parser_instruction_block(Parser* parser) {
     return statement;
 }
 
-#define block(condition) for (int i = 0;i < 1 && (condition); ++i)
-
-static Statement parser_variabel_declaration(Parser* parser) {
+static Statement parser_variable_declaration(Parser* parser) {
     Statement statement = { 0 };
     uint8_t global_index = 0;
 
     parser_consume(parser, Token_Identifier, "Expect variable name.");
 
-    block(parser->scope_current->depth > 0) {
+    block{
+        if (parser->scope_current->depth == 0)
+            break;
+
         if (StackLocal_is_full(&parser->scope_current->locals)) {
             parser_error(parser, &parser->token_previous, "Too many local variables in a scope.");
             break;
@@ -252,6 +253,7 @@ static Statement parser_variabel_declaration(Parser* parser) {
 
         if (parser_check_locals_duplicates(parser, &parser->token_previous)) {
             parser_error(parser, &parser->token_previous, "Already a variable with this name in this scope.");
+            return statement;
         }
 
         StackLocal_push(
@@ -259,25 +261,28 @@ static Statement parser_variabel_declaration(Parser* parser) {
             parser->token_previous,
             -1 // Mark Local as Uninitialized 
         );
+
+        // Check for assignment
+        // 
+        if (parser_match_then_advance(parser, Token_Equal)) {
+            parser_expression(parser, OPERATION_ASSIGNMENT);
+        } else {
+            bytecode_emit_instruction_1byte(OpCode_Nil, parser->token_previous.line_number);
+        }
+
+        parser_consume(parser, Token_Semicolon, "Expected ';' after expression.");
+
+        // Mark local as Initialized
+        //
+        Local* local = &parser->scope_current->locals.items[parser->scope_current->locals.count - 1];
+        local->scope_depth = parser->scope_current->depth;
+
+        return statement;
     }
 
-    if (parser->scope_current->depth == 0)
-        global_index = parser_store_identifier_into_bytecode(parser, parser->token_previous.start, parser->token_previous.length);
-
-    // if (parser->scope_current->depth > 0) {
-    //     parser_check_locals_duplicates(parser, &parser->token_previous);
-    //     if (!StackLocal_is_full(&parser->scope_current->locals)) {
-    //         StackLocal_push(
-    //             &parser->scope_current->locals,
-    //             parser->token_previous,
-    //             parser->scope_current->depth
-    //         );
-    //     } else {
-    //         parser_error(parser, &parser->token_previous, "Too many local variables in a scope.");
-    //     }
-    // } else {
-    //     global_index = parser_store_identifier_into_bytecode(parser, parser->token_previous.start, parser->token_previous.length);
-    // }
+        // Global Scope Only
+        //
+    global_index = parser_store_identifier_into_bytecode(parser, parser->token_previous.start, parser->token_previous.length);
 
     // Check for assignment
     // 
@@ -291,19 +296,11 @@ static Statement parser_variabel_declaration(Parser* parser) {
 
     // Define Global Varible
     //
-    if (parser->scope_current->depth == 0) {
-        bytecode_emit_instruction_2bytes(
-            OpCode_Define_Global,
-            global_index,
-            parser->token_previous.line_number
-        );
-    }
-    // Mark local as Initialized
-    //
-    else {
-        Local* local = &parser->scope_current->locals.items[parser->scope_current->locals.count - 1];
-        local->scope_depth = parser->scope_current->depth;
-    }
+    bytecode_emit_instruction_2bytes(
+        OpCode_Define_Global,
+        global_index,
+        parser->token_previous.line_number
+    );
 
     return statement;
 }
