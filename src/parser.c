@@ -30,6 +30,7 @@ static Statement parser_statement(Parser* parser);
 static Statement parser_expression_statement(Parser* parser);
 static Statement parser_instruction_print(Parser* parser);
 static Statement parser_instruction_block(Parser* parser);
+static Statement parser_instruction_if(Parser* parser);
 static Statement parser_variable_declaration(Parser* parser);
 static Expression* parser_expression(Parser* parser, OrderOfOperation operator_precedence_previous);
 static Expression* parser_unary_and_literals(parser);
@@ -181,6 +182,8 @@ static Statement parser_statement(Parser* parser)
         statement = parser_variable_declaration(parser);
     } else if (parser_match_then_advance(parser, Token_Imprimi)) {
         statement = parser_instruction_print(parser);
+    } else if (parser_match_then_advance(parser, Token_Si)) {
+        statement = parser_instruction_if(parser);
     } else if (parser_match_then_advance(parser, Token_Left_Brace)) {
         parser_begin_scope(parser);
         parser_instruction_block(parser);
@@ -232,6 +235,59 @@ static Statement parser_instruction_block(Parser* parser) {
     }
 
     parser_consume(parser, Token_Right_Brace, "Expect '}' after block.");
+
+    return statement;
+}
+
+// if (condition) {then-block} sinou {else-block} 
+//
+static Statement parser_instruction_if(Parser* parser) {
+    Statement statement = { 0 };
+
+    parser_consume(parser, Token_Left_Parenthesis, "Expect '(' after 'if'.");
+    parser_expression(parser, OPERATION_ASSIGNMENT); // Will leave a Boolean value on top of the Stack
+    parser_consume(parser, Token_Right_Parenthesis, "Expect ')' after condition.");
+
+    // If the 'if-condition' is false, jump to the begining of 'else-block'.
+    //
+    int jump_if_false_operand_index = bytecode_emit_instruction_jump(OpCode_Jump_If_False, parser->token_previous.line_number);
+
+    //
+    // Then-Block
+    //
+
+    // Removes the condition's value from the stack, since a statement leaves NO value in the
+    // stack.
+    //
+    bytecode_emit_instruction_1byte(OpCode_Pop, parser->token_previous.line_number);
+
+    // Compile then-block statements 
+    //
+    parser_statement(parser);
+
+    // After finishing compiling statements in the then-block, jump out off 
+    // the if-statement skipping the else-block statements.
+    //
+    int jump_operand_index = bytecode_emit_instruction_jump(OpCode_Jump, parser->token_previous.line_number);
+
+    // Patches the instruction 'jump_if_false' operand with the starting else-block index.
+    //
+    bool patch_error = Bytecode_PatchInstructionJump(jump_if_false_operand_index);
+    if (patch_error) parser_error(parser, &parser->token_previous, "Too much code to jump over.");
+
+    //
+    // Else-Block
+    //
+
+    // Removes the condition's value from the stack, since a statement leaves NO value in the
+    // stack.
+    //
+    bytecode_emit_instruction_1byte(OpCode_Pop, parser->token_previous.line_number);
+
+    if (parser_match_then_advance(parser, Token_Sinou)) parser_statement(parser);
+
+    bool error = Bytecode_PatchInstructionJump(jump_operand_index);
+    if (error) parser_error(parser, &parser->token_previous, "Too much code to jump over.");
 
     return statement;
 }

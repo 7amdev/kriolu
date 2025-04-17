@@ -35,7 +35,8 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm, Bytecode* byteco
 
     assert(vm->bytecode->instructions.items != NULL);
 
-#define READ_BYTE_THEN_INCREMENT() (*vm->ip++)
+#define READ_BYTE_THEN_INCREMENT() (*vm->ip++) // uint8_t instruction = (vm->ip += 1, vm->ip[-1])
+#define READ_2BYTE() (vm->ip += 2, (uint16_t)((vm->ip[-2] << 8) | vm->ip[-1])) 
 #define READ_3BYTE_THEN_INCREMENT() (((((*vm->ip++) << 8) | (*vm->ip++)) << 8) | (*vm->ip++))
 #define READ_CONSTANT() (vm->bytecode->values.items[READ_BYTE_THEN_INCREMENT()])
 #define READ_CONSTANT_3BYTE() (vm->bytecode->values.items[READ_3BYTE_THEN_INCREMENT()])
@@ -334,6 +335,19 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm, Bytecode* byteco
             printf("\n");
             break;
         }
+        case OpCode_Jump_If_False:
+        {
+            uint16_t offset = READ_2BYTE(); // TODO: change name to INCREMENT_BY_2BYTES_THEN_READ()
+            if (value_is_falsey(stack_value_peek(&vm->stack_value, 0)))
+                vm->ip += offset;
+
+            break;
+        }
+        case OpCode_Jump: {
+            uint16_t offset = READ_2BYTE();
+            vm->ip += offset;
+            break;
+        }
         case OpCode_Return:
         {
             // Value constant = stack_value_pop(&vm->stack_value);
@@ -346,6 +360,7 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm, Bytecode* byteco
     }
 
 #undef READ_BYTE_THEN_INCREMENT
+#undef READ_2BYTE
 #undef READ_3BYTE_THEN_INCREMENT
 #undef READ_CONSTANT
 #undef READ_CONSTANT_3BYTE

@@ -249,6 +249,7 @@ typedef struct
 #define value_get_string_chars(value) (value_as_string(value)->characters)
 
 bool value_negate_logically(Value value);
+bool value_is_falsey(Value value);
 bool value_is_equal(Value a, Value b);
 void value_print(Value value);
 inline bool value_is_object_type(Value value, ObjectKind object_kind) {
@@ -477,6 +478,8 @@ enum
     OpCode_Less_Than,
 
     OpCode_Print,
+    OpCode_Jump_If_False,
+    OpCode_Jump,
     OpCode_Pop,
     OpCode_Define_Global, // var x;
     OpCode_Read_Global,   // print x;
@@ -518,12 +521,18 @@ extern Bytecode g_bytecode;
 #define bytecode_emit_instruction_1byte(opcode, line) bytecode_insert_instruction_1byte(&g_bytecode, opcode, line)
 #define bytecode_emit_instruction_2bytes(opcode, operand, line) bytecode_insert_instruction_2bytes(&g_bytecode, opcode, operand, line)
 #define bytecode_emit_constant(value, line) bytecode_insert_instruction_constant(&g_bytecode, value, line)
+#define bytecode_emit_instruction_jump(opcode, line) bytecode_insert_instruction_jump(&g_bytecode, opcode, line)
+#define Bytecode_PatchInstructionJump(operand_index) bytecode_patch_instruction_jump(&g_bytecode, operand_index)
 #define bytecode_emit_value(value) array_value_insert(&g_bytecode.values, value)
 
+// TODO: add function bytecode_jump(Bytecode b, int offset_amount);
+// TODO: add function bytecode_instruction_patch_2byte(Bytecode b, int offset, uint8_t byte1, uint8_t byte2);
 void bytecode_init(Bytecode* bytecode);
 int bytecode_insert_instruction_1byte(Bytecode* bytecode, OpCode opcode, int line_number);
 int bytecode_insert_instruction_2bytes(Bytecode* bytecode, OpCode opcode, uint8_t operand, int line_number);
 int bytecode_insert_instruction_constant(Bytecode* bytecode, Value value, int line_number);
+int bytecode_insert_instruction_jump(Bytecode* bytecode, OpCode opcode, int line);
+bool bytecode_patch_instruction_jump(Bytecode* bytecode, int operand_index);
 void bytecode_disassemble(Bytecode* bytecode, const char* name);
 int bytecode_disassemble_instruction(Bytecode* bytecode, int offset);
 void bytecode_emitter_begin();

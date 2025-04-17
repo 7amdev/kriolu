@@ -77,6 +77,24 @@ int bytecode_insert_instruction_constant(Bytecode* bytecode, Value value, int li
     );
 }
 
+int bytecode_insert_instruction_jump(Bytecode* bytecode, OpCode opcode, int line) {
+    bytecode_insert_instruction_1byte(bytecode, opcode, line);
+    bytecode_insert_instruction_1byte(bytecode, 0xff, line);
+    bytecode_insert_instruction_1byte(bytecode, 0xff, line);
+
+    return bytecode->instructions.count - 2;
+}
+
+bool bytecode_patch_instruction_jump(Bytecode* bytecode, int operand_index) {
+    int jump_to_index = bytecode->instructions.count - operand_index - 2;
+    if (jump_to_index > UINT16_MAX) return true;
+
+    bytecode->instructions.items[operand_index] = (jump_to_index >> 8) & 0xff;
+    bytecode->instructions.items[operand_index + 1] = jump_to_index & 0xff;
+
+    return false;
+}
+
 static int bytecode_debug_instruction_byte(const char* opcode_text, int ret_offset_increment)
 {
     printf("%s\n", opcode_text);
@@ -107,6 +125,18 @@ static int bytecode_debug_instruction_local(Bytecode* bytecode, const char* opco
 
     printf("%-22s %5d '", opcode_text, operand);
     printf("'\n");
+    return ret_offset_increment;
+}
+
+static int bytecode_debug_instruction_3bytes(Bytecode* bytecode, const char* opcode_text, int ret_offset_increment) {
+
+    uint8_t operand_byte1 = bytecode->instructions.items[ret_offset_increment - 2];
+    uint8_t operand_byte2 = bytecode->instructions.items[ret_offset_increment - 1];
+    uint16_t operand_value = (uint16_t)((operand_byte1 << 8) | operand_byte2);
+
+    printf("%-22s %5d '", opcode_text, operand_value);
+    printf("'\n");
+
     return ret_offset_increment;
 }
 
@@ -182,6 +212,10 @@ int bytecode_disassemble_instruction(Bytecode* bytecode, int offset)
         return bytecode_debug_instruction_byte("OPCODE_LESS_THAN", (offset + 1));
     if (opcode == OpCode_Print)
         return bytecode_debug_instruction_byte("OPCODE_PRINT", (offset + 1));
+    if (opcode == OpCode_Jump_If_False)
+        return bytecode_debug_instruction_3bytes(bytecode, "OPCODE_JUMP_IF_FALSE", (offset + 3));
+    if (opcode == OpCode_Jump)
+        return bytecode_debug_instruction_3bytes(bytecode, "OPCODE_JUMP", (offset + 3));
     if (opcode == OpCode_Return)
         return bytecode_debug_instruction_byte("OPCODE_RETURN", (offset + 1));
 

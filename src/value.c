@@ -6,11 +6,20 @@ bool value_negate_logically(Value value)
     //     value_is_nil(value) ||
     //     (value_is_boolean(value) && !value_as_boolean(value)));
 
-    if (value_is_nil(value))
-        return true;
+    if (value_is_nil(value)) return true;
+    if (value_is_boolean(value)) return !value_as_boolean(value);
 
-    if (value_is_boolean(value))
-        return !value_as_boolean(value);
+    // Other Values
+    //
+    return false;
+}
+
+// Falsey values: nil, Boolean(false)
+// Truthy values: Boolean(true), String, Number, Object
+//
+bool value_is_falsey(Value value) {
+    if (value_is_nil(value)) return true;
+    if (value_is_boolean(value) && value_as_boolean(value) == false) return true;
 
     return false;
 }

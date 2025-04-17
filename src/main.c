@@ -33,7 +33,7 @@ int main(int argc, const char* argv[])
     }
 
     int result = file_read(argv[1], &source_code);
-    if (result < 0)
+    if (result <= 0)
         exit(EXIT_FAILURE);
 
     bool is_flag_lexer = false;
