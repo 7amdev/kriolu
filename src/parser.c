@@ -421,8 +421,9 @@ static Expression* parser_expression(Parser* parser, OrderOfOperation operator_p
     TokenKind operator_kind_current = parser->token_current.kind;
     OrderOfOperation operator_precedence_current = parser_operator_precedence(operator_kind_current);
 
-    while (operator_precedence_current > operator_precedence_previous)
-    {
+    while (operator_precedence_current >= operator_precedence_previous) {
+        // TODO(?): if parser->token_current.kind == Token_Equal : break;
+        //          fix: 1 = 4; or var a = 1 * 3 + x = 4 - 6;
         parser_advance(parser);
         expression = parser_binary(parser, expression);
 
@@ -588,6 +589,8 @@ static Expression* parser_unary_and_literals(Parser* parser, bool can_assign)
         if (local_found && local_found->scope_depth == -1)
             parser_error(parser, &parser->token_previous, "Can't read local variable in its own initializer.");
 
+        // Assignment
+        //
         if (can_assign && parser_match_then_advance(parser, Token_Equal)) {
             parser_expression(parser, OPERATION_ASSIGNMENT);
             bytecode_emit_instruction_2bytes(opcode_assign, operand, parser->token_previous.line_number);
@@ -604,11 +607,22 @@ static Expression* parser_unary_and_literals(Parser* parser, bool can_assign)
     return NULL;
 }
 
-static Expression* parser_binary(Parser* parser, Expression* left_operand)
-{
+static Expression* parser_binary(Parser* parser, Expression* left_operand) {
     TokenKind operator_kind_previous = parser->token_previous.kind;
-    OrderOfOperation operator_precedence_previous = parser_operator_precedence(operator_kind_previous);
+    // TODO(?): if parser->token_previous.kind == Token_Equal : return;
 
+    if (operator_kind_previous == Token_E) {
+        int operand_index = bytecode_emit_instruction_jump(OpCode_Jump_If_False, parser->token_previous.line_number);
+        bytecode_emit_instruction_1byte(OpCode_Pop, parser->token_previous.line_number);
+
+        parser_expression(parser, OPERATION_AND);
+
+        Bytecode_PatchInstructionJump(operand_index);
+
+        return NULL;
+    }
+
+    OrderOfOperation operator_precedence_previous = parser_operator_precedence(operator_kind_previous);
     Expression* right_operand = parser_expression(parser, operator_precedence_previous);
 
     if (operator_kind_previous == Token_Plus)
@@ -621,7 +635,7 @@ static Expression* parser_binary(Parser* parser, Expression* left_operand)
 
     if (operator_kind_previous == Token_Minus)
     {
-        bytecode_emit_instruction_1byte(OpCode_Addition, parser->token_previous.line_number);
+        bytecode_emit_instruction_1byte(OpCode_Subtraction, parser->token_previous.line_number);
 
         Expression subtraction = expression_make_subtraction(left_operand, right_operand);
         return expression_allocate(subtraction);

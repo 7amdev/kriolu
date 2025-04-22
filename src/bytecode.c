@@ -157,6 +157,15 @@ static int bytecode_debug_instruction_4bytes(Bytecode* bytecode, const char* opc
 
 int bytecode_disassemble_instruction(Bytecode* bytecode, int offset)
 {
+    // TODO:                                 Operand
+    // Offset    Line         OpCode         index value
+    // --------- ---- ---------------------- ----- -----
+    // 000000 +1    1 OPCODE_FALSE
+    // 000001 +3    | OPCODE_JUMP_IF_FALSE       7 ''
+    // 000004 +1    | OPCODE_POP
+    // 000005 +2    2 OPCODE_CONSTANT            0 'verdadi'
+    // 000007 +1    | OPCODE_PRINT
+
     printf("%06d ", offset);
     if (offset > 0 && bytecode->lines.items[offset] == bytecode->lines.items[offset - 1])
         printf("   | ");

@@ -14,71 +14,56 @@ int file_read(const char* file_path, char** buffer_out);
 bool filename_ends_with(const char* filename, const char* extension);
 void token_print(Token token);
 
-int main(int argc, const char* argv[])
-{
+int main(int argc, const char* argv[]) {
     const char* source_code = NULL;
 
-    if (argc < 2)
-    {
+    if (argc < 2) {
         fprintf(stderr, "Error: few arguments to run.\n\n");
         print_usage();
         exit(EXIT_FAILURE);
     }
 
-    if (!filename_ends_with(argv[1], ".k"))
-    {
+    if (!filename_ends_with(argv[1], ".k")) {
         fprintf(stderr, "Error: file extension not supported.\n\n");
         print_usage();
         exit(EXIT_FAILURE);
     }
 
     int result = file_read(argv[1], &source_code);
-    if (result <= 0)
-        exit(EXIT_FAILURE);
+    if (result <= 0) exit(EXIT_FAILURE);
 
     bool is_flag_lexer = false;
     bool is_flag_parser = false;
     bool is_flag_bytecode = false;
-    for (int i = 2; i < argc; i++)
-    {
-        if (strcmp(argv[i], "-lexer") == 0)
-        {
-            is_flag_lexer = true;
-        } else if (strcmp(argv[i], "-parser") == 0)
-        {
-            is_flag_parser = true;
-        } else if (strcmp(argv[i], "-bytecode") == 0)
-        {
-            is_flag_bytecode = true;
-        }
+    for (int i = 2; i < argc; i++) {
+        if (strcmp(argv[i], "-lexer") == 0) is_flag_lexer = true;
+        else if (strcmp(argv[i], "-parser") == 0) is_flag_parser = true;
+        else if (strcmp(argv[i], "-bytecode") == 0) is_flag_bytecode = true;
     }
 
-    if (is_flag_lexer)
-    {
+    if (is_flag_lexer) {
         Lexer lexer;
         lexer_init(&lexer, source_code);
         lexer_debug_dump_tokens(&lexer);
+        return 0;
     }
 
-    if (is_flag_parser)
-    {
+    if (is_flag_parser) {
         Parser parser;
         Bytecode bytecode;
-
         parser_init(&parser, source_code);
-        vm_init();
+        // vm_init();
 
         bytecode_emitter_begin();
         ArrayStatement* statements = parser_parse(&parser);
         bytecode = bytecode_emitter_end();
 
-        vm_interpret(&bytecode);
+        // vm_interpret(&bytecode);
 
-        printf("\n");
-        bytecode_disassemble(&bytecode, "Bytecodes");
-        bytecode_free(&bytecode);
+        // printf("\n");
+        // bytecode_disassemble(&bytecode, "Bytecodes");
 
-        printf("\n");
+        // printf("\n");
         // for (int i = 0; i < statements->count; i++)
         // {
         //     expression_print(statements->items[i].expression);
@@ -87,19 +72,17 @@ int main(int argc, const char* argv[])
         //     expression_free(statements->items[i].expression);
         // }
 
+        bytecode_free(&bytecode);
         vm_free();
     }
 
-    if (is_flag_bytecode)
-    {
-        // todo: remove parser by making statements one
-        //       level global
+    if (is_flag_bytecode) {
         Parser parser;
         Bytecode bytecode;
-
         parser_init(&parser, source_code);
+
         bytecode_emitter_begin();
-        ArrayStatement* statements = parser_parse(&parser);
+        parser_parse(&parser);
         bytecode = bytecode_emitter_end();
 
         bytecode_disassemble(&bytecode, "Bytecode");
@@ -156,8 +139,7 @@ defer:
     return result;
 }
 
-bool filename_ends_with(const char* filename, const char* extension)
-{
+bool filename_ends_with(const char* filename, const char* extension) {
     int filename_length = strlen(filename);
     int extension_length = strlen(extension);
 
