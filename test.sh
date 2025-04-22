@@ -11,6 +11,7 @@ assert_lexer() {
     for file_test_path in $(ls $TEST_DIR/lexer/*.k)
     do 
         file_ref_name=$(basename $file_test_path .k)
+        # TODO: change .ref to .expected
         file_ref_contents=$(cat $TEST_DIR/lexer/$file_ref_name.ref)
 
         lexer_output=$(./kriolu.exe "$file_test_path" "-lexer")

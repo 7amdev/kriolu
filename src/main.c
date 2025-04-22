@@ -10,7 +10,7 @@
     } while (0)
 
 void print_usage();
-int file_read(const char* file_path, char** buffer_out);
+int  file_read(const char* file_path, char** buffer_out);
 bool filename_ends_with(const char* filename, const char* extension);
 void token_print(Token token);
 
@@ -22,6 +22,32 @@ int main(int argc, const char* argv[]) {
         print_usage();
         exit(EXIT_FAILURE);
     }
+
+    bool is_info = false;
+    bool is_help = false;
+    bool is_file = false;
+    if (strcmp(argv[1], "info") == 0)  is_info = true;
+    else if (strcmp(argv[1], "djudan") == 0) is_help = true;
+    else if (filename_ends_with(argv[1], ".k")) is_file = true;
+
+
+    if (is_info) {
+#ifdef DEBUG_TRACE_EXECUTION
+        printf("Kriolu: version 1.0.0 development mode");
+#else 
+        printf("Kriolu: version 1.0.0 release mode");
+#endif
+        return 0;
+    }
+
+    if (is_help) {
+        print_usage();
+        return 0;
+    }
+
+    // 
+    // Is a file section
+    //
 
     if (!filename_ends_with(argv[1], ".k")) {
         fprintf(stderr, "Error: file extension not supported.\n\n");
@@ -41,6 +67,7 @@ int main(int argc, const char* argv[]) {
         else if (strcmp(argv[i], "-bytecode") == 0) is_flag_bytecode = true;
     }
 
+
     if (is_flag_lexer) {
         Lexer lexer;
         lexer_init(&lexer, source_code);
@@ -52,28 +79,22 @@ int main(int argc, const char* argv[]) {
         Parser parser;
         Bytecode bytecode;
         parser_init(&parser, source_code);
-        // vm_init();
 
         bytecode_emitter_begin();
         ArrayStatement* statements = parser_parse(&parser);
         bytecode = bytecode_emitter_end();
 
-        // vm_interpret(&bytecode);
-
-        // printf("\n");
-        // bytecode_disassemble(&bytecode, "Bytecodes");
-
-        // printf("\n");
-        // for (int i = 0; i < statements->count; i++)
-        // {
-        //     expression_print(statements->items[i].expression);
-        //     printf("\n");
-        //     expression_print_tree(statements->items[i].expression, 0);
-        //     expression_free(statements->items[i].expression);
-        // }
+        printf("\n");
+        for (int i = 0; i < statements->count; i++) {
+            expression_print(statements->items[i].expression);
+            printf("\n");
+            expression_print_tree(statements->items[i].expression, 0);
+            expression_free(statements->items[i].expression);
+        }
 
         bytecode_free(&bytecode);
-        vm_free();
+
+        return 0;
     }
 
     if (is_flag_bytecode) {
@@ -87,7 +108,24 @@ int main(int argc, const char* argv[]) {
 
         bytecode_disassemble(&bytecode, "Bytecode");
         bytecode_free(&bytecode);
+
+        return 0;
     }
+
+
+    Parser parser;
+    Bytecode bytecode;
+    parser_init(&parser, source_code);
+    vm_init();
+
+    bytecode_emitter_begin();
+    parser_parse(&parser);
+    bytecode = bytecode_emitter_end();
+
+    vm_interpret(&bytecode);
+
+    bytecode_free(&bytecode);
+    vm_free();
 
     return 0;
 }
@@ -131,11 +169,8 @@ int file_read(const char* file_path, char** buffer_out)
     result = bytes_read;
 
 defer:
-    if (file)
-        fclose(file);
-    if (*buffer_out != NULL && result == -1)
-        free(*buffer_out);
-
+    if (file) fclose(file);
+    if (*buffer_out != NULL && result == -1) free(*buffer_out);
     return result;
 }
 
@@ -143,8 +178,7 @@ bool filename_ends_with(const char* filename, const char* extension) {
     int filename_length = strlen(filename);
     int extension_length = strlen(extension);
 
-    for (int i = 0; i < extension_length; i++)
-    {
+    for (int i = 0; i < extension_length; i++) {
         if (filename[filename_length - i - 1] != extension[extension_length - i - 1])
             return false;
     }
@@ -154,10 +188,11 @@ bool filename_ends_with(const char* filename, const char* extension) {
 
 void print_usage()
 {
-    printf("Kriolu interpreter v0.0.1\n\n");
+    printf("Kriolu interpreter v1.0.0\n\n");
     printf("Usage:\n");
-    printf("  kriolu <filename.k> [optional flags]>\n\n");
+    printf("  kriolu <filename.k|info|djudan> [optional flags]\n\n");
     printf("Optional flags:\n");
     printf("  -lexer                   Sends tokens to the stdout.\n");
-    printf("  -parser                  Sends bytecodes to the stdout.\n");
+    printf("  -parser                  Sends AST to the stdout.\n");
+    printf("  -bytecode                Sends bytecodes to the stdout.\n");
 }

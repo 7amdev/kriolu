@@ -370,8 +370,7 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm, Bytecode* byteco
 void virtual_machine_free(VirtualMachine* vm)
 {
     Object* object = vm->objects;
-    while (object != NULL)
-    {
+    while (object != NULL) {
         Object* next = object->next;
         Object_free(object);
         object = next;

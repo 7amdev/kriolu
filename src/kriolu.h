@@ -604,7 +604,7 @@ void hash_table_free(HashTable* table);
 // Virtual Machine
 //
 
-#define DEBUG_TRACE_EXECUTION
+// #define DEBUG_TRACE_EXECUTION
 
 typedef enum
 {
