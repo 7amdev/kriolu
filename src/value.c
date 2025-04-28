@@ -1,7 +1,7 @@
 #include "kriolu.h"
 
-bool value_negate_logically(Value value)
-{
+
+bool value_negate_logically(Value value) {
     // return (
     //     value_is_nil(value) ||
     //     (value_is_boolean(value) && !value_as_boolean(value)));
@@ -24,8 +24,7 @@ bool value_is_falsey(Value value) {
     return false;
 }
 
-bool value_is_equal(Value a, Value b)
-{
+bool value_is_equal(Value a, Value b) {
     if (a.kind != b.kind)    return false;
     if (value_is_boolean(a)) return (value_as_boolean(a) == value_as_boolean(b));
     if (value_is_number(a))  return value_as_number(a) == value_as_number(b);

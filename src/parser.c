@@ -231,7 +231,7 @@ static Statement parser_instruction_block(Parser* parser) {
         if (kind == Token_Right_Brace) break;
         if (kind == Token_Eof)         break;
 
-        parser_statement(parser);
+        statement = parser_statement(parser);
     }
 
     parser_consume(parser, Token_Right_Brace, "Expect '}' after block.");
@@ -296,6 +296,8 @@ static Statement parser_variable_declaration(Parser* parser) {
     Statement statement = { 0 };
     uint8_t global_index = 0;
 
+    statement.kind = StatementKind_Variable_Declaration;
+
     parser_consume(parser, Token_Identifier, "Expect variable name.");
 
     block{
@@ -338,14 +340,25 @@ static Statement parser_variable_declaration(Parser* parser) {
 
         // Global Scope Only
         //
-    global_index = parser_store_identifier_into_bytecode(parser, parser->token_previous.start, parser->token_previous.length);
+    statement.variable_declaration.identifier = ObjectString_AllocateIfNotInterned(parser->token_previous.start, parser->token_previous.length);
+    Value value_string = value_make_object_string(statement.variable_declaration.identifier);
+
+    int value_index = bytecode_emit_value(value_string);
+    if (value_index > UINT8_MAX) {
+        parser_error(parser, &parser->token_current, "Too many constants.");
+        global_index = 0;
+    } else {
+        global_index = value_index;
+    }
+    // global_index = parser_store_identifier_into_bytecode(parser, parser->token_previous.start, parser->token_previous.length);
 
     // Check for assignment
     // 
     if (parser_match_then_advance(parser, Token_Equal)) {
-        parser_expression(parser, OPERATION_ASSIGNMENT);
+        statement.variable_declaration.rhs = parser_expression(parser, OPERATION_ASSIGNMENT);
     } else {
         bytecode_emit_instruction_1byte(OpCode_Nil, parser->token_previous.line_number);
+        statement.variable_declaration.rhs = expression_allocate(expression_make_nil());
     }
 
     parser_consume(parser, Token_Semicolon, "Expected ';' after expression.");
@@ -410,8 +423,7 @@ static OrderOfOperation parser_operator_precedence(TokenKind kind)
     }
 }
 
-static Expression* parser_expression(Parser* parser, OrderOfOperation operator_precedence_previous)
-{
+static Expression* parser_expression(Parser* parser, OrderOfOperation operator_precedence_previous) {
     parser_advance(parser);
 
     bool can_assign = (operator_precedence_previous <= OPERATION_ASSIGNMENT);
@@ -569,11 +581,11 @@ static Expression* parser_unary_and_literals(Parser* parser, bool can_assign)
     // Identifier
     //
     if (parser->token_previous.kind == Token_Identifier) {
-        // TODO: Support for more than 256 value in a Scope
-
+        Expression expression = { 0 };
         uint8_t opcode_assign = OpCode_Invalid;
         uint8_t opcode_read = OpCode_Invalid;
         Local* local_found = NULL;
+        ObjectString* variable_name = NULL;
         int operand = StackLocal_get_local_index_by_token(&parser->scope_current->locals, &parser->token_previous, &local_found);
 
         if (operand != -1) {
@@ -581,9 +593,22 @@ static Expression* parser_unary_and_literals(Parser* parser, bool can_assign)
             opcode_read = OpCode_Read_Local;
         } else {
             // Default
-            operand = parser_store_identifier_into_bytecode(parser, parser->token_previous.start, parser->token_previous.length);
             opcode_assign = OpCode_Assign_Global;
             opcode_read = OpCode_Read_Global;
+            // operand = parser_store_identifier_into_bytecode(parser, parser->token_previous.start, parser->token_previous.length);
+
+            variable_name = ObjectString_AllocateIfNotInterned(parser->token_previous.start, parser->token_previous.length);
+            Value value_string = value_make_object_string(variable_name);
+
+            int value_index = bytecode_emit_value(value_string);
+            // TODO: Support for more than 256 value in a Scope
+            if (value_index <= UINT8_MAX) {
+                operand = value_index;
+            } else {
+                parser_error(parser, &parser->token_current, "Too many constants.");
+                operand = 0;
+            }
+
         }
 
         if (local_found && local_found->scope_depth == -1)
@@ -592,13 +617,17 @@ static Expression* parser_unary_and_literals(Parser* parser, bool can_assign)
         // Assignment
         //
         if (can_assign && parser_match_then_advance(parser, Token_Equal)) {
-            parser_expression(parser, OPERATION_ASSIGNMENT);
+            expression.kind = ExpressionKind_Assignment;
+            expression.as.assignment.lhs = variable_name;
+            expression.as.assignment.rhs = parser_expression(parser, OPERATION_ASSIGNMENT);
             bytecode_emit_instruction_2bytes(opcode_assign, operand, parser->token_previous.line_number);
         } else {
+            expression.kind = ExpressionKind_Variable;
+            expression.as.variable = variable_name;
             bytecode_emit_instruction_2bytes(opcode_read, operand, parser->token_previous.line_number);
         }
 
-        return NULL;
+        return expression_allocate(expression);
     }
 
     // TODO: log token name

@@ -102,8 +102,9 @@ void expression_print_tree(Expression* expression, int indent)
     }
 }
 
-void expression_print(Expression* expression)
-{
+void expression_print(Expression* expression, int indent) {
+    for (int i = 0; i < indent; i++)
+        printf(" ");
 
     switch (expression->kind)
     {
@@ -131,7 +132,7 @@ void expression_print(Expression* expression)
     }
     case ExpressionKind_String:
     {
-        printf("%s", expression_as_string(*expression)->characters);
+        printf("'%s'", expression_as_string(*expression)->characters);
         break;
     }
     case ExpressionKind_Negation:
@@ -140,7 +141,7 @@ void expression_print(Expression* expression)
 
         printf("(");
         printf("-");
-        expression_print(operand);
+        expression_print(operand, indent);
         printf(")");
         break;
     }
@@ -150,14 +151,14 @@ void expression_print(Expression* expression)
 
         printf("(");
         printf("ka ");
-        expression_print(operand);
+        expression_print(operand, indent);
         printf(")");
         break;
     }
     case ExpressionKind_Grouping:
     {
         Expression* expr = expression_as_negation(*expression).operand;
-        expression_print(expr);
+        expression_print(expr, indent);
         break;
     }
     case ExpressionKind_Addition:
@@ -173,7 +174,7 @@ void expression_print(Expression* expression)
         Expression* right_operand = expression_as_binary(*expression).right;
 
         printf("(");
-        expression_print(left_operand);
+        expression_print(left_operand, indent);
 
         if (expression->kind == ExpressionKind_Addition)
             printf(" + ");
@@ -192,9 +193,19 @@ void expression_print(Expression* expression)
         else if (expression->kind == ExpressionKind_Less_Than)
             printf(" < ");
 
-        expression_print(right_operand);
+        expression_print(right_operand, indent);
         printf(")");
 
+        break;
+    }
+    case ExpressionKind_Assignment: {
+        printf("<Assignment>\n");
+        printf("%*s%s\n", indent + 2, "", expression->as.assignment.lhs->characters);
+        expression_print(expression->as.assignment.rhs, indent + 2);
+        break;
+    }
+    case ExpressionKind_Variable: {
+        printf("(get %s)", expression->as.variable->characters);
         break;
     }
     }

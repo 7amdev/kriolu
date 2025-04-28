@@ -255,6 +255,8 @@ void value_print(Value value);
 inline bool value_is_object_type(Value value, ObjectKind object_kind) {
     return value_is_object(value) && value_as_object(value)->kind == object_kind;
 }
+
+
 void array_value_init(ArrayValue* values);
 uint32_t array_value_insert(ArrayValue* values, Value value);
 void array_value_free(ArrayValue* values);
@@ -282,7 +284,9 @@ enum
     ExpressionKind_Exponentiation,
     ExpressionKind_Equal_To,
     ExpressionKind_Greater_Than,
-    ExpressionKind_Less_Than
+    ExpressionKind_Less_Than,
+    ExpressionKind_Assignment,
+    ExpressionKind_Variable
 };
 
 typedef struct Expression Expression;
@@ -294,15 +298,10 @@ struct Expression
         double number;
         bool boolean;
         Object* object;
-        struct
-        {
-            Expression* operand;
-        } unary;
-        struct
-        {
-            Expression* left;
-            Expression* right;
-        } binary;
+        ObjectString* variable;
+        struct { Expression* operand; } unary;
+        struct { Expression* left; Expression* right; } binary;
+        struct { ObjectString* lhs; Expression* rhs; } assignment; // lhs -> Left Hand Side; rhs -> Right Hand Side
     } as;
 };
 
@@ -321,6 +320,8 @@ struct Expression
 #define expression_make_equal_to(left_operand, right_operand) ((Expression){.kind = ExpressionKind_Equal_To, .as = {.binary = {.left = (left_operand), .right = (right_operand)}}})
 #define expression_make_greater_than(left_operand, right_operand) ((Expression){.kind = ExpressionKind_Greater_Than, .as = {.binary = {.left = (left_operand), .right = (right_operand)}}})
 #define expression_make_less_than(left_operand, right_operand) ((Expression){.kind = ExpressionKind_Less_Than, .as = {.binary = {.left = (left_operand), .right = (right_operand)}}})
+#define expression_make_variable(variable) ((Expression) {.kind = ExpressionKind_Variable, .as = {.variable = (variable)}})
+#define expression_make_assignment(lhs, rhs) ((Expression){.kind = ExpressionKind_Assignment, .as = {.assignment = {.lhs = (lhs), .rhs = (rhs)}}})
 
 #define expression_as_number(expression) ((expression).as.number)
 #define expression_as_boolean(expression) ((expression).as.boolean)
@@ -339,9 +340,11 @@ struct Expression
 #define expression_as_equal(expression) ((expression).as.binary)
 #define expression_as_greater(expression) ((expression).as.binary)
 #define expression_as_less(expression) ((expression).as.binary)
+#define expression_as_variable(expression) ((expression).as.variable)
+#define expression_as_assignment(expression) ((expression).as.assignment)
 
 Expression* expression_allocate(Expression expr);
-void expression_print(Expression* expression);
+void expression_print(Expression* expression, int indent);
 void expression_print_tree(Expression* expression, int indent);
 void expression_free(Expression* expression);
 
@@ -351,6 +354,7 @@ enum
     StatementKind_Invalid,
 
     StatementKind_Expression,
+    StatementKind_Variable_Declaration,
     StatementKind_Print,
     StatementKind_Block,
     StatementKind_Return,
@@ -365,8 +369,17 @@ struct Statement
     union
     {
         Expression* expression;
+        Expression* _returned;
+        Statement* _block;
+        struct { ObjectString* identifier; Expression* rhs; } variable_declaration;
     };
 };
+
+#define statement_make_expression(expression) ((Statement) {.kind = StatementKind_Expression, .as = {.expression = (expression)}})
+#define statement_make_variable_declaration(name, expresion) ((Statement) {.kind = StatementKind_Variable_Declaration, .as = {.variable_declaration = {.name = name, .expression = (expression)}}})
+
+Statement* statement_allocate(Statement statement);
+void statement_print(Statement* statement, int indent);
 
 typedef struct
 {
@@ -374,6 +387,7 @@ typedef struct
     uint32_t count;
     uint32_t capacity;
 } ArrayStatement;
+
 
 ArrayStatement* array_statement_allocate();
 uint32_t array_statement_insert(ArrayStatement* statements, Statement statement);

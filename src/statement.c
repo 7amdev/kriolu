@@ -1,5 +1,34 @@
 #include "kriolu.h"
 
+Statement* statement_allocate(Statement value) {
+    Statement* statement = (Statement*)calloc(1, sizeof(Statement));
+    assert(statement);
+
+    *statement = value;
+
+    return statement;
+}
+
+void statement_print(Statement* statement, int indent) {
+    int offset = 2;
+    int padding_left = indent + offset;
+    switch (statement->kind)
+    {
+    case StatementKind_Expression: {
+        printf("<expression statement>\n");
+        printf("%*s", padding_left, "");
+        expression_print(statement->expression, 0);
+        // printf("\n");
+    } break;
+    case StatementKind_Variable_Declaration: {
+        printf("<mimoria>\n");
+        printf("%*s%s\n", padding_left, "", statement->variable_declaration.identifier->characters);
+        printf("%*s", padding_left, "");
+        expression_print(statement->variable_declaration.rhs, 0);
+    } break;
+    }
+}
+
 ArrayStatement* array_statement_allocate()
 {
     ArrayStatement* statements = (ArrayStatement*)calloc(1, sizeof(ArrayStatement));

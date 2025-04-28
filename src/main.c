@@ -80,16 +80,19 @@ int main(int argc, const char* argv[]) {
         Bytecode bytecode;
         parser_init(&parser, source_code);
 
-        bytecode_emitter_begin();
+        // bytecode_emitter_begin();
         ArrayStatement* statements = parser_parse(&parser);
-        bytecode = bytecode_emitter_end();
+        // bytecode = bytecode_emitter_end();
 
         printf("\n");
         for (int i = 0; i < statements->count; i++) {
-            expression_print(statements->items[i].expression);
+            statement_print(&statements->items[i], 0);
             printf("\n");
-            expression_print_tree(statements->items[i].expression, 0);
-            expression_free(statements->items[i].expression);
+
+            // expression_print(statements->items[i].expression, 0);
+            // printf("\n");
+            // expression_print_tree(statements->items[i].expression, 0);
+            // expression_free(statements->items[i].expression);
         }
 
         bytecode_free(&bytecode);
