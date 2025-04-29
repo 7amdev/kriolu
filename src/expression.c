@@ -103,8 +103,8 @@ void expression_print_tree(Expression* expression, int indent)
 }
 
 void expression_print(Expression* expression, int indent) {
-    for (int i = 0; i < indent; i++)
-        printf(" ");
+    // for (int i = 0; i < indent; i++)
+    //     printf(" ");
 
     switch (expression->kind)
     {
@@ -141,7 +141,7 @@ void expression_print(Expression* expression, int indent) {
 
         printf("(");
         printf("-");
-        expression_print(operand, indent);
+        expression_print(operand, 0);
         printf(")");
         break;
     }
@@ -151,14 +151,14 @@ void expression_print(Expression* expression, int indent) {
 
         printf("(");
         printf("ka ");
-        expression_print(operand, indent);
+        expression_print(operand, 0);
         printf(")");
         break;
     }
     case ExpressionKind_Grouping:
     {
         Expression* expr = expression_as_negation(*expression).operand;
-        expression_print(expr, indent);
+        expression_print(expr, 0);
         break;
     }
     case ExpressionKind_Addition:
@@ -174,7 +174,7 @@ void expression_print(Expression* expression, int indent) {
         Expression* right_operand = expression_as_binary(*expression).right;
 
         printf("(");
-        expression_print(left_operand, indent);
+        expression_print(left_operand, 0);
 
         if (expression->kind == ExpressionKind_Addition)
             printf(" + ");
@@ -193,7 +193,7 @@ void expression_print(Expression* expression, int indent) {
         else if (expression->kind == ExpressionKind_Less_Than)
             printf(" < ");
 
-        expression_print(right_operand, indent);
+        expression_print(right_operand, 0);
         printf(")");
 
         break;
@@ -201,6 +201,7 @@ void expression_print(Expression* expression, int indent) {
     case ExpressionKind_Assignment: {
         printf("<Assignment>\n");
         printf("%*s%s\n", indent + 2, "", expression->as.assignment.lhs->characters);
+        printf("%*s", indent + 2, "");
         expression_print(expression->as.assignment.rhs, indent + 2);
         break;
     }

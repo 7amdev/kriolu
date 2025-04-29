@@ -17,7 +17,7 @@ void statement_print(Statement* statement, int indent) {
     case StatementKind_Expression: {
         printf("<expression statement>\n");
         printf("%*s", padding_left, "");
-        expression_print(statement->expression, 0);
+        expression_print(statement->expression, padding_left);
         // printf("\n");
     } break;
     case StatementKind_Variable_Declaration: {

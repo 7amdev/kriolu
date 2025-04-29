@@ -393,8 +393,6 @@ static OrderOfOperation parser_operator_precedence(TokenKind kind)
     {
     default:
         return 0;
-    case Token_Equal:
-        return OPERATION_ASSIGNMENT;
     case Token_Ou:
         return OPERATION_OR;
     case Token_E:
@@ -427,6 +425,7 @@ static Expression* parser_expression(Parser* parser, OrderOfOperation operator_p
     parser_advance(parser);
 
     bool can_assign = (operator_precedence_previous <= OPERATION_ASSIGNMENT);
+    // TODO: rename parser_unary_and_literals to parser_parse_unary_literals_and_identifier
     Expression* left_operand = parser_unary_and_literals(parser, can_assign);
     Expression* expression = left_operand;
 
@@ -434,9 +433,8 @@ static Expression* parser_expression(Parser* parser, OrderOfOperation operator_p
     OrderOfOperation operator_precedence_current = parser_operator_precedence(operator_kind_current);
 
     while (operator_precedence_current >= operator_precedence_previous) {
-        // TODO(?): if parser->token_current.kind == Token_Equal : break;
-        //          fix: 1 = 4; or var a = 1 * 3 + x = 4 - 6;
         parser_advance(parser);
+        // TODO: change parser_binary to parser_parse_arithmetic_logical_and_relational_operators
         expression = parser_binary(parser, expression);
 
         operator_precedence_current = parser_operator_precedence(parser->token_current.kind);
@@ -523,6 +521,7 @@ static Expression* parser_unary_and_literals(Parser* parser, bool can_assign)
             parser->interpolation_count_nesting += 1;
             if (parser->token_current.kind != Token_String_Interpolation)
                 parser->interpolation_count_value_pushed += 1;
+
             parser_expression(parser, OPERATION_ASSIGNMENT);
             parser->interpolation_count_nesting -= 1;
 
@@ -581,7 +580,6 @@ static Expression* parser_unary_and_literals(Parser* parser, bool can_assign)
     // Identifier
     //
     if (parser->token_previous.kind == Token_Identifier) {
-        Expression expression = { 0 };
         uint8_t opcode_assign = OpCode_Invalid;
         uint8_t opcode_read = OpCode_Invalid;
         Local* local_found = NULL;
@@ -616,6 +614,7 @@ static Expression* parser_unary_and_literals(Parser* parser, bool can_assign)
 
         // Assignment
         //
+        Expression expression = { 0 };
         if (can_assign && parser_match_then_advance(parser, Token_Equal)) {
             expression.kind = ExpressionKind_Assignment;
             expression.as.assignment.lhs = variable_name;
@@ -638,18 +637,27 @@ static Expression* parser_unary_and_literals(Parser* parser, bool can_assign)
 
 static Expression* parser_binary(Parser* parser, Expression* left_operand) {
     TokenKind operator_kind_previous = parser->token_previous.kind;
-    // TODO(?): if parser->token_previous.kind == Token_Equal : return;
+
+    // 
+    // Logical Operations: 
+    //     and, or, not 
+    //
 
     if (operator_kind_previous == Token_E) {
         int operand_index = bytecode_emit_instruction_jump(OpCode_Jump_If_False, parser->token_previous.line_number);
         bytecode_emit_instruction_1byte(OpCode_Pop, parser->token_previous.line_number);
 
-        parser_expression(parser, OPERATION_AND);
+        Expression* expression = parser_expression(parser, OPERATION_AND);
 
         Bytecode_PatchInstructionJump(operand_index);
 
         return NULL;
     }
+
+    // 
+    // Arithmetic Operations: 
+    //     plus, minus, multiplications, division, exponentiation, and logarithm
+    //
 
     OrderOfOperation operator_precedence_previous = parser_operator_precedence(operator_kind_previous);
     Expression* right_operand = parser_expression(parser, operator_precedence_previous);
@@ -693,6 +701,10 @@ static Expression* parser_binary(Parser* parser, Expression* left_operand) {
         Expression exponentiation = expression_make_division(left_operand, right_operand);
         return expression_allocate(exponentiation);
     }
+
+    //
+    // Comparison or Relational Operations
+    // 
 
     if (operator_kind_previous == Token_Equal_Equal)
     {

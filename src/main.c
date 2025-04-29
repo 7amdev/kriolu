@@ -84,7 +84,7 @@ int main(int argc, const char* argv[]) {
         ArrayStatement* statements = parser_parse(&parser);
         // bytecode = bytecode_emitter_end();
 
-        printf("\n");
+        // printf("\n");
         for (int i = 0; i < statements->count; i++) {
             statement_print(&statements->items[i], 0);
             printf("\n");
