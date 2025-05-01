@@ -284,7 +284,9 @@ enum
     ExpressionKind_Exponentiation,
     ExpressionKind_Equal_To,
     ExpressionKind_Greater_Than,
+    ExpressionKind_Greater_Than_Or_Equal_To,
     ExpressionKind_Less_Than,
+    ExpressionKind_Less_Than_Or_Equal_To,
     ExpressionKind_Assignment,
     ExpressionKind_Variable
 };
@@ -319,7 +321,9 @@ struct Expression
 #define expression_make_exponentiation(left_operand, right_operand) ((Expression){.kind = ExpressionKind_Exponentiation, .as = {.binary = {.left = (left_operand), .right = (right_operand)}}})
 #define expression_make_equal_to(left_operand, right_operand) ((Expression){.kind = ExpressionKind_Equal_To, .as = {.binary = {.left = (left_operand), .right = (right_operand)}}})
 #define expression_make_greater_than(left_operand, right_operand) ((Expression){.kind = ExpressionKind_Greater_Than, .as = {.binary = {.left = (left_operand), .right = (right_operand)}}})
+#define expression_make_greater_than_or_equal_to(left_operand, right_operand) ((Expression){.kind = ExpressionKind_Greater_Than_Or_Equal_To, .as = {.binary = {.left = (left_operand), .right = (right_operand)}}})
 #define expression_make_less_than(left_operand, right_operand) ((Expression){.kind = ExpressionKind_Less_Than, .as = {.binary = {.left = (left_operand), .right = (right_operand)}}})
+#define expression_make_less_than_or_equal_to(left_operand, right_operand) ((Expression){.kind = ExpressionKind_Less_Than_Or_Equal_To, .as = {.binary = {.left = (left_operand), .right = (right_operand)}}})
 #define expression_make_variable(variable) ((Expression) {.kind = ExpressionKind_Variable, .as = {.variable = (variable)}})
 #define expression_make_assignment(lhs, rhs) ((Expression){.kind = ExpressionKind_Assignment, .as = {.assignment = {.lhs = (lhs), .rhs = (rhs)}}})
 

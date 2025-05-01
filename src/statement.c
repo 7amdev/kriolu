@@ -20,6 +20,10 @@ void statement_print(Statement* statement, int indent) {
         expression_print(statement->expression, padding_left);
         // printf("\n");
     } break;
+    case StatementKind_Si: {
+        printf("<statement si>\n");
+        printf("    TBD\n");
+    } break;
     case StatementKind_Variable_Declaration: {
         printf("<mimoria>\n");
         printf("%*s%s\n", padding_left, "", statement->variable_declaration.identifier->characters);
@@ -50,7 +54,8 @@ uint32_t array_statement_insert(ArrayStatement* statements, Statement statement)
         uint32_t capacity_old = statements->capacity;
         statements->capacity = statements->capacity < 8 ? 8 : 2 * statements->capacity;
         statements->items = (Statement*)calloc(statements->capacity, sizeof(Statement));
-        memmove(statements->items, items_old, capacity_old);
+        assert(statements->items);
+        memmove(statements->items, items_old, capacity_old * sizeof(Statement));
         free(items_old);
     }
 

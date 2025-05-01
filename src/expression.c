@@ -168,7 +168,9 @@ void expression_print(Expression* expression, int indent) {
     case ExpressionKind_Exponentiation:
     case ExpressionKind_Equal_To:
     case ExpressionKind_Greater_Than:
+    case ExpressionKind_Greater_Than_Or_Equal_To:
     case ExpressionKind_Less_Than:
+    case ExpressionKind_Less_Than_Or_Equal_To:
     {
         Expression* left_operand = expression_as_binary(*expression).left;
         Expression* right_operand = expression_as_binary(*expression).right;
@@ -190,8 +192,12 @@ void expression_print(Expression* expression, int indent) {
             printf(" == ");
         else if (expression->kind == ExpressionKind_Greater_Than)
             printf(" > ");
+        else if (expression->kind == ExpressionKind_Greater_Than_Or_Equal_To)
+            printf(" >= ");
         else if (expression->kind == ExpressionKind_Less_Than)
             printf(" < ");
+        else if (expression->kind == ExpressionKind_Less_Than_Or_Equal_To)
+            printf(" <= ");
 
         expression_print(right_operand, 0);
         printf(")");

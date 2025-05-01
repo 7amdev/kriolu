@@ -1,0 +1,6 @@
+<expression statement>
+  (1.0 + (2.0 + 3.0))
+<expression statement>
+  (3.0 + (2.0 + 1.0))
+<expression statement>
+  (19.0 + (108.0 + 1017.0))

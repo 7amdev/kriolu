@@ -67,7 +67,6 @@ int main(int argc, const char* argv[]) {
         else if (strcmp(argv[i], "-bytecode") == 0) is_flag_bytecode = true;
     }
 
-
     if (is_flag_lexer) {
         Lexer lexer;
         lexer_init(&lexer, source_code);
@@ -80,19 +79,10 @@ int main(int argc, const char* argv[]) {
         Bytecode bytecode;
         parser_init(&parser, source_code);
 
-        // bytecode_emitter_begin();
         ArrayStatement* statements = parser_parse(&parser);
-        // bytecode = bytecode_emitter_end();
-
-        // printf("\n");
         for (int i = 0; i < statements->count; i++) {
             statement_print(&statements->items[i], 0);
             printf("\n");
-
-            // expression_print(statements->items[i].expression, 0);
-            // printf("\n");
-            // expression_print_tree(statements->items[i].expression, 0);
-            // expression_free(statements->items[i].expression);
         }
 
         bytecode_free(&bytecode);
