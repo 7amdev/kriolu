@@ -598,20 +598,20 @@ static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bo
         if (local_found && local_found->scope_depth == -1)
             parser_error(parser, &parser->token_previous, "Can't read local variable in its own initializer.");
 
-        // Assignment
+        // Assignment / Variable Initialization 
         //
-        Expression expression = { 0 };
         if (can_assign && parser_match_then_advance(parser, Token_Equal)) {
-            expression.kind = ExpressionKind_Assignment;
-            expression.as.assignment.lhs = variable_name;
-            expression.as.assignment.rhs = parser_parse_expresion(parser, Operation_Assignment);
+            Expression* right_hand_side = parser_parse_expresion(parser, Operation_Assignment);
+            Expression expression = expression_make_assignment(variable_name, right_hand_side);
             bytecode_emit_instruction_2bytes(opcode_assign, operand, parser->token_previous.line_number);
-        } else {
-            expression.kind = ExpressionKind_Variable;
-            expression.as.variable = variable_name;
-            bytecode_emit_instruction_2bytes(opcode_read, operand, parser->token_previous.line_number);
+
+            return expression_allocate(expression);
         }
 
+        // Get variable value
+        //
+        Expression expression = expression_make_variable(variable_name);
+        bytecode_emit_instruction_2bytes(opcode_read, operand, parser->token_previous.line_number);
         return expression_allocate(expression);
     }
 

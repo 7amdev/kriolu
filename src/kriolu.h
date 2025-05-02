@@ -324,8 +324,8 @@ struct Expression
 #define expression_make_greater_than_or_equal_to(left_operand, right_operand) ((Expression){.kind = ExpressionKind_Greater_Than_Or_Equal_To, .as = {.binary = {.left = (left_operand), .right = (right_operand)}}})
 #define expression_make_less_than(left_operand, right_operand) ((Expression){.kind = ExpressionKind_Less_Than, .as = {.binary = {.left = (left_operand), .right = (right_operand)}}})
 #define expression_make_less_than_or_equal_to(left_operand, right_operand) ((Expression){.kind = ExpressionKind_Less_Than_Or_Equal_To, .as = {.binary = {.left = (left_operand), .right = (right_operand)}}})
-#define expression_make_variable(variable) ((Expression) {.kind = ExpressionKind_Variable, .as = {.variable = (variable)}})
-#define expression_make_assignment(lhs, rhs) ((Expression){.kind = ExpressionKind_Assignment, .as = {.assignment = {.lhs = (lhs), .rhs = (rhs)}}})
+#define expression_make_variable(variable_name) ((Expression) {.kind = ExpressionKind_Variable, .as = {.variable = (variable_name)}})
+#define expression_make_assignment(variable_name, expression) ((Expression) {.kind = ExpressionKind_Assignment, .as = { .assignment = { .lhs = (variable_name), .rhs = (expression) } }})
 
 #define expression_as_number(expression) ((expression).as.number)
 #define expression_as_boolean(expression) ((expression).as.boolean)
