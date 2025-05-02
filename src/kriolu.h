@@ -434,6 +434,25 @@ void scope_init(Scope* scope);
 // Parser
 //
 
+typedef enum
+{
+    Operation_Min,
+
+    Operation_Assignment,                  // =
+    Operation_Or,                          // or
+    Operation_And,                         // and
+    Operation_Equality,                    // == =/=
+    Operation_Comparison,                  // < > <= >=
+    Operation_Addition_And_Subtraction,    // + -
+    Operation_Multiplication_And_Division, // * /
+    Operation_Negate,                      // Unary:  -
+    Operation_Exponentiation,              // ^   ex: -2^2 = -1 * 2^2 = -4
+    Operation_Not,                         // Unary: ka
+    Operation_Grouping_Call_And_Get,       // . (
+
+    Operation_Max
+} OrderOfOperation;
+
 typedef struct
 {
     Token token_current;

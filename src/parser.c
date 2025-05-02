@@ -2,38 +2,18 @@
 
 // TODO: [] parser destroy implementation
 
-typedef enum
-{
-    Operation_Min,
-
-    Operation_Assignment,                  // =
-    Operation_Or,                          // or
-    Operation_And,                         // and
-    Operation_Equality,                    // == =/=
-    Operation_Comparison,                  // < > <= >=
-    Operation_Addition_And_Subtraction,    // + -
-    Operation_Multiplication_And_Division, // * /
-    Operation_Negate,                      // Unary:  -
-    Operation_Exponentiation,              // ^   ex: -2^2 = -1 * 2^2 = -4
-    Operation_Not,                         // Unary: ka
-    Operation_Grouping_Call_And_Get,       // . (
-
-    Operation_Max
-} OrderOfOperation;
-
 static void parser_advance(Parser* parser);
 static void parser_consume(Parser* parser, TokenKind kind, const char* error_message);
 static bool parser_match_then_advance(Parser* parser, TokenKind kind);
 static void parser_synchronize(Parser* parser);
 static void parser_error(Parser* parser, Token* token, const char* message);
-static Statement parser_statement(Parser* parser);
-static Statement parser_expression_statement(Parser* parser);
-static Statement parser_instruction_print(Parser* parser);
-static Statement parser_instruction_block(Parser* parser);
-static Statement parser_instruction_if(Parser* parser);
-static Statement parser_variable_declaration(Parser* parser);
-static Expression* parser_expression(Parser* parser, OrderOfOperation operator_precedence_previous);
-static Expression* parser_binary(Parser* parser, Expression* left_operand);
+static Statement parser_parse_statement(Parser* parser);
+static Statement parser_parse_statement_expression(Parser* parser);
+static Statement parser_parse_instruction_print(Parser* parser);
+static Statement parser_parse_instruction_block(Parser* parser);
+static Statement parser_parse_instruction_if(Parser* parser);
+static Statement parser_parse_variable_declaration(Parser* parser);
+static Expression* parser_parse_expresion(Parser* parser, OrderOfOperation operator_precedence_previous);
 static Expression* parser_parse_unary_literals_and_identifier(parser);
 static Expression* parser_parse_operators_logical(Parser* parser, Expression* left_operand);
 static Expression* parser_parse_operators_arithmetic(Parser* parser, Expression* left_operand);
@@ -41,11 +21,14 @@ static Expression* parser_parse_operators_relational(Parser* parser, Expression*
 static bool parser_is_operator_arithmetic(Parser* parser);
 static bool parser_is_operator_logical(Parser* parser);
 static bool parser_is_operator_relational(Parser* parser);
-static uint8_t parser_store_identifier_into_bytecode(Parser* parser, const char* start, int length);
 static bool parser_check_locals_duplicates(Parser* parser, Token* identifier);
-static void parser_end(Parser* parser);
+static void parser_end_parsing(Parser* parser);
 static void parser_begin_scope(Parser* parser);
 static void parser_end_scope(Parser* parser);
+
+// TODO: Delete 
+static Expression* parser_binary(Parser* parser, Expression* left_operand);
+static uint8_t parser_store_identifier_into_bytecode(Parser* parser, const char* start, int length);
 
 //
 // Globals
@@ -80,11 +63,11 @@ ArrayStatement* parser_parse(Parser* parser)
     for (;;) {
         if (parser->token_current.kind == Token_Eof) break;
 
-        Statement statement = parser_statement(parser);
+        Statement statement = parser_parse_statement(parser);
         array_statement_insert(statements, statement);
     }
 
-    parser_end(parser);
+    parser_end_parsing(parser);
 
     return statements;
 }
@@ -172,7 +155,7 @@ static void parser_error(Parser* parser, Token* token, const char* message)
     }
 }
 
-static Statement parser_statement(Parser* parser)
+static Statement parser_parse_statement(Parser* parser)
 {
     // DECLARATIONS: introduces new identifiers
     //   klassi, mimoria, funson
@@ -185,17 +168,17 @@ static Statement parser_statement(Parser* parser)
     Statement statement = { 0 };
 
     if (parser_match_then_advance(parser, Token_Mimoria)) {
-        statement = parser_variable_declaration(parser);
+        statement = parser_parse_variable_declaration(parser);
     } else if (parser_match_then_advance(parser, Token_Imprimi)) {
-        statement = parser_instruction_print(parser);
+        statement = parser_parse_instruction_print(parser);
     } else if (parser_match_then_advance(parser, Token_Si)) {
-        statement = parser_instruction_if(parser);
+        statement = parser_parse_instruction_if(parser);
     } else if (parser_match_then_advance(parser, Token_Left_Brace)) {
         parser_begin_scope(parser);
-        parser_instruction_block(parser);
+        parser_parse_instruction_block(parser);
         parser_end_scope(parser);
     } else {
-        statement = parser_expression_statement(parser);
+        statement = parser_parse_statement_expression(parser);
     }
 
     if (parser->panic_mode)
@@ -204,9 +187,9 @@ static Statement parser_statement(Parser* parser)
     return statement;
 }
 
-static Statement parser_expression_statement(Parser* parser)
+static Statement parser_parse_statement_expression(Parser* parser)
 {
-    Expression* expression = parser_expression(parser, Operation_Assignment);
+    Expression* expression = parser_parse_expresion(parser, Operation_Assignment);
     parser_consume(parser, Token_Semicolon, "Expect ';' after expression.");
     bytecode_emit_instruction_1byte(OpCode_Pop, parser->token_previous.line_number);
 
@@ -217,10 +200,10 @@ static Statement parser_expression_statement(Parser* parser)
     return statement;
 }
 
-static Statement parser_instruction_print(Parser* parser) {
+static Statement parser_parse_instruction_print(Parser* parser) {
     Statement statement = { 0 };
 
-    Expression* expression = parser_expression(parser, Operation_Assignment);
+    Expression* expression = parser_parse_expresion(parser, Operation_Assignment);
     parser_consume(parser, Token_Semicolon, "Expect ';' after expression.");
     bytecode_emit_instruction_1byte(OpCode_Print, parser->token_previous.line_number);
 
@@ -229,7 +212,7 @@ static Statement parser_instruction_print(Parser* parser) {
     return statement;
 }
 
-static Statement parser_instruction_block(Parser* parser) {
+static Statement parser_parse_instruction_block(Parser* parser) {
     Statement statement = { 0 };
 
     for (;;) {
@@ -237,7 +220,7 @@ static Statement parser_instruction_block(Parser* parser) {
         if (kind == Token_Right_Brace) break;
         if (kind == Token_Eof)         break;
 
-        statement = parser_statement(parser);
+        statement = parser_parse_statement(parser);
     }
 
     parser_consume(parser, Token_Right_Brace, "Expect '}' after block.");
@@ -247,12 +230,12 @@ static Statement parser_instruction_block(Parser* parser) {
 
 // if (condition) {then-block} sinou {else-block} 
 //
-static Statement parser_instruction_if(Parser* parser) {
+static Statement parser_parse_instruction_if(Parser* parser) {
     Statement statement = { 0 };
     statement.kind = StatementKind_Si;
 
     parser_consume(parser, Token_Left_Parenthesis, "Expect '(' after 'if'.");
-    parser_expression(parser, Operation_Assignment); // Will leave a Boolean value on top of the Stack
+    parser_parse_expresion(parser, Operation_Assignment); // Will leave a Boolean value on top of the Stack
     parser_consume(parser, Token_Right_Parenthesis, "Expect ')' after condition.");
 
     // If the 'if-condition' is false, jump to the begining of 'else-block'.
@@ -270,7 +253,7 @@ static Statement parser_instruction_if(Parser* parser) {
 
     // Compile then-block statements 
     //
-    parser_statement(parser);
+    parser_parse_statement(parser);
 
     // After finishing compiling statements in the then-block, jump out off 
     // the if-statement skipping the else-block statements.
@@ -291,7 +274,7 @@ static Statement parser_instruction_if(Parser* parser) {
     //
     bytecode_emit_instruction_1byte(OpCode_Pop, parser->token_previous.line_number);
 
-    if (parser_match_then_advance(parser, Token_Sinou)) parser_statement(parser);
+    if (parser_match_then_advance(parser, Token_Sinou)) parser_parse_statement(parser);
 
     bool error = Bytecode_PatchInstructionJump(jump_operand_index);
     if (error) parser_error(parser, &parser->token_previous, "Too much code to jump over.");
@@ -299,7 +282,7 @@ static Statement parser_instruction_if(Parser* parser) {
     return statement;
 }
 
-static Statement parser_variable_declaration(Parser* parser) {
+static Statement parser_parse_variable_declaration(Parser* parser) {
     Statement statement = { 0 };
     uint8_t global_index = 0;
 
@@ -330,7 +313,7 @@ static Statement parser_variable_declaration(Parser* parser) {
         // Check for assignment
         // 
         if (parser_match_then_advance(parser, Token_Equal)) {
-            parser_expression(parser, Operation_Assignment);
+            parser_parse_expresion(parser, Operation_Assignment);
         } else {
             bytecode_emit_instruction_1byte(OpCode_Nil, parser->token_previous.line_number);
         }
@@ -346,6 +329,7 @@ static Statement parser_variable_declaration(Parser* parser) {
     }
 
         // Global Scope Only
+        // TODO: clean this line: global_index = parser_store_identifier_into_bytecode(parser, parser->token_previous.start, parser->token_previous.length);
         //
     statement.variable_declaration.identifier = ObjectString_AllocateIfNotInterned(parser->token_previous.start, parser->token_previous.length);
     Value value_string = value_make_object_string(statement.variable_declaration.identifier);
@@ -357,12 +341,11 @@ static Statement parser_variable_declaration(Parser* parser) {
     } else {
         global_index = value_index;
     }
-    // global_index = parser_store_identifier_into_bytecode(parser, parser->token_previous.start, parser->token_previous.length);
 
     // Check for assignment
     // 
     if (parser_match_then_advance(parser, Token_Equal)) {
-        statement.variable_declaration.rhs = parser_expression(parser, Operation_Assignment);
+        statement.variable_declaration.rhs = parser_parse_expresion(parser, Operation_Assignment);
     } else {
         bytecode_emit_instruction_1byte(OpCode_Nil, parser->token_previous.line_number);
         statement.variable_declaration.rhs = expression_allocate(expression_make_nil());
@@ -429,7 +412,7 @@ static OrderOfOperation parser_get_order_of_operation(TokenKind kind)
     }
 }
 
-static Expression* parser_expression(Parser* parser, OrderOfOperation operator_precedence_previous) {
+static Expression* parser_parse_expresion(Parser* parser, OrderOfOperation operator_precedence_previous) {
     parser_advance(parser);
 
     bool can_assign = (operator_precedence_previous <= Operation_Assignment);
@@ -449,8 +432,8 @@ static Expression* parser_expression(Parser* parser, OrderOfOperation operator_p
             expression = parser_parse_operators_relational(parser, expression);
         }
 
-        // expression = parser_binary(parser, expression);
         operator_precedence_current = parser_get_order_of_operation(parser->token_current.kind);
+        // TODO: clean this line: expression = parser_binary(parser, expression);
     }
 
     if (can_assign && parser_match_then_advance(parser, Token_Equal)) {
@@ -529,7 +512,7 @@ static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bo
             if (parser->token_current.kind != Token_String_Interpolation)
                 parser->interpolation_count_value_pushed += 1;
 
-            parser_expression(parser, Operation_Assignment);
+            parser_parse_expresion(parser, Operation_Assignment);
             parser->interpolation_count_nesting -= 1;
 
             parser_advance(parser);
@@ -557,7 +540,7 @@ static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bo
     // Unary
     //
     if (parser->token_previous.kind == Token_Minus) {
-        Expression* expression = parser_expression(parser, Operation_Negate);
+        Expression* expression = parser_parse_expresion(parser, Operation_Negate);
         Expression negation = expression_make_negation(expression);
 
         bytecode_emit_instruction_1byte(OpCode_Negation, parser->token_previous.line_number);
@@ -565,7 +548,7 @@ static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bo
     }
 
     if (parser->token_previous.kind == Token_Ka) {
-        Expression* expression = parser_expression(parser, Operation_Not);
+        Expression* expression = parser_parse_expresion(parser, Operation_Not);
         Expression not = expression_make_not(expression);
 
         bytecode_emit_instruction_1byte(OpCode_Not, parser->token_previous.line_number);
@@ -573,7 +556,7 @@ static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bo
     }
 
     if (parser->token_previous.kind == Token_Left_Parenthesis) {
-        Expression* expression = parser_expression(parser, Operation_Assignment);
+        Expression* expression = parser_parse_expresion(parser, Operation_Assignment);
         Expression grouping = expression_make_grouping(expression);
 
         parser_consume(parser, Token_Right_Parenthesis, "Expected ')' after expression.");
@@ -621,7 +604,7 @@ static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bo
         if (can_assign && parser_match_then_advance(parser, Token_Equal)) {
             expression.kind = ExpressionKind_Assignment;
             expression.as.assignment.lhs = variable_name;
-            expression.as.assignment.rhs = parser_expression(parser, Operation_Assignment);
+            expression.as.assignment.rhs = parser_parse_expresion(parser, Operation_Assignment);
             bytecode_emit_instruction_2bytes(opcode_assign, operand, parser->token_previous.line_number);
         } else {
             expression.kind = ExpressionKind_Variable;
@@ -669,7 +652,7 @@ static Expression* parser_parse_operators_logical(Parser* parser, Expression* le
         int operand_index = bytecode_emit_instruction_jump(OpCode_Jump_If_False, parser->token_previous.line_number);
         bytecode_emit_instruction_1byte(OpCode_Pop, parser->token_previous.line_number);
 
-        Expression* expression = parser_expression(parser, Operation_And);
+        Expression* expression = parser_parse_expresion(parser, Operation_And);
 
         Bytecode_PatchInstructionJump(operand_index);
         return NULL;
@@ -682,7 +665,7 @@ static Expression* parser_parse_operators_logical(Parser* parser, Expression* le
 static Expression* parser_parse_operators_arithmetic(Parser* parser, Expression* left_operand) {
     TokenKind operator_kind_previous = parser->token_previous.kind;
     OrderOfOperation operator_precedence_previous = parser_get_order_of_operation(operator_kind_previous);
-    Expression* right_operand = parser_expression(parser, operator_precedence_previous);
+    Expression* right_operand = parser_parse_expresion(parser, operator_precedence_previous);
 
     switch (operator_kind_previous)
     {
@@ -720,7 +703,7 @@ static Expression* parser_parse_operators_arithmetic(Parser* parser, Expression*
 static Expression* parser_parse_operators_relational(Parser* parser, Expression* left_operand) {
     TokenKind operator_kind_previous = parser->token_previous.kind;
     OrderOfOperation operator_precedence_previous = parser_get_order_of_operation(operator_kind_previous);
-    Expression* right_operand = parser_expression(parser, operator_precedence_previous);
+    Expression* right_operand = parser_parse_expresion(parser, operator_precedence_previous);
 
     switch (operator_kind_previous)
     {
@@ -787,7 +770,7 @@ static Expression* parser_binary(Parser* parser, Expression* left_operand) {
         int operand_index = bytecode_emit_instruction_jump(OpCode_Jump_If_False, parser->token_previous.line_number);
         bytecode_emit_instruction_1byte(OpCode_Pop, parser->token_previous.line_number);
 
-        Expression* expression = parser_expression(parser, Operation_And);
+        Expression* expression = parser_parse_expresion(parser, Operation_And);
 
         Bytecode_PatchInstructionJump(operand_index);
 
@@ -800,7 +783,7 @@ static Expression* parser_binary(Parser* parser, Expression* left_operand) {
     //
 
     OrderOfOperation operator_precedence_previous = parser_get_order_of_operation(operator_kind_previous);
-    Expression* right_operand = parser_expression(parser, operator_precedence_previous);
+    Expression* right_operand = parser_parse_expresion(parser, operator_precedence_previous);
 
     if (operator_kind_previous == Token_Plus)
     {
@@ -930,7 +913,7 @@ static bool parser_check_locals_duplicates(Parser* parser, Token* identifier) {
     return false;
 }
 
-static void parser_end(Parser* parser) {
+static void parser_end_parsing(Parser* parser) {
     bytecode_emit_instruction_1byte(OpCode_Return, parser->token_current.line_number);
 }
 
