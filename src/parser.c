@@ -27,7 +27,7 @@ static void parser_begin_scope(Parser* parser);
 static void parser_end_scope(Parser* parser);
 
 // TODO: Delete 
-static Expression* parser_binary(Parser* parser, Expression* left_operand);
+static Expression* parser_parse_binary(Parser* parser, Expression* left_operand);
 static uint8_t parser_store_identifier_into_bytecode(Parser* parser, const char* start, int length);
 
 //
@@ -138,20 +138,21 @@ static void parser_synchronize(Parser* parser)
 
 static void parser_error(Parser* parser, Token* token, const char* message)
 {
-    if (parser->panic_mode)
-        return;
+    if (parser->panic_mode) return;
+
+    FILE* error_output = stdout;
 
     parser->panic_mode = true;
     parser->had_error = true;
 
-    fprintf(stderr, "[line %d] Error", token->line_number);
+    fprintf(error_output, "[line %d] Error", token->line_number);
     if (token->kind == Token_Eof) {
-        fprintf(stderr, " at end");
+        fprintf(error_output, " at end");
     } else if (token->kind == Token_Error) {
-        fprintf(stderr, " at %.*s\n", token->length, token->start);
+        fprintf(error_output, " at %.*s\n", token->length, token->start);
     } else {
-        fprintf(stderr, " at '%.*s'", token->length, token->start);
-        fprintf(stderr, " : '%s'\n", message);
+        fprintf(error_output, " at '%.*s'", token->length, token->start);
+        fprintf(error_output, " : '%s'\n", message);
     }
 }
 
@@ -175,7 +176,7 @@ static Statement parser_parse_statement(Parser* parser)
         statement = parser_parse_instruction_if(parser);
     } else if (parser_match_then_advance(parser, Token_Left_Brace)) {
         parser_begin_scope(parser);
-        parser_parse_instruction_block(parser);
+        statement = parser_parse_instruction_block(parser);
         parser_end_scope(parser);
     } else {
         statement = parser_parse_statement_expression(parser);
@@ -252,6 +253,7 @@ static Statement parser_parse_instruction_if(Parser* parser) {
     bytecode_emit_instruction_1byte(OpCode_Pop, parser->token_previous.line_number);
 
     // Compile then-block statements 
+    // statement._if.then_block =
     //
     parser_parse_statement(parser);
 
@@ -310,12 +312,15 @@ static Statement parser_parse_variable_declaration(Parser* parser) {
             -1 // Mark Local as Uninitialized 
         );
 
+        statement.variable_declaration.identifier = ObjectString_AllocateIfNotInterned(parser->token_previous.start, parser->token_previous.length);
+
         // Check for assignment
         // 
         if (parser_match_then_advance(parser, Token_Equal)) {
-            parser_parse_expresion(parser, Operation_Assignment);
+            statement.variable_declaration.rhs = parser_parse_expresion(parser, Operation_Assignment);
         } else {
             bytecode_emit_instruction_1byte(OpCode_Nil, parser->token_previous.line_number);
+            statement.variable_declaration.rhs = expression_allocate(expression_make_nil());
         }
 
         parser_consume(parser, Token_Semicolon, "Expected ';' after expression.");
@@ -329,7 +334,6 @@ static Statement parser_parse_variable_declaration(Parser* parser) {
     }
 
         // Global Scope Only
-        // TODO: clean this line: global_index = parser_store_identifier_into_bytecode(parser, parser->token_previous.start, parser->token_previous.length);
         //
     statement.variable_declaration.identifier = ObjectString_AllocateIfNotInterned(parser->token_previous.start, parser->token_previous.length);
     Value value_string = value_make_object_string(statement.variable_declaration.identifier);
@@ -433,7 +437,7 @@ static Expression* parser_parse_expresion(Parser* parser, OrderOfOperation opera
         }
 
         operator_precedence_current = parser_get_order_of_operation(parser->token_current.kind);
-        // TODO: clean this line: expression = parser_binary(parser, expression);
+        // TODO: clean this line: expression = parser_parse_binary(parser, expression);
     }
 
     if (can_assign && parser_match_then_advance(parser, Token_Equal)) {
@@ -569,8 +573,8 @@ static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bo
         uint8_t opcode_assign = OpCode_Invalid;
         uint8_t opcode_read = OpCode_Invalid;
         Local* local_found = NULL;
-        ObjectString* variable_name = NULL;
         int operand = StackLocal_get_local_index_by_token(&parser->scope_current->locals, &parser->token_previous, &local_found);
+        ObjectString* variable_name = ObjectString_AllocateIfNotInterned(parser->token_previous.start, parser->token_previous.length);
 
         if (operand != -1) {
             opcode_assign = OpCode_Assign_Local;
@@ -579,9 +583,7 @@ static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bo
             // Default
             opcode_assign = OpCode_Assign_Global;
             opcode_read = OpCode_Read_Global;
-            // operand = parser_store_identifier_into_bytecode(parser, parser->token_previous.start, parser->token_previous.length);
 
-            variable_name = ObjectString_AllocateIfNotInterned(parser->token_previous.start, parser->token_previous.length);
             Value value_string = value_make_object_string(variable_name);
 
             int value_index = bytecode_emit_value(value_string);
@@ -648,18 +650,37 @@ static bool parser_is_operator_relational(Parser* parser) {
 static Expression* parser_parse_operators_logical(Parser* parser, Expression* left_operand) {
     TokenKind operator_kind_previous = parser->token_previous.kind;
 
-    if (operator_kind_previous == Token_E) {
+    switch (parser->token_previous.kind)
+    {
+    default: {
+        assert(false && "Error: Unhandled Logical Operator.");
+        return NULL;
+    } break;
+    case Token_E: {
         int operand_index = bytecode_emit_instruction_jump(OpCode_Jump_If_False, parser->token_previous.line_number);
         bytecode_emit_instruction_1byte(OpCode_Pop, parser->token_previous.line_number);
 
-        Expression* expression = parser_parse_expresion(parser, Operation_And);
+        Expression* rigth_operand = parser_parse_expresion(parser, Operation_And);
 
         Bytecode_PatchInstructionJump(operand_index);
-        return NULL;
+
+        Expression expression_and = expression_make_and(left_operand, rigth_operand);
+        return expression_allocate(expression_and);
+    } break;
     }
 
-    assert(false && "Error: Unhandled Logical Operator.");
-    return NULL;
+    // if (operator_kind_previous == Token_E) {
+    //     int operand_index = bytecode_emit_instruction_jump(OpCode_Jump_If_False, parser->token_previous.line_number);
+    //     bytecode_emit_instruction_1byte(OpCode_Pop, parser->token_previous.line_number);
+
+    //     Expression* expression = parser_parse_expresion(parser, Operation_And);
+
+    //     Bytecode_PatchInstructionJump(operand_index);
+    //     return NULL;
+    // }
+
+    // assert(false && "Error: Unhandled Logical Operator.");
+    // return NULL;
 }
 
 static Expression* parser_parse_operators_arithmetic(Parser* parser, Expression* left_operand) {
@@ -758,7 +779,7 @@ static Expression* parser_parse_operators_relational(Parser* parser, Expression*
     return NULL;
 }
 
-static Expression* parser_binary(Parser* parser, Expression* left_operand) {
+static Expression* parser_parse_binary(Parser* parser, Expression* left_operand) {
     TokenKind operator_kind_previous = parser->token_previous.kind;
 
     // 

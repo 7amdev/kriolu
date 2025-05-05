@@ -1,11 +1,10 @@
- 1 <string>  '""' 
- 2 <string>  '"2"' 
- 2 <string>  '"Hello World."' 
- 6 <string>  '"some random 
+1 <string>                 '"2"' 
+1 <string>                 '"Hello World."' 
+4 <string>                 '"some random 
 string with break line and 
 numbers 1234"' 
- 7 <string>  '"      "' 
- 8 <string>      '"Hello "' 
- 8 <identifier>  'World' 
- 8 <string>      '""' 
- 8 <string>      '"!"' 
+5 <string>                 '"      "' 
+6 <string>                 '"Hello "' 
+6 <identifier>             'World' 
+6 <string>                 '""' 
+6 <string>                 '"!"' 

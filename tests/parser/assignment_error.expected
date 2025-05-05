@@ -1,6 +1,12 @@
+[line 1] Error at '2' : 'Invalid assignment target.'
+[line 2] Error at '5' : 'Invalid assignment target.'
+[line 4] Error at 'b' : 'Can't read local variable in its own initializer.'
 <expression statement>
   1.0
 <expression statement>
   <Assignment>
     x
     ((1.0 * 2.0) + (get a))
+<mimoria>
+  b
+  ((get b) - 1.0)

@@ -54,7 +54,7 @@ assert_parser() {
         else
             echo -e "\e[31mFAILED: ${file_test_path}\e[0m"
             echo "$diff_output"
-            echo "Expected: ${file_ref_contents}, but got ${parser_output}"
+            # echo "Expected: ${file_ref_contents}, but got ${parser_output}"
         fi
     done
 
@@ -64,5 +64,5 @@ assert_parser() {
     echo "Passed $test_pass/$total tests"
 }
 
-# assert_lexer
+assert_lexer
 assert_parser

@@ -1,3 +1,1 @@
-mimoria x;
-x = 2 + 2 * 10 - 2;
-imprimi x; 
+verdadi e 1 e falsu e 3 e 4;

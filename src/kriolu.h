@@ -275,7 +275,6 @@ enum
     ExpressionKind_String,
     ExpressionKind_Nil,
     ExpressionKind_Negation,
-    ExpressionKind_Not,
     ExpressionKind_Grouping,
     ExpressionKind_Addition,
     ExpressionKind_Subtraction,
@@ -288,7 +287,10 @@ enum
     ExpressionKind_Less_Than,
     ExpressionKind_Less_Than_Or_Equal_To,
     ExpressionKind_Assignment,
-    ExpressionKind_Variable
+    ExpressionKind_Variable,
+    ExpressionKind_Not,
+    ExpressionKind_And,
+    ExpressionKind_Or
 };
 
 typedef struct Expression Expression;
@@ -326,6 +328,7 @@ struct Expression
 #define expression_make_less_than_or_equal_to(left_operand, right_operand) ((Expression){.kind = ExpressionKind_Less_Than_Or_Equal_To, .as = {.binary = {.left = (left_operand), .right = (right_operand)}}})
 #define expression_make_variable(variable_name) ((Expression) {.kind = ExpressionKind_Variable, .as = {.variable = (variable_name)}})
 #define expression_make_assignment(variable_name, expression) ((Expression) {.kind = ExpressionKind_Assignment, .as = { .assignment = { .lhs = (variable_name), .rhs = (expression) } }})
+#define expression_make_and(left_operand, right_operand) ((Expression) {.kind = ExpressionKind_And, .as = { .binary = { .left = (left_operand), .right = (right_operand) }}})
 
 #define expression_as_number(expression) ((expression).as.number)
 #define expression_as_boolean(expression) ((expression).as.boolean)
@@ -346,6 +349,7 @@ struct Expression
 #define expression_as_less(expression) ((expression).as.binary)
 #define expression_as_variable(expression) ((expression).as.variable)
 #define expression_as_assignment(expression) ((expression).as.assignment)
+#define expression_as_and(expression) ((expression).as.binary)
 
 Expression* expression_allocate(Expression expr);
 void expression_print(Expression* expression, int indent);
@@ -376,11 +380,13 @@ struct Statement
         Expression* _returned;
         Statement* _block;
         struct { ObjectString* identifier; Expression* rhs; } variable_declaration;
+        struct { Expression* condition; Statement* then_block; Statement* else_block; } _if;
     };
 };
 
-#define statement_make_expression(expression) ((Statement) {.kind = StatementKind_Expression, .as = {.expression = (expression)}})
-#define statement_make_variable_declaration(name, expresion) ((Statement) {.kind = StatementKind_Variable_Declaration, .as = {.variable_declaration = {.name = name, .expression = (expression)}}})
+#define statement_make_expression(expression) ((Statement) {.kind = StatementKind_Expression, .expression = (expression)})
+#define statement_make_variable_declaration(name, expresion) ((Statement) {.kind = StatementKind_Variable_Declaration, .variable_declaration = {.name = name, .expression = (expression)}})
+#define statement_make_if(condition, then_block, else_block) ((Statement) {.kind = StatementKind_Si, ._if = {.condition = (condition), .then_block = (then_block), .else_block = (else_block)}})
 
 Statement* statement_allocate(Statement statement);
 void statement_print(Statement* statement, int indent);
