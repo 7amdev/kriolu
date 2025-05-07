@@ -1,0 +1,1 @@
+verdadi e 1 e "text";

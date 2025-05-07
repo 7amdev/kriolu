@@ -1,6 +1,6 @@
 #include "kriolu.h"
 
-char* statement_kind_text[StatementKind_Max] = {
+char* g_statement_kind_text[StatementKind_Max] = {
     [StatementKind_Invalid] = "Invalid Statement!",
     [StatementKind_Expression] = "Statment::Expression",
     [StatementKind_Variable_Declaration] = "Statement::Variable declaration",
@@ -26,7 +26,7 @@ void statement_print(Statement* statement, int indent) {
     switch (statement->kind)
     {
     default: {
-        printf("%s not supported\n", statement_kind_text[statement->kind]);
+        printf("%s not supported\n", g_statement_kind_text[statement->kind]);
     } break;
     case StatementKind_Expression: {
         printf("<expression statement>\n");

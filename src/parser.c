@@ -430,7 +430,10 @@ static Expression* parser_parse_expresion(Parser* parser, OrderOfOperation opera
     TokenKind operator_kind_current = parser->token_current.kind;
     OrderOfOperation operator_precedence_current = parser_get_order_of_operation(operator_kind_current);
 
-    while (operator_precedence_current >= operator_precedence_previous) {
+    // TODO
+    //      if left_associative  then while (operator_precedence_current > operator_precedence_previous) {...}
+    // else if right_associative then while (operator_precedence_current >= operator_precedence_previous) {...} 
+    while (operator_precedence_current > operator_precedence_previous) {
         parser_advance(parser);
 
         if (parser_is_operator_arithmetic(parser)) {
@@ -442,7 +445,6 @@ static Expression* parser_parse_expresion(Parser* parser, OrderOfOperation opera
         }
 
         operator_precedence_current = parser_get_order_of_operation(parser->token_current.kind);
-        // TODO: clean this line: expression = parser_parse_binary(parser, expression);
     }
 
     if (can_assign && parser_match_then_advance(parser, Token_Equal)) {
