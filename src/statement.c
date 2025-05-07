@@ -1,5 +1,16 @@
 #include "kriolu.h"
 
+char* statement_kind_text[StatementKind_Max] = {
+    [StatementKind_Invalid] = "Invalid Statement!",
+    [StatementKind_Expression] = "Statment::Expression",
+    [StatementKind_Variable_Declaration] = "Statement::Variable declaration",
+    [StatementKind_Print] = "Statment::Imprimi",
+    [StatementKind_Block] = "Statement::Block",
+    [StatementKind_Return] = "Statement::Divolvi",
+    [StatementKind_Si] = "Statement::Si",
+    [StatementKind_Di] = "Statement::Di",
+};
+
 Statement* statement_allocate(Statement value) {
     Statement* statement = (Statement*)calloc(1, sizeof(Statement));
     assert(statement);
@@ -15,19 +26,16 @@ void statement_print(Statement* statement, int indent) {
     switch (statement->kind)
     {
     default: {
-        // printf("%*s", padding_left, "");
         printf("%s not supported\n", statement_kind_text[statement->kind]);
     } break;
     case StatementKind_Expression: {
         printf("<expression statement>\n");
         printf("%*s", padding_left, "");
         expression_print(statement->expression, padding_left);
-        // printf("\n");
     } break;
     case StatementKind_Si: {
         printf("<statement si>\n");
         printf("<condition>\n");
-        printf("%*s", padding_left, "");
         printf("%*s", padding_left, "");
         expression_print(statement->_if.condition, padding_left);
         printf("\n<then>\n");

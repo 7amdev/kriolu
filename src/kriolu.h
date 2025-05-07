@@ -372,17 +372,6 @@ enum
     StatementKind_Max
 };
 
-char* statement_kind_text[StatementKind_Max] = {
-    [StatementKind_Invalid] = "Invalid Statement!",
-    [StatementKind_Expression] = "Statment::Expression",
-    [StatementKind_Variable_Declaration] = "Statement::Variable declaration",
-    [StatementKind_Print] = "Statment::Imprimi",
-    [StatementKind_Block] = "Statement::Block",
-    [StatementKind_Return] = "Statement::Divolvi",
-    [StatementKind_Si] = "Statement::Si",
-    [StatementKind_Di] = "Statement::Di",
-};
-
 typedef struct Statement Statement;
 struct Statement
 {
