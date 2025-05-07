@@ -14,6 +14,10 @@ void statement_print(Statement* statement, int indent) {
     int padding_left = indent + offset;
     switch (statement->kind)
     {
+    default: {
+        // printf("%*s", padding_left, "");
+        printf("%s not supported\n", statement_kind_text[statement->kind]);
+    } break;
     case StatementKind_Expression: {
         printf("<expression statement>\n");
         printf("%*s", padding_left, "");
@@ -22,13 +26,32 @@ void statement_print(Statement* statement, int indent) {
     } break;
     case StatementKind_Si: {
         printf("<statement si>\n");
-        printf("    TBD\n");
+        printf("<condition>\n");
+        printf("%*s", padding_left, "");
+        printf("%*s", padding_left, "");
+        expression_print(statement->_if.condition, padding_left);
+        printf("\n<then>\n");
+        printf("%*s", padding_left, "");
+        statement_print(statement->_if.then_block, padding_left);
+        printf("\n<else>\n");
+        printf("%*s", padding_left, "");
+        statement_print(statement->_if.else_block, padding_left);
+    } break;
+    case StatementKind_Block: {
+        printf("<block>\n");
+        printf("%*s", padding_left, "");
+        statement_print(statement->_block, padding_left);
     } break;
     case StatementKind_Variable_Declaration: {
         printf("<mimoria>\n");
         printf("%*s%s\n", padding_left, "", statement->variable_declaration.identifier->characters);
         printf("%*s", padding_left, "");
         expression_print(statement->variable_declaration.rhs, 0);
+    } break;
+    case StatementKind_Print: {
+        printf("<imprimi>\n");
+        printf("%*s", padding_left, "");
+        expression_print(statement->print, padding_left);
     } break;
     }
 }

@@ -7,6 +7,7 @@
   <Assignment>
     x
     ((1.0 * 2.0) + (get a))
-<mimoria>
-  b
-  ((get b) - 1.0)
+<block>
+  <mimoria>
+    b
+    ((get b) - 1.0)

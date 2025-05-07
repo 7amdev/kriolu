@@ -1,0 +1,11 @@
+<statement si>
+<condition>
+    verdadi
+<then>
+  <block>
+    <imprimi>
+      'verdadi!'
+<else>
+  <block>
+    <imprimi>
+      'falsu!'
