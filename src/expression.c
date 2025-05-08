@@ -217,10 +217,15 @@ void expression_print(Expression* expression, int indent) {
         break;
     }
     case ExpressionKind_Assignment: {
-        printf("<Assignment>\n");
-        printf("%*s%s\n", indent + 2, "", expression->as.assignment.lhs->characters);
-        printf("%*s", indent + 2, "");
-        expression_print(expression->as.assignment.rhs, indent + 2);
+        // printf("<Assignment>\n");
+        // printf("%*s%s\n", indent + 2, "", expression->as.assignment.lhs->characters);
+        // printf("%*s", indent + 2, "");
+        // expression_print(expression->as.assignment.rhs, indent + 2);
+        printf("(");
+        printf("%s", expression->as.assignment.lhs->characters);
+        printf(" = ");
+        expression_print(expression->as.assignment.rhs, 0);
+        printf(")");
         break;
     }
     case ExpressionKind_Variable: {

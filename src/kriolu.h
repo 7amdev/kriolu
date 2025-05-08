@@ -445,22 +445,28 @@ void scope_init(Scope* scope);
 
 typedef enum
 {
-    Operation_Min,
+    OperatorPrecedence_Invalid,
 
-    Operation_Assignment,                  // =
-    Operation_Or,                          // or
-    Operation_And,                         // and
-    Operation_Equality,                    // == =/=
-    Operation_Comparison,                  // < > <= >=
-    Operation_Addition_And_Subtraction,    // + -
-    Operation_Multiplication_And_Division, // * /
-    Operation_Negate,                      // Unary:  -
-    Operation_Exponentiation,              // ^   ex: -2^2 = -1 * 2^2 = -4
-    Operation_Not,                         // Unary: ka
-    Operation_Grouping_Call_And_Get,       // . (
+    OperatorPrecedence_Assignment,                  // =
+    OperatorPrecedence_Or,                          // or
+    OperatorPrecedence_And,                         // and
+    OperatorPrecedence_Equality,                    // == =/=
+    OperatorPrecedence_Comparison,                  // < > <= >=
+    OperatorPrecedence_Addition_And_Subtraction,    // + -
+    OperatorPrecedence_Multiplication_And_Division, // * /
+    OperatorPrecedence_Negate,                      // Unary:  -
+    OperatorPrecedence_Exponentiation,              // ^   ex: -2^2 = -1 * 2^2 = -4
+    OperatorPrecedence_Not,                         // Unary: ka
+    OperatorPrecedence_Grouping_Call_And_Get,       // . (
 
-    Operation_Max
-} OrderOfOperation;
+    OperatorPrecedence_Max
+} OperatorPrecedence;
+
+typedef struct {
+    OperatorPrecedence precedence;
+    bool is_left_associative;
+    bool is_right_associative;
+} OperatorMetadata;
 
 typedef struct
 {

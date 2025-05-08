@@ -13,7 +13,7 @@ static Statement* parser_parse_instruction_print(Parser* parser);
 static Statement* parser_parse_instruction_block(Parser* parser);
 static Statement* parser_parse_instruction_if(Parser* parser);
 static Statement* parser_parse_variable_declaration(Parser* parser);
-static Expression* parser_parse_expresion(Parser* parser, OrderOfOperation operator_precedence_previous);
+static Expression* parser_parse_expression(Parser* parser, OperatorPrecedence operator_precedence_previous);
 static Expression* parser_parse_unary_literals_and_identifier(parser);
 static Expression* parser_parse_operators_logical(Parser* parser, Expression* left_operand);
 static Expression* parser_parse_operators_arithmetic(Parser* parser, Expression* left_operand);
@@ -191,7 +191,7 @@ static Statement* parser_parse_statement(Parser* parser)
 
 static Statement* parser_parse_statement_expression(Parser* parser)
 {
-    Expression* expression = parser_parse_expresion(parser, Operation_Assignment);
+    Expression* expression = parser_parse_expression(parser, OperatorPrecedence_Assignment);
     parser_consume(parser, Token_Semicolon, "Expect ';' after expression.");
     bytecode_emit_instruction_1byte(OpCode_Pop, parser->token_previous.line_number);
 
@@ -206,7 +206,7 @@ static Statement* parser_parse_statement_expression(Parser* parser)
 static Statement* parser_parse_instruction_print(Parser* parser) {
     Statement statement = { 0 };
 
-    Expression* expression = parser_parse_expresion(parser, Operation_Assignment);
+    Expression* expression = parser_parse_expression(parser, OperatorPrecedence_Assignment);
     parser_consume(parser, Token_Semicolon, "Expect ';' after expression.");
     bytecode_emit_instruction_1byte(OpCode_Print, parser->token_previous.line_number);
 
@@ -240,7 +240,7 @@ static Statement* parser_parse_instruction_if(Parser* parser) {
     statement.kind = StatementKind_Si;
 
     parser_consume(parser, Token_Left_Parenthesis, "Expect '(' after 'if'.");
-    statement._if.condition = parser_parse_expresion(parser, Operation_Assignment); // Will leave a Boolean value on top of the Stack
+    statement._if.condition = parser_parse_expression(parser, OperatorPrecedence_Assignment); // Will leave a Boolean value on top of the Stack
     parser_consume(parser, Token_Right_Parenthesis, "Expect ')' after condition.");
 
     // If the 'if-condition' is false, jump to the begining of 'else-block'.
@@ -322,7 +322,7 @@ static Statement* parser_parse_variable_declaration(Parser* parser) {
         // Check for assignment
         // 
         if (parser_match_then_advance(parser, Token_Equal)) {
-            statement.variable_declaration.rhs = parser_parse_expresion(parser, Operation_Assignment);
+            statement.variable_declaration.rhs = parser_parse_expression(parser, OperatorPrecedence_Assignment);
         } else {
             bytecode_emit_instruction_1byte(OpCode_Nil, parser->token_previous.line_number);
             statement.variable_declaration.rhs = expression_allocate(expression_make_nil());
@@ -354,7 +354,7 @@ static Statement* parser_parse_variable_declaration(Parser* parser) {
     // Check for assignment
     // 
     if (parser_match_then_advance(parser, Token_Equal)) {
-        statement.variable_declaration.rhs = parser_parse_expresion(parser, Operation_Assignment);
+        statement.variable_declaration.rhs = parser_parse_expression(parser, OperatorPrecedence_Assignment);
     } else {
         bytecode_emit_instruction_1byte(OpCode_Nil, parser->token_previous.line_number);
         statement.variable_declaration.rhs = expression_allocate(expression_make_nil());
@@ -386,54 +386,109 @@ static uint8_t parser_store_identifier_into_bytecode(Parser* parser, const char*
 }
 
 
-// static OrderOfOperation parser_get_order_of_operation_by_token(TokenKind kind);
-static OrderOfOperation parser_get_order_of_operation(TokenKind kind)
+static OperatorMetadata parser_get_operator_metadata(TokenKind kind)
 {
     switch (kind)
     {
-    default:
-        return 0;
-    case Token_Ou:
-        return Operation_Or;
-    case Token_E:
-        return Operation_And;
+    default: {
+        OperatorMetadata operator_metadata = { 0 };
+        operator_metadata.is_left_associative = true;
+        return operator_metadata;
+    }
+    case Token_Equal: {
+        OperatorMetadata operator_metadata = { 0 };
+        operator_metadata.precedence = OperatorPrecedence_Assignment;
+        operator_metadata.is_left_associative = false;
+        operator_metadata.is_right_associative = true;
+        return operator_metadata;
+    }
+    case Token_Ou: {
+        OperatorMetadata operator_metadata = { 0 };
+        operator_metadata.precedence = OperatorPrecedence_Or;
+        operator_metadata.is_left_associative = true;
+        operator_metadata.is_right_associative = false;
+        return operator_metadata;
+    }
+    case Token_E: {
+        OperatorMetadata operator_metadata = { 0 };
+        operator_metadata.precedence = OperatorPrecedence_And;
+        operator_metadata.is_left_associative = true;
+        operator_metadata.is_right_associative = false;
+        return operator_metadata;
+    }
     case Token_Equal_Equal:
-    case Token_Not_Equal:
-        return Operation_Equality;
+    case Token_Not_Equal: {
+        OperatorMetadata operator_metadata = { 0 };
+        operator_metadata.precedence = OperatorPrecedence_Equality;
+        operator_metadata.is_left_associative = true;
+        operator_metadata.is_right_associative = false;
+        return operator_metadata;
+    }
     case Token_Greater:
     case Token_Less:
     case Token_Greater_Equal:
-    case Token_Less_Equal:
-        return Operation_Comparison;
+    case Token_Less_Equal: {
+        OperatorMetadata operator_metadata = { 0 };
+        operator_metadata.precedence = OperatorPrecedence_Comparison;
+        operator_metadata.is_left_associative = true;
+        operator_metadata.is_right_associative = false;
+        return operator_metadata;
+    }
     case Token_Plus:
-    case Token_Minus:
-        return Operation_Addition_And_Subtraction;
+    case Token_Minus: {
+        OperatorMetadata operator_metadata = { 0 };
+        operator_metadata.precedence = OperatorPrecedence_Addition_And_Subtraction;
+        operator_metadata.is_left_associative = true;
+        operator_metadata.is_right_associative = false;
+        return operator_metadata;
+    }
     case Token_Asterisk:
-    case Token_Slash:
-        return Operation_Multiplication_And_Division;
-    case Token_Caret:
-        return Operation_Exponentiation;
-    case Token_Ka:
-        return Operation_Not;
+    case Token_Slash: {
+        OperatorMetadata operator_metadata = { 0 };
+        operator_metadata.precedence = OperatorPrecedence_Multiplication_And_Division;
+        operator_metadata.is_left_associative = true;
+        operator_metadata.is_right_associative = false;
+        return operator_metadata;
+    }
+    case Token_Caret: {
+        OperatorMetadata operator_metadata = { 0 };
+        operator_metadata.precedence = OperatorPrecedence_Exponentiation;
+        operator_metadata.is_left_associative = true;
+        operator_metadata.is_right_associative = false;
+        return operator_metadata;
+    }
+    case Token_Ka: {
+        OperatorMetadata operator_metadata = { 0 };
+        operator_metadata.precedence = OperatorPrecedence_Not;
+        operator_metadata.is_left_associative = true;
+        operator_metadata.is_right_associative = false;
+        return operator_metadata;
+    }
     case Token_Dot:
-    case Token_Left_Parenthesis:
-        return Operation_Grouping_Call_And_Get;
+    case Token_Left_Parenthesis: {
+        OperatorMetadata operator_metadata = { 0 };
+        operator_metadata.precedence = OperatorPrecedence_Grouping_Call_And_Get;
+        operator_metadata.is_left_associative = true;
+        operator_metadata.is_right_associative = false;
+        return operator_metadata;
+    }
     }
 }
 
-static Expression* parser_parse_expresion(Parser* parser, OrderOfOperation operator_precedence_previous) {
+static Expression* parser_parse_expression(Parser* parser, OperatorPrecedence operator_precedence_previous) {
     parser_advance(parser);
 
-    bool can_assign = (operator_precedence_previous <= Operation_Assignment);
+    bool can_assign = (operator_precedence_previous <= OperatorPrecedence_Assignment);
     Expression* expression = parser_parse_unary_literals_and_identifier(parser, can_assign);
 
     TokenKind operator_kind_current = parser->token_current.kind;
-    OrderOfOperation operator_precedence_current = parser_get_order_of_operation(operator_kind_current);
+    OperatorMetadata operator_current = parser_get_operator_metadata(operator_kind_current);
 
-    // TODO
-    //      if left_associative  then while (operator_precedence_current > operator_precedence_previous) {...}
-    // else if right_associative then while (operator_precedence_current >= operator_precedence_previous) {...} 
-    while (operator_precedence_current > operator_precedence_previous) {
+    for (;;) {
+        if (operator_current.is_left_associative && operator_current.precedence <= operator_precedence_previous) break;
+        if (operator_current.is_right_associative && operator_current.precedence < operator_precedence_previous) break;
+        if (parser->token_current.kind == Token_Equal) break;
+
         parser_advance(parser);
 
         if (parser_is_operator_arithmetic(parser)) {
@@ -444,7 +499,7 @@ static Expression* parser_parse_expresion(Parser* parser, OrderOfOperation opera
             expression = parser_parse_operators_relational(parser, expression);
         }
 
-        operator_precedence_current = parser_get_order_of_operation(parser->token_current.kind);
+        operator_current = parser_get_operator_metadata(parser->token_current.kind);
     }
 
     if (can_assign && parser_match_then_advance(parser, Token_Equal)) {
@@ -523,7 +578,7 @@ static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bo
             if (parser->token_current.kind != Token_String_Interpolation)
                 parser->interpolation_count_value_pushed += 1;
 
-            parser_parse_expresion(parser, Operation_Assignment);
+            parser_parse_expression(parser, OperatorPrecedence_Assignment);
             parser->interpolation_count_nesting -= 1;
 
             parser_advance(parser);
@@ -551,7 +606,7 @@ static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bo
     // Unary
     //
     if (parser->token_previous.kind == Token_Minus) {
-        Expression* expression = parser_parse_expresion(parser, Operation_Negate);
+        Expression* expression = parser_parse_expression(parser, OperatorPrecedence_Negate);
         Expression negation = expression_make_negation(expression);
 
         bytecode_emit_instruction_1byte(OpCode_Negation, parser->token_previous.line_number);
@@ -559,7 +614,7 @@ static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bo
     }
 
     if (parser->token_previous.kind == Token_Ka) {
-        Expression* expression = parser_parse_expresion(parser, Operation_Not);
+        Expression* expression = parser_parse_expression(parser, OperatorPrecedence_Not);
         Expression not = expression_make_not(expression);
 
         bytecode_emit_instruction_1byte(OpCode_Not, parser->token_previous.line_number);
@@ -567,7 +622,7 @@ static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bo
     }
 
     if (parser->token_previous.kind == Token_Left_Parenthesis) {
-        Expression* expression = parser_parse_expresion(parser, Operation_Assignment);
+        Expression* expression = parser_parse_expression(parser, OperatorPrecedence_Assignment);
         Expression grouping = expression_make_grouping(expression);
 
         parser_consume(parser, Token_Right_Parenthesis, "Expected ')' after expression.");
@@ -610,7 +665,7 @@ static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bo
         // Assignment / Variable Initialization 
         //
         if (can_assign && parser_match_then_advance(parser, Token_Equal)) {
-            Expression* right_hand_side = parser_parse_expresion(parser, Operation_Assignment);
+            Expression* right_hand_side = parser_parse_expression(parser, OperatorPrecedence_Assignment);
             Expression expression = expression_make_assignment(variable_name, right_hand_side);
             bytecode_emit_instruction_2bytes(opcode_assign, operand, parser->token_previous.line_number);
 
@@ -667,7 +722,7 @@ static Expression* parser_parse_operators_logical(Parser* parser, Expression* le
         int operand_index = bytecode_emit_instruction_jump(OpCode_Jump_If_False, parser->token_previous.line_number);
         bytecode_emit_instruction_1byte(OpCode_Pop, parser->token_previous.line_number);
 
-        Expression* rigth_operand = parser_parse_expresion(parser, Operation_And);
+        Expression* rigth_operand = parser_parse_expression(parser, OperatorPrecedence_And);
 
         Bytecode_PatchInstructionJump(operand_index);
 
@@ -680,7 +735,7 @@ static Expression* parser_parse_operators_logical(Parser* parser, Expression* le
     //     int operand_index = bytecode_emit_instruction_jump(OpCode_Jump_If_False, parser->token_previous.line_number);
     //     bytecode_emit_instruction_1byte(OpCode_Pop, parser->token_previous.line_number);
 
-    //     Expression* expression = parser_parse_expresion(parser, Operation_And);
+    //     Expression* expression = parser_parse_expression(parser, OperatorPrecedence_And);
 
     //     Bytecode_PatchInstructionJump(operand_index);
     //     return NULL;
@@ -692,8 +747,8 @@ static Expression* parser_parse_operators_logical(Parser* parser, Expression* le
 
 static Expression* parser_parse_operators_arithmetic(Parser* parser, Expression* left_operand) {
     TokenKind operator_kind_previous = parser->token_previous.kind;
-    OrderOfOperation operator_precedence_previous = parser_get_order_of_operation(operator_kind_previous);
-    Expression* right_operand = parser_parse_expresion(parser, operator_precedence_previous);
+    OperatorMetadata operator_previous = parser_get_operator_metadata(operator_kind_previous);
+    Expression* right_operand = parser_parse_expression(parser, operator_previous.precedence);
 
     switch (operator_kind_previous)
     {
@@ -730,8 +785,8 @@ static Expression* parser_parse_operators_arithmetic(Parser* parser, Expression*
 
 static Expression* parser_parse_operators_relational(Parser* parser, Expression* left_operand) {
     TokenKind operator_kind_previous = parser->token_previous.kind;
-    OrderOfOperation operator_precedence_previous = parser_get_order_of_operation(operator_kind_previous);
-    Expression* right_operand = parser_parse_expresion(parser, operator_precedence_previous);
+    OperatorMetadata operator_previous = parser_get_operator_metadata(operator_kind_previous);
+    Expression* right_operand = parser_parse_expression(parser, operator_previous.precedence);
 
     switch (operator_kind_previous)
     {
@@ -798,7 +853,7 @@ static Expression* parser_parse_binary(Parser* parser, Expression* left_operand)
         int operand_index = bytecode_emit_instruction_jump(OpCode_Jump_If_False, parser->token_previous.line_number);
         bytecode_emit_instruction_1byte(OpCode_Pop, parser->token_previous.line_number);
 
-        Expression* expression = parser_parse_expresion(parser, Operation_And);
+        Expression* expression = parser_parse_expression(parser, OperatorPrecedence_And);
 
         Bytecode_PatchInstructionJump(operand_index);
 
@@ -810,8 +865,8 @@ static Expression* parser_parse_binary(Parser* parser, Expression* left_operand)
     //     plus, minus, multiplications, division, exponentiation, and logarithm
     //
 
-    OrderOfOperation operator_precedence_previous = parser_get_order_of_operation(operator_kind_previous);
-    Expression* right_operand = parser_parse_expresion(parser, operator_precedence_previous);
+    OperatorMetadata operator_previous = parser_get_operator_metadata(operator_kind_previous);
+    Expression* right_operand = parser_parse_expression(parser, operator_previous.precedence);
 
     if (operator_kind_previous == Token_Plus)
     {
