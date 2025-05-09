@@ -167,6 +167,18 @@ void expression_print(Expression* expression, int indent) {
         printf(")");
         break;
     }
+    case ExpressionKind_Or:
+    {
+        Expression* left_operand = expression_as_and(*expression).left;
+        Expression* right_operand = expression_as_and(*expression).right;
+
+        printf("(");
+        expression_print(left_operand, 0);
+        printf(" ou ");
+        expression_print(right_operand, 0);
+        printf(")");
+        break;
+    }
     case ExpressionKind_Grouping:
     {
         Expression* expr = expression_as_negation(*expression).operand;

@@ -1,0 +1,5 @@
+<mimoria>
+  a
+  (falsu ou (1.0 ou 2.0))
+<imprimi>
+  (get a)

@@ -329,6 +329,7 @@ struct Expression
 #define expression_make_variable(variable_name) ((Expression) {.kind = ExpressionKind_Variable, .as = {.variable = (variable_name)}})
 #define expression_make_assignment(variable_name, expression) ((Expression) {.kind = ExpressionKind_Assignment, .as = { .assignment = { .lhs = (variable_name), .rhs = (expression) } }})
 #define expression_make_and(left_operand, right_operand) ((Expression) {.kind = ExpressionKind_And, .as = { .binary = { .left = (left_operand), .right = (right_operand) }}})
+#define expression_make_or(left_operand, right_operand) ((Expression) {.kind = ExpressionKind_Or, .as = { .binary = { .left = (left_operand), .right = (right_operand) }}})
 
 #define expression_as_number(expression) ((expression).as.number)
 #define expression_as_boolean(expression) ((expression).as.boolean)
@@ -350,6 +351,7 @@ struct Expression
 #define expression_as_variable(expression) ((expression).as.variable)
 #define expression_as_assignment(expression) ((expression).as.assignment)
 #define expression_as_and(expression) ((expression).as.binary)
+#define expression_as_or(expression) ((expression).as.binary)
 
 Expression* expression_allocate(Expression expr);
 void expression_print(Expression* expression, int indent);

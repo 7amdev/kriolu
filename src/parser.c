@@ -403,17 +403,29 @@ static OperatorMetadata parser_get_operator_metadata(TokenKind kind)
         return operator_metadata;
     }
     case Token_Ou: {
+        // NOTE: Since its a bytecode interpreter, we use right-associativity when parsing 
+        //       and emitting instructions to make jumps-instructions efficient, beacuse 
+        //       we now the end of the statement while preserving left-associativity when 
+        //       interpreting the code. 
+        //       Otherwise if we were to use a AST interpreter, we would use left-associativity 
+        //       when parsing to ensure that the interpretation will occour from left-to-right;
         OperatorMetadata operator_metadata = { 0 };
         operator_metadata.precedence = OperatorPrecedence_Or;
-        operator_metadata.is_left_associative = true;
-        operator_metadata.is_right_associative = false;
+        operator_metadata.is_left_associative = false;
+        operator_metadata.is_right_associative = true;
         return operator_metadata;
     }
     case Token_E: {
+        // NOTE: Since its a bytecode interpreter, we use right-associativity when parsing 
+        //       and emitting instructions to make jumps-instructions efficient, beacuse 
+        //       we now the end of the statement while preserving left-associativity when 
+        //       interpreting the code. 
+        //       Otherwise if we were to use a AST interpreter, we would use left-associativity 
+        //       when parsing to ensure that the interpretation will occour from left-to-right;
         OperatorMetadata operator_metadata = { 0 };
         operator_metadata.precedence = OperatorPrecedence_And;
-        operator_metadata.is_left_associative = true;
-        operator_metadata.is_right_associative = false;
+        operator_metadata.is_left_associative = false;
+        operator_metadata.is_right_associative = true;
         return operator_metadata;
     }
     case Token_Equal_Equal:
@@ -729,20 +741,21 @@ static Expression* parser_parse_operators_logical(Parser* parser, Expression* le
         Expression expression_and = expression_make_and(left_operand, rigth_operand);
         return expression_allocate(expression_and);
     } break;
+    case Token_Ou: {
+        int jump_if_false_operand_index = bytecode_emit_instruction_jump(OpCode_Jump_If_False, parser->token_previous.line_number);
+        int jump_operand_index = bytecode_emit_instruction_jump(OpCode_Jump, parser->token_previous.line_number);
+
+        Bytecode_PatchInstructionJump(jump_if_false_operand_index);
+        bytecode_emit_instruction_1byte(OpCode_Pop, parser->token_previous.line_number);
+
+        Expression* rigth_operand = parser_parse_expression(parser, OperatorPrecedence_Or);
+        Bytecode_PatchInstructionJump(jump_operand_index);
+
+        Expression expression_or = expression_make_or(left_operand, rigth_operand);
+        return expression_allocate(expression_or);
+    } break;
     }
 
-    // if (operator_kind_previous == Token_E) {
-    //     int operand_index = bytecode_emit_instruction_jump(OpCode_Jump_If_False, parser->token_previous.line_number);
-    //     bytecode_emit_instruction_1byte(OpCode_Pop, parser->token_previous.line_number);
-
-    //     Expression* expression = parser_parse_expression(parser, OperatorPrecedence_And);
-
-    //     Bytecode_PatchInstructionJump(operand_index);
-    //     return NULL;
-    // }
-
-    // assert(false && "Error: Unhandled Logical Operator.");
-    // return NULL;
 }
 
 static Expression* parser_parse_operators_arithmetic(Parser* parser, Expression* left_operand) {

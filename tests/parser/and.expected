@@ -1,2 +1,4 @@
 <expression statement>
-  ((verdadi e 1.0) e 'text')
+  (verdadi e (1.0 e 'text'))
+<expression statement>
+  (1.0 e (2.0 e (falsu e (3.0 e 4.0))))
