@@ -465,8 +465,8 @@ static OperatorMetadata parser_get_operator_metadata(TokenKind kind)
     case Token_Caret: {
         OperatorMetadata operator_metadata = { 0 };
         operator_metadata.precedence = OperatorPrecedence_Exponentiation;
-        operator_metadata.is_left_associative = true;
-        operator_metadata.is_right_associative = false;
+        operator_metadata.is_left_associative = false;
+        operator_metadata.is_right_associative = true;
         return operator_metadata;
     }
     case Token_Ka: {
