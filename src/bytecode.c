@@ -77,12 +77,26 @@ int bytecode_insert_instruction_constant(Bytecode* bytecode, Value value, int li
     );
 }
 
+// Jumps Forward
+//
 int bytecode_insert_instruction_jump(Bytecode* bytecode, OpCode opcode, int line) {
     bytecode_insert_instruction_1byte(bytecode, opcode, line);
     bytecode_insert_instruction_1byte(bytecode, 0xff, line);
     bytecode_insert_instruction_1byte(bytecode, 0xff, line);
 
     return bytecode->instructions.count - 2;
+}
+
+// Jumps Backwards
+//
+void bytecode_emit_instruction_loop(Bytecode* bytecode, int loop_start_index, int line_number) {
+    int offset = bytecode->instructions.count - loop_start_index - 2;
+    uint8_t operand_byte1 = ((offset >> 8) && 0xff);
+    uint8_t operand_byte2 = ((offset >> 0) && 0xff);
+
+    bytecode_insert_instruction_1byte(bytecode, OpCode_Loop, line_number);
+    bytecode_insert_instruction_1byte(bytecode, operand_byte1, line_number);
+    bytecode_insert_instruction_1byte(bytecode, operand_byte2, line_number);
 }
 
 bool bytecode_patch_instruction_jump(Bytecode* bytecode, int operand_index) {
@@ -128,6 +142,8 @@ static int bytecode_debug_instruction_local(Bytecode* bytecode, const char* opco
     return ret_offset_increment;
 }
 
+// TODO: rename to bytecode_debug_instruction_jump(bytecode, text, sign, offset);
+//
 static int bytecode_debug_instruction_3bytes(Bytecode* bytecode, const char* opcode_text, int ret_offset_increment) {
 
     uint8_t operand_byte1 = bytecode->instructions.items[ret_offset_increment - 2];
@@ -225,6 +241,8 @@ int bytecode_disassemble_instruction(Bytecode* bytecode, int offset)
         return bytecode_debug_instruction_3bytes(bytecode, "OPCODE_JUMP_IF_FALSE", (offset + 3));
     if (opcode == OpCode_Jump)
         return bytecode_debug_instruction_3bytes(bytecode, "OPCODE_JUMP", (offset + 3));
+    if (opcode == OpCode_Loop)
+        return bytecode_debug_instruction_3bytes(bytecode, "OPCODE_LOOP", (offset + 3));
     if (opcode == OpCode_Return)
         return bytecode_debug_instruction_byte("OPCODE_RETURN", (offset + 1));
 

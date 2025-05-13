@@ -9,6 +9,7 @@ char* g_statement_kind_text[StatementKind_Max] = {
     [StatementKind_Return] = "Statement::Divolvi",
     [StatementKind_Si] = "Statement::Si",
     [StatementKind_Di] = "Statement::Di",
+    [StatementKind_Timenti] = "Statement::Timenti",
 };
 
 Statement* statement_allocate(Statement value) {
@@ -48,7 +49,13 @@ void statement_print(Statement* statement, int indent) {
     case StatementKind_Block: {
         printf("<block>\n");
         printf("%*s", padding_left, "");
-        statement_print(statement->_block, padding_left);
+        for (int i = 0; i < statement->bloco->count; i++) {
+            statement_print(&statement->bloco->items[i], padding_left);
+            if ((i + 1) < statement->bloco->count) {
+                printf("\n");
+                printf("%*s", padding_left, "");
+            }
+        }
     } break;
     case StatementKind_Variable_Declaration: {
         printf("<mimoria>\n");
@@ -60,6 +67,17 @@ void statement_print(Statement* statement, int indent) {
         printf("<imprimi>\n");
         printf("%*s", padding_left, "");
         expression_print(statement->print, padding_left);
+    } break;
+    case StatementKind_Timenti: {
+        printf("<timenti>\n");
+        printf("%*s", padding_left, "");
+        printf("<condition>\n");
+        printf("%*s", padding_left, "");
+        printf("%*s", padding_left, "");
+        expression_print(statement->timenti.condition, padding_left);
+        printf("\n");
+        printf("%*s", padding_left, "");
+        statement_print(statement->timenti.body, padding_left);
     } break;
     }
 }

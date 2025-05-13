@@ -343,9 +343,16 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm, Bytecode* byteco
 
             break;
         }
-        case OpCode_Jump: {
+        case OpCode_Jump:
+        {
             uint16_t offset = READ_2BYTE();
             vm->ip += offset;
+            break;
+        }
+        case OpCode_Loop:
+        {
+            uint16_t offset = READ_2BYTE();
+            vm->ip -= offset;
             break;
         }
         case OpCode_Return:

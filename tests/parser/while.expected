@@ -1,0 +1,11 @@
+<mimoria>
+  a
+  1.0
+<timenti>
+  <condition>
+    ((get a) == 1.0)
+  <block>
+    <imprimi>
+      'hello'
+    <expression statement>
+      (a = 2.0)

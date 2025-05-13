@@ -12,9 +12,10 @@ static Statement* parser_parse_statement_expression(Parser* parser);
 static Statement* parser_parse_instruction_print(Parser* parser);
 static Statement* parser_parse_instruction_block(Parser* parser);
 static Statement* parser_parse_instruction_if(Parser* parser);
+static Statement* parser_instruction_while(Parser* parser);
 static Statement* parser_parse_variable_declaration(Parser* parser);
 static Expression* parser_parse_expression(Parser* parser, OperatorPrecedence operator_precedence_previous);
-static Expression* parser_parse_unary_literals_and_identifier(parser);
+static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bool can_assign);
 static Expression* parser_parse_operators_logical(Parser* parser, Expression* left_operand);
 static Expression* parser_parse_operators_arithmetic(Parser* parser, Expression* left_operand);
 static Expression* parser_parse_operators_relational(Parser* parser, Expression* left_operand);
@@ -162,7 +163,7 @@ static Statement* parser_parse_statement(Parser* parser)
     // DECLARATIONS: introduces new identifiers
     //   klassi, mimoria, funson
     // INSTRUCTIONS: tells the computer to perform an action
-    //   imprimi, di, si, divolvi, ripiti, block
+    //   imprimi, di, si, divolvi, timenti, block
     // EXPRESSIONS: a calculation that produces a result
     //   +, -, /, *, call '(', assignment '=', objectGet '.'
     //   variableGet, literals
@@ -179,6 +180,8 @@ static Statement* parser_parse_statement(Parser* parser)
         parser_begin_scope(parser);
         statement = parser_parse_instruction_block(parser);
         parser_end_scope(parser);
+    } else if (parser_match_then_advance(parser, Token_Timenti)) {
+        statement = parser_instruction_while(parser);
     } else {
         statement = parser_parse_statement_expression(parser);
     }
@@ -204,12 +207,12 @@ static Statement* parser_parse_statement_expression(Parser* parser)
 }
 
 static Statement* parser_parse_instruction_print(Parser* parser) {
-    Statement statement = { 0 };
 
     Expression* expression = parser_parse_expression(parser, OperatorPrecedence_Assignment);
     parser_consume(parser, Token_Semicolon, "Expect ';' after expression.");
     bytecode_emit_instruction_1byte(OpCode_Print, parser->token_previous.line_number);
 
+    Statement statement = { 0 };
     statement.kind = StatementKind_Print;
     statement.print = expression;
 
@@ -217,19 +220,23 @@ static Statement* parser_parse_instruction_print(Parser* parser) {
 }
 
 static Statement* parser_parse_instruction_block(Parser* parser) {
-    Statement statement = { 0 };
-    statement.kind = StatementKind_Block;
+    ArrayStatement* bloco = array_statement_allocate();
 
     for (;;) {
         TokenKind kind = parser->token_current.kind;
         if (kind == Token_Right_Brace) break;
         if (kind == Token_Eof)         break;
 
-        statement._block = parser_parse_statement(parser);
+        Statement* statement = parser_parse_statement(parser);
+        array_statement_insert(bloco, *statement);
+        // TODO: free statement
     }
 
     parser_consume(parser, Token_Right_Brace, "Expect '}' after block.");
 
+    Statement statement = { 0 };
+    statement.kind = StatementKind_Block;
+    statement.bloco = bloco;
     return statement_allocate(statement);
 }
 
@@ -285,6 +292,30 @@ static Statement* parser_parse_instruction_if(Parser* parser) {
 
     bool error = Bytecode_PatchInstructionJump(jump_operand_index);
     if (error) parser_error(parser, &parser->token_previous, "Too much code to jump over.");
+
+    return statement_allocate(statement);
+}
+
+static Statement* parser_instruction_while(Parser* parser) {
+    int loop_start = g_bytecode.instructions.count; // TODO: use a macro to access count variable
+
+    parser_consume(parser, Token_Left_Parenthesis, "Expect '(' after 'timenti'.");
+    Expression* condition = parser_parse_expression(parser, OperatorPrecedence_Assignment);
+    parser_consume(parser, Token_Right_Parenthesis, "Expect ')' after condition.");
+
+    int jump_if_false_operand_index = bytecode_emit_instruction_jump(OpCode_Jump_If_False, parser->token_previous.line_number);
+    bytecode_emit_instruction_1byte(OpCode_Pop, parser->token_previous.line_number);
+
+    Statement* body = parser_parse_statement(parser);
+
+    Bytecode_EmitLoop(loop_start, parser->token_previous.line_number);
+    Bytecode_PatchInstructionJump(jump_if_false_operand_index);
+    bytecode_emit_instruction_1byte(OpCode_Pop, parser->token_previous.line_number);
+
+    Statement statement = { 0 };
+    statement.kind = StatementKind_Timenti;
+    statement.timenti.condition = condition;
+    statement.timenti.body = body;
 
     return statement_allocate(statement);
 }

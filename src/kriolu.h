@@ -370,10 +370,12 @@ enum
     StatementKind_Return,
     StatementKind_Si,
     StatementKind_Di,
+    StatementKind_Timenti,
 
     StatementKind_Max
 };
 
+typedef struct ArrayStatement ArrayStatement;
 typedef struct Statement Statement;
 struct Statement
 {
@@ -381,11 +383,12 @@ struct Statement
     union
     {
         Expression* expression;
-        Expression* _return;
-        Expression* print;
-        Statement* _block;
+        Expression* _return; // TODO: rename to 'divovi'
+        Expression* print;   // TODO: rename to 'imprimi'
+        ArrayStatement* bloco;
         struct { ObjectString* identifier; Expression* rhs; } variable_declaration;
         struct { Expression* condition; Statement* then_block; Statement* else_block; } _if;
+        struct { Expression* condition; Statement* body; } timenti;
     };
 };
 
@@ -396,13 +399,12 @@ struct Statement
 Statement* statement_allocate(Statement statement);
 void statement_print(Statement* statement, int indent);
 
-typedef struct
+struct ArrayStatement
 {
     Statement* items;
     uint32_t count;
     uint32_t capacity;
-} ArrayStatement;
-
+};
 
 ArrayStatement* array_statement_allocate();
 uint32_t array_statement_insert(ArrayStatement* statements, Statement statement);
@@ -540,6 +542,7 @@ enum
     OpCode_Assign_Global, // x = 7;
     OpCode_Read_Local,   // print x;
     OpCode_Assign_Local,  // x = 7;
+    OpCode_Loop,
 
     OpCode_Return
 };
@@ -576,16 +579,17 @@ extern Bytecode g_bytecode;
 #define bytecode_emit_instruction_2bytes(opcode, operand, line) bytecode_insert_instruction_2bytes(&g_bytecode, opcode, operand, line)
 #define bytecode_emit_constant(value, line) bytecode_insert_instruction_constant(&g_bytecode, value, line)
 #define bytecode_emit_instruction_jump(opcode, line) bytecode_insert_instruction_jump(&g_bytecode, opcode, line)
-#define Bytecode_PatchInstructionJump(operand_index) bytecode_patch_instruction_jump(&g_bytecode, operand_index)
 #define bytecode_emit_value(value) array_value_insert(&g_bytecode.values, value)
+#define Bytecode_EmitLoop(start_index, line) bytecode_emit_instruction_loop(&g_bytecode, start_index, line);
+#define Bytecode_PatchInstructionJump(operand_index) bytecode_patch_instruction_jump(&g_bytecode, operand_index)
 
-// TODO: add function bytecode_jump(Bytecode b, int offset_amount);
-// TODO: add function bytecode_instruction_patch_2byte(Bytecode b, int offset, uint8_t byte1, uint8_t byte2);
 void bytecode_init(Bytecode* bytecode);
 int bytecode_insert_instruction_1byte(Bytecode* bytecode, OpCode opcode, int line_number);
 int bytecode_insert_instruction_2bytes(Bytecode* bytecode, OpCode opcode, uint8_t operand, int line_number);
 int bytecode_insert_instruction_constant(Bytecode* bytecode, Value value, int line_number);
+// TODO: rename to bytecode_emit_instruction_jump(...)
 int bytecode_insert_instruction_jump(Bytecode* bytecode, OpCode opcode, int line);
+void bytecode_emit_instruction_loop(Bytecode* bytecode, int loop_start_index, int line_number);
 bool bytecode_patch_instruction_jump(Bytecode* bytecode, int operand_index);
 void bytecode_disassemble(Bytecode* bytecode, const char* name);
 int bytecode_disassemble_instruction(Bytecode* bytecode, int offset);
