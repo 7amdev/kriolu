@@ -70,6 +70,7 @@ typedef enum
     Token_Keli,    // THIS
     Token_Mimoria, // VARIABLE
     Token_Timenti,
+    Token_Pa,
     Token_Ti,
 
     Token_Comment
@@ -389,6 +390,7 @@ struct Statement
         struct { ObjectString* identifier; Expression* rhs; } variable_declaration;
         struct { Expression* condition; Statement* then_block; Statement* else_block; } _if;
         struct { Expression* condition; Statement* body; } timenti;
+        struct { Statement* initializer; Expression* condition; Expression* increment; } di;
     };
 };
 
