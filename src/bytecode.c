@@ -90,9 +90,9 @@ int bytecode_insert_instruction_jump(Bytecode* bytecode, OpCode opcode, int line
 // Jumps Backwards
 //
 void bytecode_emit_instruction_loop(Bytecode* bytecode, int loop_start_index, int line_number) {
-    int offset = bytecode->instructions.count - loop_start_index - 2;
-    uint8_t operand_byte1 = ((offset >> 8) && 0xff);
-    uint8_t operand_byte2 = ((offset >> 0) && 0xff);
+    int offset = bytecode->instructions.count - loop_start_index + 2;
+    uint8_t operand_byte1 = ((offset >> 8) & 0xff);
+    uint8_t operand_byte2 = (offset & 0xff);
 
     bytecode_insert_instruction_1byte(bytecode, OpCode_Loop, line_number);
     bytecode_insert_instruction_1byte(bytecode, operand_byte1, line_number);
@@ -145,13 +145,23 @@ static int bytecode_debug_instruction_local(Bytecode* bytecode, const char* opco
 // TODO: rename to bytecode_debug_instruction_jump(bytecode, text, sign, offset);
 //
 static int bytecode_debug_instruction_3bytes(Bytecode* bytecode, const char* opcode_text, int ret_offset_increment) {
-
     uint8_t operand_byte1 = bytecode->instructions.items[ret_offset_increment - 2];
     uint8_t operand_byte2 = bytecode->instructions.items[ret_offset_increment - 1];
     uint16_t operand_value = (uint16_t)((operand_byte1 << 8) | operand_byte2);
 
     printf("%-22s %5d '", opcode_text, operand_value);
     printf("'\n");
+
+    return ret_offset_increment;
+}
+
+static int bytecode_debug_instruction_jump(Bytecode* bytecode, const char* text, int sign, int ret_offset_increment) {
+    uint8_t operand_byte1 = bytecode->instructions.items[ret_offset_increment - 2];
+    uint8_t operand_byte2 = bytecode->instructions.items[ret_offset_increment - 1];
+    uint16_t operand_value = (uint16_t)((operand_byte1 << 8) | operand_byte2);
+    int current_offset = ret_offset_increment - 3;
+
+    printf("%-22s %5d -> %d\n", text, current_offset, ret_offset_increment + operand_value * sign);
 
     return ret_offset_increment;
 }
@@ -238,11 +248,11 @@ int bytecode_disassemble_instruction(Bytecode* bytecode, int offset)
     if (opcode == OpCode_Print)
         return bytecode_debug_instruction_byte("OPCODE_PRINT", (offset + 1));
     if (opcode == OpCode_Jump_If_False)
-        return bytecode_debug_instruction_3bytes(bytecode, "OPCODE_JUMP_IF_FALSE", (offset + 3));
+        return bytecode_debug_instruction_jump(bytecode, "OPCODE_JUMP_IF_FALSE", 1, (offset + 3));
     if (opcode == OpCode_Jump)
-        return bytecode_debug_instruction_3bytes(bytecode, "OPCODE_JUMP", (offset + 3));
+        return bytecode_debug_instruction_jump(bytecode, "OPCODE_JUMP", 1, (offset + 3));
     if (opcode == OpCode_Loop)
-        return bytecode_debug_instruction_3bytes(bytecode, "OPCODE_LOOP", (offset + 3));
+        return bytecode_debug_instruction_jump(bytecode, "OPCODE_LOOP", -1, (offset + 3));
     if (opcode == OpCode_Return)
         return bytecode_debug_instruction_byte("OPCODE_RETURN", (offset + 1));
 
