@@ -1,0 +1,13 @@
+<pa>
+  <initializer>
+    <mimoria>
+      i
+      0.0
+  <condition>
+    ((get i) < 2.0)
+  <increment>
+    (i = ((get i) + 1.0))
+  <body>
+    <block>
+      <imprimi>
+        'Hi'

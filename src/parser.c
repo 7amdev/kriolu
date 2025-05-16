@@ -13,6 +13,7 @@ static Statement* parser_parse_instruction_print(Parser* parser);
 static Statement* parser_parse_instruction_block(Parser* parser);
 static Statement* parser_parse_instruction_if(Parser* parser);
 static Statement* parser_instruction_while(Parser* parser);
+static Statement* parser_instruction_for(Parser* parser);
 static Statement* parser_parse_variable_declaration(Parser* parser);
 static Expression* parser_parse_expression(Parser* parser, OperatorPrecedence operator_precedence_previous);
 static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bool can_assign);
@@ -182,6 +183,10 @@ static Statement* parser_parse_statement(Parser* parser)
         parser_end_scope(parser);
     } else if (parser_match_then_advance(parser, Token_Timenti)) {
         statement = parser_instruction_while(parser);
+    } else if (parser_match_then_advance(parser, Token_Di)) {
+        statement = parser_instruction_for(parser);
+    } else if (parser_match_then_advance(parser, Token_Pa)) {
+        statement = parser_instruction_for(parser);
     } else {
         statement = parser_parse_statement_expression(parser);
     }
@@ -317,6 +322,60 @@ static Statement* parser_instruction_while(Parser* parser) {
     statement.timenti.condition = condition;
     statement.timenti.body = body;
 
+    return statement_allocate(statement);
+}
+
+static Statement* parser_instruction_for(Parser* parser) {
+    parser_begin_scope(parser);
+    parser_consume(parser, Token_Left_Parenthesis, "Expected '(' after 'pa'.");
+    Statement* initializer = NULL;
+    if (parser_match_then_advance(parser, Token_Semicolon)) {
+        // Do nothing. There is no initializer.
+    } else if (parser_match_then_advance(parser, Token_Mimoria)) {
+        initializer = parser_parse_variable_declaration(parser);
+    } else {
+        initializer = parser_parse_statement_expression(parser);
+    }
+
+    int condition_start_index = g_bytecode.instructions.count;
+    int exit_jump_operand_index = -1;
+    Expression* condition = NULL;
+    if (!parser_match_then_advance(parser, Token_Semicolon)) {
+        condition = parser_parse_expression(parser, OperatorPrecedence_Assignment);
+        parser_consume(parser, Token_Semicolon, "Epected ';'.");
+
+        exit_jump_operand_index = bytecode_emit_instruction_jump(OpCode_Jump_If_False, parser->token_previous.line_number);
+        bytecode_emit_instruction_1byte(OpCode_Pop, parser->token_previous.line_number);
+    }
+
+    Expression* increment = NULL;
+    int increment_start_index = -1;
+    if (!parser_match_then_advance(parser, Token_Right_Parenthesis)) {
+        int jump_to_body = bytecode_emit_instruction_jump(OpCode_Jump, parser->token_previous.line_number);
+        increment_start_index = g_bytecode.instructions.count;
+        increment = parser_parse_expression(parser, OperatorPrecedence_Assignment);
+        bytecode_emit_instruction_1byte(OpCode_Pop, parser->token_previous.line_number);
+        parser_consume(parser, Token_Right_Parenthesis, "Epected ')' after increment expression clause.");
+
+        Bytecode_EmitLoop(condition_start_index, parser->token_previous.line_number);
+        Bytecode_PatchInstructionJump(jump_to_body);
+    }
+
+    Statement* body = parser_parse_statement(parser);
+
+    Bytecode_EmitLoop(increment_start_index, parser->token_previous.line_number);
+    if (exit_jump_operand_index != -1) {
+        Bytecode_PatchInstructionJump(exit_jump_operand_index);
+        bytecode_emit_instruction_1byte(OpCode_Pop, parser->token_previous.line_number);
+    }
+    parser_end_scope(parser);
+
+    Statement statement = { 0 };
+    statement.kind = StatementKind_Pa;
+    statement.pa.initializer = initializer;
+    statement.pa.condition = condition;
+    statement.pa.increment = increment;
+    statement.pa.body = body;
     return statement_allocate(statement);
 }
 

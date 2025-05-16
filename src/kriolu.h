@@ -372,6 +372,7 @@ enum
     StatementKind_Si,
     StatementKind_Di,
     StatementKind_Timenti,
+    StatementKind_Pa,
 
     StatementKind_Max
 };
@@ -390,7 +391,7 @@ struct Statement
         struct { ObjectString* identifier; Expression* rhs; } variable_declaration;
         struct { Expression* condition; Statement* then_block; Statement* else_block; } _if;
         struct { Expression* condition; Statement* body; } timenti;
-        struct { Statement* initializer; Expression* condition; Expression* increment; } di;
+        struct { Statement* initializer; Expression* condition; Expression* increment; Statement* body; } pa;
     };
 };
 

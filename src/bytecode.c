@@ -90,7 +90,9 @@ int bytecode_insert_instruction_jump(Bytecode* bytecode, OpCode opcode, int line
 // Jumps Backwards
 //
 void bytecode_emit_instruction_loop(Bytecode* bytecode, int loop_start_index, int line_number) {
-    int offset = bytecode->instructions.count - loop_start_index + 2;
+    // instruction_array_current_position + loop_instruction_size(3 bytes) - increment_index_in_instruction_array
+    //
+    int offset = bytecode->instructions.count + 3 - loop_start_index;
     uint8_t operand_byte1 = ((offset >> 8) & 0xff);
     uint8_t operand_byte2 = (offset & 0xff);
 

@@ -24,6 +24,7 @@ Statement* statement_allocate(Statement value) {
 void statement_print(Statement* statement, int indent) {
     int offset = 2;
     int padding_left = indent + offset;
+
     switch (statement->kind)
     {
     default: {
@@ -78,6 +79,32 @@ void statement_print(Statement* statement, int indent) {
         printf("\n");
         printf("%*s", padding_left, "");
         statement_print(statement->timenti.body, padding_left);
+    } break;
+    case StatementKind_Pa: {
+        printf("<pa>\n");
+        printf("%*s", padding_left, "");
+        printf("<initializer>\n");
+        printf("%*s", padding_left, "");
+        printf("%*s", padding_left, "");
+        statement_print(statement->pa.initializer, 2 * padding_left);
+        printf("\n");
+        printf("%*s", padding_left, "");
+        printf("<condition>\n");
+        printf("%*s", padding_left, "");
+        printf("%*s", padding_left, "");
+        expression_print(statement->pa.condition, 2 * padding_left);
+        printf("\n");
+        printf("%*s", padding_left, "");
+        printf("<increment>\n");
+        printf("%*s", padding_left, "");
+        printf("%*s", padding_left, "");
+        expression_print(statement->pa.increment, 2 * padding_left);
+        printf("\n");
+        printf("%*s", padding_left, "");
+        printf("<body>\n");
+        printf("%*s", padding_left, "");
+        printf("%*s", padding_left, "");
+        statement_print(statement->pa.body, 2 * padding_left);
     } break;
     }
 }
