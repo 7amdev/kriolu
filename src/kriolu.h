@@ -67,6 +67,7 @@ typedef enum
     Token_Imprimi,
     Token_Divolvi,
     Token_Super,
+    Token_Sai,
     Token_Keli,    // THIS
     Token_Mimoria, // VARIABLE
     Token_Timenti,
@@ -373,6 +374,7 @@ enum
     StatementKind_Di,
     StatementKind_Timenti,
     StatementKind_Pa,
+    StatementKind_Sai,
 
     StatementKind_Max
 };
@@ -475,6 +477,17 @@ typedef struct {
     bool is_right_associative;
 } OperatorMetadata;
 
+#define BREAK_POINT_MAX 60
+typedef struct {
+    int depth;
+    int operand_index;
+} BreakPoint;
+
+typedef struct {
+    BreakPoint items[BREAK_POINT_MAX];
+    int count;
+} BreakPoints;
+
 typedef struct
 {
     Token token_current;
@@ -486,6 +499,10 @@ typedef struct
 
     int interpolation_count_nesting;
     int interpolation_count_value_pushed;
+    struct {
+        BreakPoints break_points;
+        int depth;
+    } loop;
 } Parser;
 
 #define parser_init(parser, source_code) parser_initialize(parser, source_code, NULL)

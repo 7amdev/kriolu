@@ -266,6 +266,8 @@ Token lexer_scan(Lexer* lexer)
                 }
             } else if (token.start[1] == 'u') {
                 token.kind = lexer_keyword_kind(token, "super", 2, Token_Super);
+            } else if (token.start[1] == 'a') {
+                token.kind = lexer_keyword_kind(token, "sai", 2, Token_Sai);
             }
         } else if (*token.start == 'f') {
             if (token.start[1] == 'a') {

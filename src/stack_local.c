@@ -30,6 +30,7 @@ Local StackLocal_pop(StackLocal* locals) {
 
     locals->count -= 1;
     Local* local = &locals->items[locals->count];
+    locals->items[locals->count] = (Local){ .token = {0}, .scope_depth = 0 };
 
     return *local;
 }

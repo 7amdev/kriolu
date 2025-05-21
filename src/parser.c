@@ -14,6 +14,7 @@ static Statement* parser_parse_instruction_block(Parser* parser);
 static Statement* parser_parse_instruction_if(Parser* parser);
 static Statement* parser_instruction_while(Parser* parser);
 static Statement* parser_instruction_for(Parser* parser);
+static Statement* parser_instruction_break(Parser* parser);
 static Statement* parser_parse_variable_declaration(Parser* parser);
 static Expression* parser_parse_expression(Parser* parser, OperatorPrecedence operator_precedence_previous);
 static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bool can_assign);
@@ -51,6 +52,8 @@ void parser_initialize(Parser* parser, const char* source_code, Lexer* lexer)
         assert(parser->lexer);
         lexer_init(parser->lexer, source_code);
     }
+    parser->loop.break_points.count = 0;
+    parser->loop.depth = 0;
 }
 
 ArrayStatement* parser_parse(Parser* parser)
@@ -66,6 +69,8 @@ ArrayStatement* parser_parse(Parser* parser)
         if (parser->token_current.kind == Token_Eof) break;
 
         Statement* statement = parser_parse_statement(parser);
+        if (statement == NULL) continue;
+
         array_statement_insert(statements, *statement);
         // TODO: free statement here
     }
@@ -187,6 +192,8 @@ static Statement* parser_parse_statement(Parser* parser)
         statement = parser_instruction_for(parser);
     } else if (parser_match_then_advance(parser, Token_Pa)) {
         statement = parser_instruction_for(parser);
+    } else if (parser_match_then_advance(parser, Token_Sai)) {
+        statement = parser_instruction_break(parser);
     } else {
         statement = parser_parse_statement_expression(parser);
     }
@@ -225,6 +232,7 @@ static Statement* parser_parse_instruction_print(Parser* parser) {
 }
 
 static Statement* parser_parse_instruction_block(Parser* parser) {
+    // TODO: add 'break' instruction
     ArrayStatement* bloco = array_statement_allocate();
 
     for (;;) {
@@ -233,6 +241,8 @@ static Statement* parser_parse_instruction_block(Parser* parser) {
         if (kind == Token_Eof)         break;
 
         Statement* statement = parser_parse_statement(parser);
+        if (statement == NULL) continue;
+
         array_statement_insert(bloco, *statement);
         // TODO: free statement
     }
@@ -301,9 +311,28 @@ static Statement* parser_parse_instruction_if(Parser* parser) {
     return statement_allocate(statement);
 }
 
+static void parser_start_loop(Parser* parser) {
+    parser->loop.depth += 1;
+}
+
+static void parser_end_loop(Parser* parser) {
+    if (parser->loop.break_points.count > 0) {
+        BreakPoints* break_points = &parser->loop.break_points;
+        for (int i = break_points->count - 1; i >= 0; i -= 1) {
+            if (break_points->items[i].depth == parser->loop.depth) {
+                Bytecode_PatchInstructionJump(break_points->items[i].operand_index);
+                // TODO: StackBreak::pop();
+            }
+        }
+    }
+
+    parser->loop.depth -= 1;
+}
+
 static Statement* parser_instruction_while(Parser* parser) {
     int loop_start = g_bytecode.instructions.count; // TODO: use a macro to access count variable
 
+    parser_start_loop(parser);
     parser_consume(parser, Token_Left_Parenthesis, "Expect '(' after 'timenti'.");
     Expression* condition = parser_parse_expression(parser, OperatorPrecedence_Assignment);
     parser_consume(parser, Token_Right_Parenthesis, "Expect ')' after condition.");
@@ -317,17 +346,20 @@ static Statement* parser_instruction_while(Parser* parser) {
     Bytecode_PatchInstructionJump(jump_if_false_operand_index);
     bytecode_emit_instruction_1byte(OpCode_Pop, parser->token_previous.line_number);
 
+    parser_end_loop(parser);
+
     Statement statement = { 0 };
     statement.kind = StatementKind_Timenti;
     statement.timenti.condition = condition;
     statement.timenti.body = body;
-
     return statement_allocate(statement);
 }
 
 static Statement* parser_instruction_for(Parser* parser) {
     parser_begin_scope(parser);
+    parser_start_loop(parser);
     parser_consume(parser, Token_Left_Parenthesis, "Expected '(' after 'pa'.");
+
     Statement* initializer = NULL;
     if (parser_match_then_advance(parser, Token_Semicolon)) {
         // Do nothing. There is no initializer.
@@ -368,6 +400,8 @@ static Statement* parser_instruction_for(Parser* parser) {
         Bytecode_PatchInstructionJump(exit_jump_operand_index);
         bytecode_emit_instruction_1byte(OpCode_Pop, parser->token_previous.line_number);
     }
+
+    parser_end_loop(parser);
     parser_end_scope(parser);
 
     Statement statement = { 0 };
@@ -376,6 +410,28 @@ static Statement* parser_instruction_for(Parser* parser) {
     statement.pa.condition = condition;
     statement.pa.increment = increment;
     statement.pa.body = body;
+    return statement_allocate(statement);
+}
+
+static Statement* parser_instruction_break(Parser* parser) {
+    if (parser->loop.depth == 0) {
+        parser_error(parser, &parser->token_previous, "Cannot exit top-level scope.");
+        return NULL;
+    }
+
+    if (parser->loop.break_points.count >= BREAK_POINT_MAX) {
+        parser_error(parser, &parser->token_previous, "You've reached the limit of 'sai' instruction.");
+        return NULL;
+    }
+
+    parser->loop.break_points.items[parser->loop.break_points.count].operand_index = bytecode_emit_instruction_jump(OpCode_Jump, parser->token_previous.line_number);
+    parser->loop.break_points.items[parser->loop.break_points.count].depth = parser->loop.depth;
+    parser->loop.break_points.count++;
+
+    parser_consume(parser, Token_Semicolon, "Expected ';' after token 'sai'.");
+
+    Statement statement = { 0 };
+    statement.kind = StatementKind_Sai;
     return statement_allocate(statement);
 }
 
