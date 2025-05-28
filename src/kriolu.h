@@ -68,6 +68,7 @@ typedef enum
     Token_Divolvi,
     Token_Super,
     Token_Sai,
+    Token_Salta,
     Token_Keli,    // THIS
     Token_Mimoria, // VARIABLE
     Token_Timenti,

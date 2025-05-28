@@ -85,8 +85,8 @@ int main(int argc, const char* argv[]) {
             printf("\n");
         }
 
-        bytecode_free(&bytecode);
-
+        // bytecode_free(&bytecode);
+        
         return 0;
     }
 

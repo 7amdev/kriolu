@@ -196,7 +196,6 @@ static Statement* parser_parse_statement(Parser* parser, BlockType block_type)
         statement = parser_instruction_break(parser);
     else statement = parser_parse_statement_expression(parser);
 
-
     if (parser->panic_mode)
         parser_synchronize(parser);
 

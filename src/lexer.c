@@ -267,7 +267,11 @@ Token lexer_scan(Lexer* lexer)
             } else if (token.start[1] == 'u') {
                 token.kind = lexer_keyword_kind(token, "super", 2, Token_Super);
             } else if (token.start[1] == 'a') {
-                token.kind = lexer_keyword_kind(token, "sai", 2, Token_Sai);
+                if (token.start[2] == 'l') {
+                    token.kind = lexer_keyword_kind(token, "salta", 3, Token_Salta);
+                } else if (token.start[2] == 'i') {
+                    token.kind = lexer_keyword_kind(token, "sai", 2, Token_Sai);
+                }
             }
         } else if (*token.start == 'f') {
             if (token.start[1] == 'a') {
@@ -529,7 +533,18 @@ void lexer_debug_print_token(Token token, const char* format)
         fprintf(stdout, format, "<ka>");
         break;
     }
+    case Token_Sai:
+    {
+        fprintf(stdout, format, "<sai>");
+        break;
     }
+    case Token_Salta:
+    {
+        fprintf(stdout, format, "<salta>");
+        break;
+    }
+    }
+
     fprintf(stdout, "'%.*s' \n", token.length, token.start);
 }
 

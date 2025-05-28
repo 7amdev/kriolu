@@ -8,3 +8,5 @@ imprimi
 verdadi
 mimoria
 nulo
+salta
+sai
