@@ -7,10 +7,10 @@ static void parser_consume(Parser* parser, TokenKind kind, const char* error_mes
 static bool parser_match_then_advance(Parser* parser, TokenKind kind);
 static void parser_synchronize(Parser* parser);
 static void parser_error(Parser* parser, Token* token, const char* message);
-static Statement* parser_parse_statement(Parser* parser);
+static Statement* parser_parse_statement(Parser* parser, BlockType block_type);
 static Statement* parser_parse_statement_expression(Parser* parser);
 static Statement* parser_parse_instruction_print(Parser* parser);
-static Statement* parser_parse_instruction_block(Parser* parser);
+static Statement* parser_parse_instruction_block(Parser* parser, BlockType is_pure_block);
 static Statement* parser_parse_instruction_if(Parser* parser);
 static Statement* parser_instruction_while(Parser* parser);
 static Statement* parser_instruction_for(Parser* parser);
@@ -33,6 +33,7 @@ static void parser_end_scope(Parser* parser);
 static Expression* parser_parse_binary(Parser* parser, Expression* left_operand);
 static uint8_t parser_store_identifier_into_bytecode(Parser* parser, const char* start, int length);
 
+
 //
 // Globals
 //
@@ -52,8 +53,8 @@ void parser_initialize(Parser* parser, const char* source_code, Lexer* lexer)
         assert(parser->lexer);
         lexer_init(parser->lexer, source_code);
     }
-    parser->loop.break_points.count = 0;
-    parser->loop.depth = 0;
+    StackBreak_init(&parser->breakpoints);
+    StackBlock_init(&parser->blocks);
 }
 
 ArrayStatement* parser_parse(Parser* parser)
@@ -67,8 +68,7 @@ ArrayStatement* parser_parse(Parser* parser)
 
     for (;;) {
         if (parser->token_current.kind == Token_Eof) break;
-
-        Statement* statement = parser_parse_statement(parser);
+        Statement* statement = parser_parse_statement(parser, 1);
         if (statement == NULL) continue;
 
         array_statement_insert(statements, *statement);
@@ -164,7 +164,7 @@ static void parser_error(Parser* parser, Token* token, const char* message)
     }
 }
 
-static Statement* parser_parse_statement(Parser* parser)
+static Statement* parser_parse_statement(Parser* parser, BlockType block_type)
 {
     // DECLARATIONS: introduces new identifiers
     //   klassi, mimoria, funson
@@ -176,27 +176,26 @@ static Statement* parser_parse_statement(Parser* parser)
 
     Statement* statement = { 0 };
 
-    if (parser_match_then_advance(parser, Token_Mimoria)) {
+    if (parser_match_then_advance(parser, Token_Mimoria))
         statement = parser_parse_variable_declaration(parser);
-    } else if (parser_match_then_advance(parser, Token_Imprimi)) {
+    else if (parser_match_then_advance(parser, Token_Imprimi))
         statement = parser_parse_instruction_print(parser);
-    } else if (parser_match_then_advance(parser, Token_Si)) {
+    else if (parser_match_then_advance(parser, Token_Si))
         statement = parser_parse_instruction_if(parser);
-    } else if (parser_match_then_advance(parser, Token_Left_Brace)) {
+    else if (parser_match_then_advance(parser, Token_Left_Brace)) {
         parser_begin_scope(parser);
-        statement = parser_parse_instruction_block(parser);
+        statement = parser_parse_instruction_block(parser, block_type);
         parser_end_scope(parser);
-    } else if (parser_match_then_advance(parser, Token_Timenti)) {
+    } else if (parser_match_then_advance(parser, Token_Timenti))
         statement = parser_instruction_while(parser);
-    } else if (parser_match_then_advance(parser, Token_Di)) {
+    else if (parser_match_then_advance(parser, Token_Di))
         statement = parser_instruction_for(parser);
-    } else if (parser_match_then_advance(parser, Token_Pa)) {
+    else if (parser_match_then_advance(parser, Token_Pa))
         statement = parser_instruction_for(parser);
-    } else if (parser_match_then_advance(parser, Token_Sai)) {
+    else if (parser_match_then_advance(parser, Token_Sai))
         statement = parser_instruction_break(parser);
-    } else {
-        statement = parser_parse_statement_expression(parser);
-    }
+    else statement = parser_parse_statement_expression(parser);
+
 
     if (parser->panic_mode)
         parser_synchronize(parser);
@@ -231,8 +230,31 @@ static Statement* parser_parse_instruction_print(Parser* parser) {
     return statement_allocate(statement);
 }
 
-static Statement* parser_parse_instruction_block(Parser* parser) {
-    // TODO: add 'break' instruction
+static void parser_begin_block(Parser* parser, BlockType block_type) {
+    StackBlock_push(&parser->blocks, block_type);
+}
+
+static void parser_end_block(Parser* parser, BlockType block_type) {
+    StackBlock* blocks = &parser->blocks;
+    StackBreakpoint* breakpoints = &parser->breakpoints;
+    int top_block_index = StackBlock_get_top_item_index(&parser->blocks);
+
+    for (;;) {
+        Breakpoint breakpoint = StackBreak_peek(breakpoints, 0);
+
+        if (StackBreak_is_empty(&parser->breakpoints)) break;
+        if (StackBlock_is_empty(&parser->blocks)) break;
+        if (breakpoint.block_depth < top_block_index) break;
+
+        Bytecode_PatchInstructionJump(breakpoint.operand_index);
+        StackBreak_pop(breakpoints);
+    }
+
+    StackBlock_pop(blocks);
+}
+static Statement* parser_parse_instruction_block(Parser* parser, BlockType block_type) {
+    if (block_type == BlockType_Clean) parser_begin_block(parser, block_type);
+
     ArrayStatement* bloco = array_statement_allocate();
 
     for (;;) {
@@ -240,7 +262,7 @@ static Statement* parser_parse_instruction_block(Parser* parser) {
         if (kind == Token_Right_Brace) break;
         if (kind == Token_Eof)         break;
 
-        Statement* statement = parser_parse_statement(parser);
+        Statement* statement = parser_parse_statement(parser, block_type);
         if (statement == NULL) continue;
 
         array_statement_insert(bloco, *statement);
@@ -248,6 +270,8 @@ static Statement* parser_parse_instruction_block(Parser* parser) {
     }
 
     parser_consume(parser, Token_Right_Brace, "Expect '}' after block.");
+
+    if (block_type == BlockType_Clean) parser_end_block(parser, block_type);
 
     Statement statement = { 0 };
     statement.kind = StatementKind_Block;
@@ -280,8 +304,7 @@ static Statement* parser_parse_instruction_if(Parser* parser) {
 
     // Compile then-block statements 
     // 
-    //
-    statement._if.then_block = parser_parse_statement(parser);
+    statement._if.then_block = parser_parse_statement(parser, BlockType_If);
 
     // After finishing compiling statements in the then-block, jump out off 
     // the if-statement skipping the else-block statements.
@@ -303,7 +326,7 @@ static Statement* parser_parse_instruction_if(Parser* parser) {
     bytecode_emit_instruction_1byte(OpCode_Pop, parser->token_previous.line_number);
 
     if (parser_match_then_advance(parser, Token_Sinou))
-        statement._if.else_block = parser_parse_statement(parser);
+        statement._if.else_block = parser_parse_statement(parser, BlockType_If);
 
     bool error = Bytecode_PatchInstructionJump(jump_operand_index);
     if (error) parser_error(parser, &parser->token_previous, "Too much code to jump over.");
@@ -311,28 +334,12 @@ static Statement* parser_parse_instruction_if(Parser* parser) {
     return statement_allocate(statement);
 }
 
-static void parser_start_loop(Parser* parser) {
-    parser->loop.depth += 1;
-}
-
-static void parser_end_loop(Parser* parser) {
-    if (parser->loop.break_points.count > 0) {
-        BreakPoints* break_points = &parser->loop.break_points;
-        for (int i = break_points->count - 1; i >= 0; i -= 1) {
-            if (break_points->items[i].depth == parser->loop.depth) {
-                Bytecode_PatchInstructionJump(break_points->items[i].operand_index);
-                // TODO: StackBreak::pop();
-            }
-        }
-    }
-
-    parser->loop.depth -= 1;
-}
-
 static Statement* parser_instruction_while(Parser* parser) {
     int loop_start = g_bytecode.instructions.count; // TODO: use a macro to access count variable
 
-    parser_start_loop(parser);
+    // parser_start_loop(parser);
+    parser_begin_block(parser, BlockType_Loop);
+
     parser_consume(parser, Token_Left_Parenthesis, "Expect '(' after 'timenti'.");
     Expression* condition = parser_parse_expression(parser, OperatorPrecedence_Assignment);
     parser_consume(parser, Token_Right_Parenthesis, "Expect ')' after condition.");
@@ -340,13 +347,14 @@ static Statement* parser_instruction_while(Parser* parser) {
     int jump_if_false_operand_index = bytecode_emit_instruction_jump(OpCode_Jump_If_False, parser->token_previous.line_number);
     bytecode_emit_instruction_1byte(OpCode_Pop, parser->token_previous.line_number);
 
-    Statement* body = parser_parse_statement(parser);
+    Statement* body = parser_parse_statement(parser, false);
 
     Bytecode_EmitLoop(loop_start, parser->token_previous.line_number);
     Bytecode_PatchInstructionJump(jump_if_false_operand_index);
     bytecode_emit_instruction_1byte(OpCode_Pop, parser->token_previous.line_number);
 
-    parser_end_loop(parser);
+    // parser_end_loop(parser);
+    parser_end_block(parser, BlockType_Loop);
 
     Statement statement = { 0 };
     statement.kind = StatementKind_Timenti;
@@ -357,7 +365,9 @@ static Statement* parser_instruction_while(Parser* parser) {
 
 static Statement* parser_instruction_for(Parser* parser) {
     parser_begin_scope(parser);
-    parser_start_loop(parser);
+    // parser_start_loop(parser);
+    parser_begin_block(parser, BlockType_Loop);
+
     parser_consume(parser, Token_Left_Parenthesis, "Expected '(' after 'pa'.");
 
     Statement* initializer = NULL;
@@ -393,7 +403,7 @@ static Statement* parser_instruction_for(Parser* parser) {
         Bytecode_PatchInstructionJump(jump_to_body);
     }
 
-    Statement* body = parser_parse_statement(parser);
+    Statement* body = parser_parse_statement(parser, 2); // false
 
     Bytecode_EmitLoop(increment_start_index, parser->token_previous.line_number);
     if (exit_jump_operand_index != -1) {
@@ -401,7 +411,8 @@ static Statement* parser_instruction_for(Parser* parser) {
         bytecode_emit_instruction_1byte(OpCode_Pop, parser->token_previous.line_number);
     }
 
-    parser_end_loop(parser);
+    // parser_end_loop(parser);
+    parser_end_block(parser, BlockType_Loop);
     parser_end_scope(parser);
 
     Statement statement = { 0 };
@@ -414,19 +425,11 @@ static Statement* parser_instruction_for(Parser* parser) {
 }
 
 static Statement* parser_instruction_break(Parser* parser) {
-    if (parser->loop.depth == 0) {
-        parser_error(parser, &parser->token_previous, "Cannot exit top-level scope.");
-        return NULL;
-    }
-
-    if (parser->loop.break_points.count >= BREAK_POINT_MAX) {
-        parser_error(parser, &parser->token_previous, "You've reached the limit of 'sai' instruction.");
-        return NULL;
-    }
-
-    parser->loop.break_points.items[parser->loop.break_points.count].operand_index = bytecode_emit_instruction_jump(OpCode_Jump, parser->token_previous.line_number);
-    parser->loop.break_points.items[parser->loop.break_points.count].depth = parser->loop.depth;
-    parser->loop.break_points.count++;
+    Breakpoint breakpoint = (Breakpoint){
+        .operand_index = bytecode_emit_instruction_jump(OpCode_Jump, parser->token_previous.line_number),
+        .block_depth = StackBlock_get_top_item_index(&parser->blocks)
+    };
+    StackBreak_push(&parser->breakpoints, breakpoint);
 
     parser_consume(parser, Token_Semicolon, "Expected ';' after token 'sai'.");
 
@@ -1176,4 +1179,5 @@ static void parser_end_scope(Parser* parser) {
         StackLocal_pop(&parser->scope_current->locals);
     }
 }
+
 // todo: parser destroy implementation

@@ -9,6 +9,7 @@ pa (mimoria i = 0; i < 2; i = i + 1) {
       sai;
       imprimi "Alfredo";
     }
-    sai;
+    // sai;
     imprimi "Alfie";
 }
+ 

@@ -477,16 +477,58 @@ typedef struct {
     bool is_right_associative;
 } OperatorMetadata;
 
-#define BREAK_POINT_MAX 60
-typedef struct {
-    int depth;
-    int operand_index;
-} BreakPoint;
+typedef enum {
+    BlockType_None,
+
+    BlockType_Clean,
+    BlockType_Loop,
+    BlockType_If
+} BlockType;
 
 typedef struct {
-    BreakPoint items[BREAK_POINT_MAX];
-    int count;
-} BreakPoints;
+    bool is_block;
+    BlockType block_type;
+} ParseStatementParams;
+
+#define ParseStatementParamsDefault()    \
+    (ParseStatementParams) {             \
+        .block_type = BlockType_None,       \
+        .is_block = false                   \
+    }
+
+#define BREAK_POINT_MAX 200
+
+typedef struct {
+    int block_depth;
+    int operand_index;
+} Breakpoint;
+
+typedef struct {
+    Breakpoint items[BREAK_POINT_MAX];
+    int top;
+} StackBreakpoint;
+
+void StackBreak_init(StackBreakpoint* breakpoints);
+Breakpoint StackBreak_push(StackBreakpoint* breakpoints, Breakpoint value);
+Breakpoint StackBreak_pop(StackBreakpoint* breakpoints);
+Breakpoint StackBreak_peek(StackBreakpoint* breakpoints, int offset);
+bool StackBreak_is_empty(StackBreakpoint* breakpoints);
+bool StackBreak_is_full(StackBreakpoint* breakpoints);
+
+#define BLOCKS_MAX 200
+
+typedef struct {
+    BlockType items[BLOCKS_MAX];
+    int top;
+} StackBlock;
+
+void StackBlock_init(StackBlock* blocks);
+BlockType StackBlock_push(StackBlock* blocks, BlockType value);
+BlockType StackBlock_pop(StackBlock* blocks);
+BlockType StackBlock_peek(StackBlock* blocks, int offset);
+bool StackBlock_is_empty(StackBlock* blocks);
+bool StackBlock_is_full(StackBlock* blocks);
+int StackBlock_get_top_item_index(StackBlock* blocks);
 
 typedef struct
 {
@@ -497,12 +539,12 @@ typedef struct
     bool had_error;
     bool panic_mode;
 
+    // Bookkeeping
+    //
     int interpolation_count_nesting;
     int interpolation_count_value_pushed;
-    struct {
-        BreakPoints break_points;
-        int depth;
-    } loop;
+    StackBreakpoint breakpoints;
+    StackBlock blocks;
 } Parser;
 
 #define parser_init(parser, source_code) parser_initialize(parser, source_code, NULL)

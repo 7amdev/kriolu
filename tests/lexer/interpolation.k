@@ -1,1 +1,2 @@
-"hello %{name %{last_name}}!";
+"hello %{name} %{one + "%{two + "%{three}"}"}.";
+// "outside %(one + "%(two + "%(three)")")"
