@@ -76,7 +76,6 @@ int main(int argc, const char* argv[]) {
 
     if (is_flag_parser) {
         Parser parser;
-        Bytecode bytecode;
         parser_init(&parser, source_code);
 
         ArrayStatement* statements = parser_parse(&parser);
@@ -85,8 +84,6 @@ int main(int argc, const char* argv[]) {
             printf("\n");
         }
 
-        // bytecode_free(&bytecode);
-        
         return 0;
     }
 

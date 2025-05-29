@@ -106,6 +106,14 @@ void statement_print(Statement* statement, int indent) {
         printf("%*s", padding_left, "");
         statement_print(statement->pa.body, 2 * padding_left);
     } break;
+    case StatementKind_Sai: {
+        // TODO
+        printf("<sai>\n");
+    } break;
+    case StatementKind_Salta: {
+        // TODO
+        printf("<salta>\n");
+    } break;
     }
 }
 

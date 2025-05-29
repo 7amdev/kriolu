@@ -376,6 +376,7 @@ enum
     StatementKind_Timenti,
     StatementKind_Pa,
     StatementKind_Sai,
+    StatementKind_Salta,
 
     StatementKind_Max
 };
@@ -445,7 +446,7 @@ bool  StackLocal_is_full(StackLocal* locals);
 typedef struct {
     StackLocal locals;
     int depth;
-} Scope; // ScopeEmulator 
+} Scope;
 
 void scope_init(Scope* scope);
 
@@ -546,6 +547,7 @@ typedef struct
     int interpolation_count_value_pushed;
     StackBreakpoint breakpoints;
     StackBlock blocks;
+    int continue_jump_to;
 } Parser;
 
 #define parser_init(parser, source_code) parser_initialize(parser, source_code, NULL)

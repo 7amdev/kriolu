@@ -15,6 +15,7 @@ static Statement* parser_parse_instruction_if(Parser* parser);
 static Statement* parser_instruction_while(Parser* parser);
 static Statement* parser_instruction_for(Parser* parser);
 static Statement* parser_instruction_break(Parser* parser);
+static Statement* parser_instruction_continue(Parser* parser);
 static Statement* parser_parse_variable_declaration(Parser* parser);
 static Expression* parser_parse_expression(Parser* parser, OperatorPrecedence operator_precedence_previous);
 static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bool can_assign);
@@ -55,6 +56,7 @@ void parser_initialize(Parser* parser, const char* source_code, Lexer* lexer)
     }
     StackBreak_init(&parser->breakpoints);
     StackBlock_init(&parser->blocks);
+    parser->continue_jump_to = -1;
 }
 
 ArrayStatement* parser_parse(Parser* parser)
@@ -194,6 +196,8 @@ static Statement* parser_parse_statement(Parser* parser, BlockType block_type)
         statement = parser_instruction_for(parser);
     else if (parser_match_then_advance(parser, Token_Sai))
         statement = parser_instruction_break(parser);
+    else if (parser_match_then_advance(parser, Token_Salta))
+        statement = parser_instruction_continue(parser);
     else statement = parser_parse_statement_expression(parser);
 
     if (parser->panic_mode)
@@ -336,7 +340,6 @@ static Statement* parser_parse_instruction_if(Parser* parser) {
 static Statement* parser_instruction_while(Parser* parser) {
     int loop_start = g_bytecode.instructions.count; // TODO: use a macro to access count variable
 
-    // parser_start_loop(parser);
     parser_begin_block(parser, BlockType_Loop);
 
     parser_consume(parser, Token_Left_Parenthesis, "Expect '(' after 'timenti'.");
@@ -352,7 +355,6 @@ static Statement* parser_instruction_while(Parser* parser) {
     Bytecode_PatchInstructionJump(jump_if_false_operand_index);
     bytecode_emit_instruction_1byte(OpCode_Pop, parser->token_previous.line_number);
 
-    // parser_end_loop(parser);
     parser_end_block(parser, BlockType_Loop);
 
     Statement statement = { 0 };
@@ -364,7 +366,6 @@ static Statement* parser_instruction_while(Parser* parser) {
 
 static Statement* parser_instruction_for(Parser* parser) {
     parser_begin_scope(parser);
-    // parser_start_loop(parser);
     parser_begin_block(parser, BlockType_Loop);
 
     parser_consume(parser, Token_Left_Parenthesis, "Expected '(' after 'pa'.");
@@ -391,9 +392,11 @@ static Statement* parser_instruction_for(Parser* parser) {
 
     Expression* increment = NULL;
     int increment_start_index = -1;
+    int continue_jump_to_old = parser->continue_jump_to;
     if (!parser_match_then_advance(parser, Token_Right_Parenthesis)) {
         int jump_to_body = bytecode_emit_instruction_jump(OpCode_Jump, parser->token_previous.line_number);
         increment_start_index = g_bytecode.instructions.count;
+        parser->continue_jump_to = increment_start_index;
         increment = parser_parse_expression(parser, OperatorPrecedence_Assignment);
         bytecode_emit_instruction_1byte(OpCode_Pop, parser->token_previous.line_number);
         parser_consume(parser, Token_Right_Parenthesis, "Epected ')' after increment expression clause.");
@@ -402,7 +405,7 @@ static Statement* parser_instruction_for(Parser* parser) {
         Bytecode_PatchInstructionJump(jump_to_body);
     }
 
-    Statement* body = parser_parse_statement(parser, 2); // false
+    Statement* body = parser_parse_statement(parser, BlockType_Loop); // false
 
     Bytecode_EmitLoop(increment_start_index, parser->token_previous.line_number);
     if (exit_jump_operand_index != -1) {
@@ -410,7 +413,7 @@ static Statement* parser_instruction_for(Parser* parser) {
         bytecode_emit_instruction_1byte(OpCode_Pop, parser->token_previous.line_number);
     }
 
-    // parser_end_loop(parser);
+    parser->continue_jump_to = continue_jump_to_old;
     parser_end_block(parser, BlockType_Loop);
     parser_end_scope(parser);
 
@@ -424,10 +427,19 @@ static Statement* parser_instruction_for(Parser* parser) {
 }
 
 static Statement* parser_instruction_break(Parser* parser) {
-    Breakpoint breakpoint = (Breakpoint){
-        .operand_index = bytecode_emit_instruction_jump(OpCode_Jump, parser->token_previous.line_number),
-        .block_depth = StackBlock_get_top_item_index(&parser->blocks)
-    };
+    if (StackBlock_is_empty(&parser->blocks)) {
+        parser_error(parser, &parser->token_previous, "Cannot exit top-level scope.");
+        return NULL;
+    }
+
+    if (parser->breakpoints.top == BREAK_POINT_MAX) {
+        parser_error(parser, &parser->token_previous, "Check your spaghetti code dude!");
+        return NULL;
+    }
+
+    Breakpoint breakpoint = { 0 };
+    breakpoint.operand_index = bytecode_emit_instruction_jump(OpCode_Jump, parser->token_previous.line_number);
+    breakpoint.block_depth = StackBlock_get_top_item_index(&parser->blocks);
     StackBreak_push(&parser->breakpoints, breakpoint);
 
     parser_consume(parser, Token_Semicolon, "Expected ';' after token 'sai'.");
@@ -437,6 +449,20 @@ static Statement* parser_instruction_break(Parser* parser) {
     return statement_allocate(statement);
 }
 
+static Statement* parser_instruction_continue(Parser* parser) {
+    if (parser->continue_jump_to == -1) {
+        parser_error(parser, &parser->token_previous, "'salta' must be inside a loop");
+        return NULL;
+    }
+
+    Bytecode_EmitLoop(parser->continue_jump_to, parser->token_previous.line_number);
+
+    parser_consume(parser, Token_Semicolon, "Expected ';' after token 'salta'.");
+
+    Statement statement = { 0 };
+    statement.kind = StatementKind_Salta;
+    return statement_allocate(statement);
+}
 static Statement* parser_parse_variable_declaration(Parser* parser) {
     Statement statement = { 0 };
     uint8_t global_index = 0;
@@ -1167,7 +1193,7 @@ static void parser_begin_scope(Parser* parser) {
 
 static void parser_end_scope(Parser* parser) {
     parser->scope_current->depth -= 1;
-
+    // TODO: refactor StackLocal by adding function like peek and get_top_item_index
     for (;;) {
         StackLocal locals = parser->scope_current->locals;
 
