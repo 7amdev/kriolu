@@ -22,7 +22,10 @@ BlockType StackBlock_pop(StackBlock* blocks) {
 }
 
 BlockType StackBlock_peek(StackBlock* blocks, int offset) {
-    return blocks->items[blocks->top - 1 - offset];
+    int index = blocks->top - 1 - offset;
+    assert(index >= 0 && index < BREAK_POINT_MAX);
+
+    return blocks->items[index];
 }
 
 bool StackBlock_is_empty(StackBlock* blocks) {
