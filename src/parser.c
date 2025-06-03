@@ -46,7 +46,7 @@ void parser_initialize(Parser* parser, const char* source_code, Lexer* lexer)
     parser->panic_mode = false;
     parser->had_error = false;
     parser->lexer = lexer;
-    parser->scope_current = NULL;
+    parser->scope = NULL;
     parser->interpolation_count_nesting = 0;
     parser->interpolation_count_value_pushed = 0;
     if (lexer == NULL) {
@@ -65,7 +65,7 @@ ArrayStatement* parser_parse(Parser* parser)
     Scope scope_script;
     scope_init(&scope_script);
 
-    parser->scope_current = &scope_script;
+    parser->scope = &scope_script;
     parser_advance(parser);
 
     for (;;) {
@@ -405,7 +405,7 @@ static Statement* parser_instruction_for(Parser* parser) {
         Bytecode_PatchInstructionJump(jump_to_body);
     }
 
-    Statement* body = parser_parse_statement(parser, BlockType_Loop); // false
+    Statement* body = parser_parse_statement(parser, BlockType_Loop);
 
     Bytecode_EmitLoop(increment_start_index, parser->token_previous.line_number);
     if (exit_jump_operand_index != -1) {
@@ -472,10 +472,10 @@ static Statement* parser_parse_variable_declaration(Parser* parser) {
     parser_consume(parser, Token_Identifier, "Expect variable name.");
 
     block{
-        if (parser->scope_current->depth == 0)
+        if (parser->scope->depth == 0)
             break;
 
-        if (StackLocal_is_full(&parser->scope_current->locals)) {
+        if (StackLocal_is_full(&parser->scope->locals)) {
             parser_error(parser, &parser->token_previous, "Too many local variables in a scope.");
             break;
         }
@@ -486,7 +486,7 @@ static Statement* parser_parse_variable_declaration(Parser* parser) {
         }
 
         StackLocal_push(
-            &parser->scope_current->locals,
+            &parser->scope->locals,
             parser->token_previous,
             -1 // Mark Local as Uninitialized 
         );
@@ -506,8 +506,8 @@ static Statement* parser_parse_variable_declaration(Parser* parser) {
 
         // Mark local as Initialized
         //
-        Local* local = &parser->scope_current->locals.items[parser->scope_current->locals.count - 1];
-        local->scope_depth = parser->scope_current->depth;
+        Local* local = &parser->scope->locals.items[parser->scope->locals.top - 1];
+        local->scope_depth = parser->scope->depth;
 
         return statement_allocate(statement);
     }
@@ -821,7 +821,7 @@ static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bo
         uint8_t opcode_assign = OpCode_Invalid;
         uint8_t opcode_read = OpCode_Invalid;
         Local* local_found = NULL;
-        int operand = StackLocal_get_local_index_by_token(&parser->scope_current->locals, &parser->token_previous, &local_found);
+        int operand = StackLocal_get_local_index_by_token(&parser->scope->locals, &parser->token_previous, &local_found);
         ObjectString* variable_name = ObjectString_AllocateIfNotInterned(parser->token_previous.start, parser->token_previous.length);
 
         if (operand != -1) {
@@ -1165,8 +1165,8 @@ static Expression* parser_parse_binary(Parser* parser, Expression* left_operand)
 }
 
 static bool parser_check_locals_duplicates(Parser* parser, Token* identifier) {
-    Scope* current_scope = parser->scope_current;
-    for (int i = current_scope->locals.count - 1; i >= 0; i--) {
+    Scope* current_scope = parser->scope;
+    for (int i = current_scope->locals.top - 1; i >= 0; i--) {
         Local* local = &current_scope->locals.items[i];
         if (local->scope_depth < current_scope->depth && local->scope_depth != -1) {
             break;
@@ -1188,20 +1188,20 @@ static void parser_end_parsing(Parser* parser) {
 }
 
 static void parser_begin_scope(Parser* parser) {
-    parser->scope_current->depth += 1;
+    parser->scope->depth += 1;
 }
 
 static void parser_end_scope(Parser* parser) {
-    parser->scope_current->depth -= 1;
+    parser->scope->depth -= 1;
     // TODO: refactor StackLocal by adding function like peek and get_top_item_index
     for (;;) {
-        StackLocal locals = parser->scope_current->locals;
+        StackLocal locals = parser->scope->locals;
 
-        if (locals.count <= 0) break;
-        if (locals.items[locals.count - 1].scope_depth <= parser->scope_current->depth) break;
+        if (locals.top <= 0) break;
+        if (locals.items[locals.top - 1].scope_depth <= parser->scope->depth) break;
 
         bytecode_emit_instruction_1byte(OpCode_Pop, parser->token_previous.line_number);
-        StackLocal_pop(&parser->scope_current->locals);
+        StackLocal_pop(&parser->scope->locals);
     }
 }
 
