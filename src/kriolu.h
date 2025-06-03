@@ -660,7 +660,7 @@ typedef struct
     Token token_current;
     Token token_previous;
     Lexer* lexer;
-    Scope* scope;
+    Scope scope;
     bool had_error;
     bool panic_mode;
 
@@ -761,8 +761,9 @@ typedef enum {
 
 typedef struct
 {
-    Bytecode* bytecode;
     StackValue stack_value;
+
+    Bytecode* bytecode;
     // ObjectFunction* function;
     // FunctionKind function_kind;
 
