@@ -147,60 +147,79 @@ bool string_equal(String a, String b);
 void string_free(String* string);
 
 //
-// Object
+// Line Number
 //
 
-typedef struct HashTable HashTable;
-typedef struct Object Object;
-
-typedef enum
+typedef struct
 {
-    ObjectKind_Invalid,
+    int* items;
+    int count;
+    int capacity;
+} ArrayLineNumber;
 
-    ObjectKind_String
-} ObjectKind;
+void array_line_init(ArrayLineNumber* lines);
+int array_line_insert(ArrayLineNumber* lines, int line);
+int array_line_insert_3x(ArrayLineNumber* lines, int line);
+void array_line_free(ArrayLineNumber* lines);
 
-struct Object
+//
+// Instruction
+//
+
+typedef uint8_t OpCode;
+enum
 {
-    ObjectKind kind;
+    OpCode_Invalid,
 
-    // Access next object on the linked list
-    //
-    Object* next;
+    OpCode_Constant,
+    OpCode_Constant_Long,
+    OpCode_Interpolation,
+    OpCode_Nil,
+    OpCode_True,
+    OpCode_False,
+    OpCode_Negation,
+    OpCode_Not,
+    OpCode_Addition,
+    OpCode_Subtraction,
+    OpCode_Multiplication,
+    OpCode_Division,
+    // TODO: add OpCode_Modulus
+    OpCode_Exponentiation,
+    OpCode_Equal_To,
+    OpCode_Greater_Than,
+    OpCode_Less_Than,
+
+    OpCode_Print,
+    OpCode_Jump_If_False,
+    OpCode_Jump,
+    OpCode_Pop,
+    OpCode_Define_Global, // var x;
+    OpCode_Read_Global,   // print x;
+    OpCode_Assign_Global, // x = 7;
+    OpCode_Read_Local,   // print x;
+    OpCode_Assign_Local,  // x = 7;
+    OpCode_Loop,
+
+    OpCode_Return
 };
 
 typedef struct
 {
-    Object object;
+    uint8_t* items;
+    int count;
+    int capacity;
+} ArrayInstruction;
 
-    // String related fields
-    //
-    char* characters;
-    int length;
-    uint32_t hash;
-
-} ObjectString;
-
-Object* Object_allocate(ObjectKind kind, size_t size);
-Object* Object_allocate_string(char* characters, int length, uint32_t hash);
-void Object_init(Object* object, ObjectKind kind);
-void Object_clear(Object* object);
-void Object_print(Object* object);
-void Object_free(Object* object);
-
-#define ObjectString_AllocateAndIntern(characters, length, hash) ObjectString_allocate_and_intern(&g_vm.string_database, characters, length, hash)
-#define ObjectString_AllocateIfNotInterned(characters, length) ObjectString_allocate_if_not_interned(&g_vm.string_database, characters, length)
-
-ObjectString* ObjectString_allocate(char* characters, int length, uint32_t hash);
-ObjectString* ObjectString_allocate_if_not_interned(HashTable* table, const char* characters, int length);
-ObjectString* ObjectString_allocate_and_intern(HashTable* table, char* characters, int length, uint32_t hash);
-void ObjectString_init(ObjectString* object_string, char* characters, int length, uint32_t hash);
-String ObjectString_to_string(ObjectString* object_string);
-void ObjectString_free(ObjectString* string);
+void array_instruction_init(ArrayInstruction* instructions);
+int array_instruction_insert(ArrayInstruction* instructions, uint8_t item);
+int array_instruction_insert_u24(ArrayInstruction* instructions, uint8_t byte1, uint8_t byte2, uint8_t byte3);
+void array_instruction_free(ArrayInstruction* instructions);
 
 //
 // Value
 //
+
+typedef struct Object Object;
 
 typedef enum
 {
@@ -241,12 +260,14 @@ typedef struct
 #define value_as_nil(value) ((value).as.number)
 #define value_as_object(value) ((value).as.object)
 #define value_as_string(value) ((ObjectString *)value_as_object(value))
+#define value_as_function(value) ((ObjectFunction *)value_as_object(value))
 
 #define value_is_boolean(value) ((value).kind == Value_Boolean)
 #define value_is_number(value) ((value).kind == Value_Number)
 #define value_is_object(value) ((value).kind == Value_Object)
 #define value_is_nil(value) ((value).kind == Value_Nil)
-#define value_is_string(value) value_is_object_type(value, ObjectKind_String)
+#define value_is_string(value) object_validate_kind_from_value(value, ObjectKind_String)
+#define value_is_function(value) object_validate_kind_from_value(value, ObjectKind_Function)
 
 #define value_get_object_type(value) (value_as_object(value)->type)
 #define value_get_string_chars(value) (value_as_string(value)->characters)
@@ -255,14 +276,115 @@ bool value_negate_logically(Value value);
 bool value_is_falsey(Value value);
 bool value_is_equal(Value a, Value b);
 void value_print(Value value);
-inline bool value_is_object_type(Value value, ObjectKind object_kind) {
-    return value_is_object(value) && value_as_object(value)->kind == object_kind;
-}
 
 
 void array_value_init(ArrayValue* values);
 uint32_t array_value_insert(ArrayValue* values, Value value);
 void array_value_free(ArrayValue* values);
+
+//
+// Bytecode
+//
+
+// Bytecode is a series of instructions. Eventually, we'll store
+// some other data along with instructions, so ...
+//
+typedef struct
+{
+    ArrayInstruction instructions;
+    ArrayValue values;
+    ArrayLineNumber lines;
+}Bytecode;
+
+extern Bytecode g_bytecode;
+
+#define bytecode_emit_instruction_1byte(opcode, line) bytecode_insert_instruction_1byte(&g_bytecode, opcode, line)
+#define bytecode_emit_instruction_2bytes(opcode, operand, line) bytecode_insert_instruction_2bytes(&g_bytecode, opcode, operand, line)
+#define bytecode_emit_constant(value, line) bytecode_insert_instruction_constant(&g_bytecode, value, line)
+#define bytecode_emit_instruction_jump(opcode, line) bytecode_insert_instruction_jump(&g_bytecode, opcode, line)
+#define bytecode_emit_value(value) array_value_insert(&g_bytecode.values, value)
+#define Bytecode_EmitLoop(start_index, line) bytecode_emit_instruction_loop(&g_bytecode, start_index, line);
+#define Bytecode_PatchInstructionJump(operand_index) bytecode_patch_instruction_jump(&g_bytecode, operand_index)
+
+void bytecode_init(Bytecode* bytecode);
+int bytecode_insert_instruction_1byte(Bytecode* bytecode, OpCode opcode, int line_number);
+int bytecode_insert_instruction_2bytes(Bytecode* bytecode, OpCode opcode, uint8_t operand, int line_number);
+int bytecode_insert_instruction_constant(Bytecode* bytecode, Value value, int line_number);
+// TODO: rename to bytecode_emit_instruction_jump(...)
+int bytecode_insert_instruction_jump(Bytecode* bytecode, OpCode opcode, int line);
+void bytecode_emit_instruction_loop(Bytecode* bytecode, int loop_start_index, int line_number);
+bool bytecode_patch_instruction_jump(Bytecode* bytecode, int operand_index);
+void bytecode_disassemble(Bytecode* bytecode, const char* name);
+int bytecode_disassemble_instruction(Bytecode* bytecode, int offset);
+void bytecode_emitter_begin();
+Bytecode bytecode_emitter_end();
+void bytecode_free(Bytecode* bytecode);
+
+//
+// Object
+//
+
+typedef struct HashTable HashTable;
+
+typedef enum
+{
+    ObjectKind_Invalid,
+
+    ObjectKind_String,
+    ObjectKind_Function
+} ObjectKind;
+
+struct Object
+{
+    ObjectKind kind;
+
+    // Access next object on the linked list
+    //
+    Object* next;
+};
+
+typedef struct
+{
+    Object object;
+
+    // String related fields
+    //
+    char* characters;
+    int length;
+    uint32_t hash;
+
+} ObjectString;
+
+typedef struct
+{
+    Object object;
+
+    Bytecode bytecode;
+    ObjectString* name;
+    int arity; // Number of parameters
+} ObjectFunction;
+
+Object* Object_allocate(ObjectKind kind, size_t size);
+void Object_init(Object* object, ObjectKind kind);
+void Object_clear(Object* object);
+void Object_print(Object* object);
+void Object_free(Object* object);
+inline bool object_validate_kind_from_value(Value value, ObjectKind object_kind) {
+    return value_is_object(value) && value_as_object(value)->kind == object_kind;
+}
+#define ObjectString_AllocateAndIntern(characters, length, hash) ObjectString_allocate_and_intern(&g_vm.string_database, characters, length, hash)
+#define ObjectString_AllocateIfNotInterned(characters, length) ObjectString_allocate_if_not_interned(&g_vm.string_database, characters, length)
+
+ObjectString* ObjectString_allocate(char* characters, int length, uint32_t hash);
+ObjectString* ObjectString_allocate_if_not_interned(HashTable* table, const char* characters, int length);
+ObjectString* ObjectString_allocate_and_intern(HashTable* table, char* characters, int length, uint32_t hash);
+void ObjectString_init(ObjectString* object_string, char* characters, int length, uint32_t hash);
+String ObjectString_to_string(ObjectString* object_string);
+void ObjectString_free(ObjectString* string);
+
+
+ObjectFunction* ObjectFunction_allocate();
+void ObjectFunction_init(ObjectFunction* function, ObjectString* name, Bytecode* bytecode, int arity);
 
 //
 // Abstract Syntax Tree
@@ -433,13 +555,14 @@ typedef struct {
 
 typedef struct {
     Local* items;
-    int count;
+    int top;
     int capacity;
 } StackLocal;
 
 void  StackLocal_init(StackLocal* locals, int capacity);
 Local StackLocal_push(StackLocal* locals, Token token, int scope_depth);
 Local StackLocal_pop(StackLocal* local);
+Local StackLocal_peek(StackLocal* local, int offset);
 int   StackLocal_get_local_index_by_token(StackLocal* locals, Token* token, Local** local_out);
 bool  StackLocal_is_full(StackLocal* locals);
 
@@ -494,8 +617,8 @@ typedef struct {
 
 #define ParseStatementParamsDefault()    \
     (ParseStatementParams) {             \
-        .block_type = BlockType_None,       \
-        .is_block = false                   \
+        .block_type = BlockType_None,    \
+        .is_block = false                \
     }
 
 #define BREAK_POINT_MAX 200
@@ -537,7 +660,7 @@ typedef struct
     Token token_current;
     Token token_previous;
     Lexer* lexer;
-    Scope* scope_current;
+    Scope* scope;
     bool had_error;
     bool panic_mode;
 
@@ -555,112 +678,6 @@ typedef struct
 void parser_initialize(Parser* parser, const char* source_code, Lexer* lexer);
 ArrayStatement* parser_parse(Parser* parser);
 
-//
-// Line Number
-//
-
-typedef struct
-{
-    int* items;
-    int count;
-    int capacity;
-} ArrayLineNumber;
-
-void array_line_init(ArrayLineNumber* lines);
-int array_line_insert(ArrayLineNumber* lines, int line);
-int array_line_insert_3x(ArrayLineNumber* lines, int line);
-void array_line_free(ArrayLineNumber* lines);
-
-//
-// Instruction
-//
-
-typedef uint8_t OpCode;
-enum
-{
-    OpCode_Invalid,
-
-    OpCode_Constant,
-    OpCode_Constant_Long,
-    OpCode_Interpolation,
-    OpCode_Nil,
-    OpCode_True,
-    OpCode_False,
-    OpCode_Negation,
-    OpCode_Not,
-    OpCode_Addition,
-    OpCode_Subtraction,
-    OpCode_Multiplication,
-    OpCode_Division,
-    // TODO: add OpCode_Modulus
-    OpCode_Exponentiation,
-    OpCode_Equal_To,
-    OpCode_Greater_Than,
-    OpCode_Less_Than,
-
-    OpCode_Print,
-    OpCode_Jump_If_False,
-    OpCode_Jump,
-    OpCode_Pop,
-    OpCode_Define_Global, // var x;
-    OpCode_Read_Global,   // print x;
-    OpCode_Assign_Global, // x = 7;
-    OpCode_Read_Local,   // print x;
-    OpCode_Assign_Local,  // x = 7;
-    OpCode_Loop,
-
-    OpCode_Return
-};
-
-typedef struct
-{
-    uint8_t* items;
-    int count;
-    int capacity;
-} ArrayInstruction;
-
-void array_instruction_init(ArrayInstruction* instructions);
-int array_instruction_insert(ArrayInstruction* instructions, uint8_t item);
-int array_instruction_insert_u24(ArrayInstruction* instructions, uint8_t byte1, uint8_t byte2, uint8_t byte3);
-void array_instruction_free(ArrayInstruction* instructions);
-
-//
-// Bytecode
-//
-
-// Bytecode is a series of instructions. Eventually, we'll store
-// some other data along with instructions, so ...
-//
-typedef struct
-{
-    ArrayInstruction instructions;
-    ArrayValue values;
-    ArrayLineNumber lines;
-} Bytecode;
-
-extern Bytecode g_bytecode;
-
-#define bytecode_emit_instruction_1byte(opcode, line) bytecode_insert_instruction_1byte(&g_bytecode, opcode, line)
-#define bytecode_emit_instruction_2bytes(opcode, operand, line) bytecode_insert_instruction_2bytes(&g_bytecode, opcode, operand, line)
-#define bytecode_emit_constant(value, line) bytecode_insert_instruction_constant(&g_bytecode, value, line)
-#define bytecode_emit_instruction_jump(opcode, line) bytecode_insert_instruction_jump(&g_bytecode, opcode, line)
-#define bytecode_emit_value(value) array_value_insert(&g_bytecode.values, value)
-#define Bytecode_EmitLoop(start_index, line) bytecode_emit_instruction_loop(&g_bytecode, start_index, line);
-#define Bytecode_PatchInstructionJump(operand_index) bytecode_patch_instruction_jump(&g_bytecode, operand_index)
-
-void bytecode_init(Bytecode* bytecode);
-int bytecode_insert_instruction_1byte(Bytecode* bytecode, OpCode opcode, int line_number);
-int bytecode_insert_instruction_2bytes(Bytecode* bytecode, OpCode opcode, uint8_t operand, int line_number);
-int bytecode_insert_instruction_constant(Bytecode* bytecode, Value value, int line_number);
-// TODO: rename to bytecode_emit_instruction_jump(...)
-int bytecode_insert_instruction_jump(Bytecode* bytecode, OpCode opcode, int line);
-void bytecode_emit_instruction_loop(Bytecode* bytecode, int loop_start_index, int line_number);
-bool bytecode_patch_instruction_jump(Bytecode* bytecode, int operand_index);
-void bytecode_disassemble(Bytecode* bytecode, const char* name);
-int bytecode_disassemble_instruction(Bytecode* bytecode, int offset);
-void bytecode_emitter_begin();
-Bytecode bytecode_emitter_end();
-void bytecode_free(Bytecode* bytecode);
 
 //
 // Value Stack
@@ -687,6 +704,7 @@ void stack_free(StackValue* stack);
 //
 // HashTable
 //
+
 // HashTable:
 //     Associates a set of Keys to a set of Values.
 //     Each Key/Value pair is an Entry in the Table.
@@ -736,10 +754,17 @@ typedef enum
     Interpreter_Runtime_Error
 } InterpreterResult;
 
+typedef enum {
+    FunctionKind_Script,
+    FunctionKind_Function
+} FunctionKind;
+
 typedef struct
 {
     Bytecode* bytecode;
     StackValue stack_value;
+    // ObjectFunction* function;
+    // FunctionKind function_kind;
 
     // Instruction Pointer
     //
@@ -752,11 +777,11 @@ typedef struct
 
     // Stores global variables 
     //
-    HashTable global_database; // TODO: change name to global_database
+    HashTable global_database;
 
     // Stores all unique strings allocated during runtime
     //
-    HashTable string_database; // TODO: change name to stting_database
+    HashTable string_database;
 
     // TODO: add a varible to track total bytes allocated
 } VirtualMachine;
