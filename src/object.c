@@ -45,6 +45,10 @@ void Object_print(Object* object)
     } break;
     case ObjectKind_Function: {
         ObjectFunction* function = (ObjectFunction*)object;
+        if (function->name == NULL) {
+            printf("<script>");
+            return;
+        }
         printf("<fn %s>", function->name->characters);
     } break;
     }

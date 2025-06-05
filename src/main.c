@@ -78,7 +78,8 @@ int main(int argc, const char* argv[]) {
         Parser parser;
         parser_init(&parser, source_code);
 
-        ArrayStatement* statements = parser_parse(&parser);
+        ArrayStatement* statements = NULL;
+        parser_parse(&parser, &statements);
         for (int i = 0; i < statements->count; i++) {
             statement_print(&statements->items[i], 0);
             printf("\n");
@@ -92,29 +93,32 @@ int main(int argc, const char* argv[]) {
         Bytecode bytecode;
         parser_init(&parser, source_code);
 
-        bytecode_emitter_begin();
-        parser_parse(&parser);
-        bytecode = bytecode_emitter_end();
+        Bytecode_emitter_begin();
+        ObjectFunction* script = parser_parse(&parser, NULL);
+        bytecode = Bytecode_emitter_end();
 
-        bytecode_disassemble(&bytecode, "Bytecode");
-        bytecode_free(&bytecode);
+        Bytecode_disassemble(&bytecode, "Script");
+        Bytecode_free(&bytecode);
 
         return 0;
     }
-
 
     Parser parser;
     Bytecode bytecode;
     parser_init(&parser, source_code);
     vm_init();
 
-    bytecode_emitter_begin();
-    parser_parse(&parser);
-    bytecode = bytecode_emitter_end();
+    Bytecode_emitter_begin();
+    ObjectFunction* script = parser_parse(&parser, NULL);
+    bytecode = Bytecode_emitter_end();
 
+    // VirtualMachine vm;
+    // VirtualMachine_init(&vm, value_as_function(script));
+    // [Optional] stack_value_push(&vm, value_as_function(script));
+    // VirtualMachine_interpret(&vm);
     vm_interpret(&bytecode);
 
-    bytecode_free(&bytecode);
+    Bytecode_free(&bytecode);
     vm_free();
 
     return 0;

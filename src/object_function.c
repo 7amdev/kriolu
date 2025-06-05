@@ -13,11 +13,11 @@ void ObjectFunction_init(ObjectFunction* function, ObjectString* name, Bytecode*
     assert(function->object.kind == ObjectKind_Function);
     function->arity = arity;
     function->name = name;
-    bytecode_init(bytecode);
+    Bytecode_init(bytecode);
 }
 
 void ObjectFunction_free(ObjectFunction* function) {
-    bytecode_free(&function->bytecode);
+    Bytecode_free(&function->bytecode);
     free(function);
     function->arity = 0;
     function->bytecode = (Bytecode){ 0 };

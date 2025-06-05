@@ -294,31 +294,37 @@ typedef struct
     ArrayInstruction instructions;
     ArrayValue values;
     ArrayLineNumber lines;
-}Bytecode;
+} Bytecode;
 
-extern Bytecode g_bytecode;
+// #define bytecode_emit_instruction_1byte(opcode, line) Bytecode_insert_instruction_1byte(&g_bytecode, opcode, line)
+// #define bytecode_emit_instruction_2bytes(opcode, operand, line) bytecode_insert_instruction_2bytes(&g_bytecode, opcode, operand, line)
+// #define bytecode_emit_constant(value, line) bytecode_insert_instruction_constant(&g_bytecode, value, line)
+// #define bytecode_emit_instruction_jump(opcode, line) bytecode_insert_instruction_jump(&g_bytecode, opcode, line)
+// #define bytecode_emit_value(value) array_value_insert(&g_bytecode.values, value)
+// #define Bytecode_EmitLoop(start_index, line) bytecode_emit_instruction_loop(&g_bytecode, start_index, line);
+// #define Bytecode_PatchInstructionJump(operand_index) bytecode_patch_instruction_jump(&g_bytecode, operand_index)
 
-#define bytecode_emit_instruction_1byte(opcode, line) bytecode_insert_instruction_1byte(&g_bytecode, opcode, line)
-#define bytecode_emit_instruction_2bytes(opcode, operand, line) bytecode_insert_instruction_2bytes(&g_bytecode, opcode, operand, line)
-#define bytecode_emit_constant(value, line) bytecode_insert_instruction_constant(&g_bytecode, value, line)
-#define bytecode_emit_instruction_jump(opcode, line) bytecode_insert_instruction_jump(&g_bytecode, opcode, line)
-#define bytecode_emit_value(value) array_value_insert(&g_bytecode.values, value)
-#define Bytecode_EmitLoop(start_index, line) bytecode_emit_instruction_loop(&g_bytecode, start_index, line);
-#define Bytecode_PatchInstructionJump(operand_index) bytecode_patch_instruction_jump(&g_bytecode, operand_index)
+#define Compiler_CompileInstruction_1Byte(bytecode, opcode, line) Bytecode_insert_instruction_1byte(bytecode, opcode, line)
+#define Compiler_CompileInstruction_2Bytes(bytecode, opcode, operand, line) Bytecode_insert_instruction_2bytes(bytecode, opcode, operand, line)
+#define Compiler_CompileInstruction_Constant(bytecode, value, line) Bytecode_insert_instruction_constant(bytecode, value, line)
+#define Compiler_CompileInstruction_Jump(bytecode, opcode, line) Bytecode_insert_instruction_jump(bytecode, opcode, line)
+#define Compiler_CompileInstruction_Loop(bytecode, start_index, line) Bytecode_emit_instruction_loop(bytecode, start_index, line);
+#define Compiler_CompileValue(bytecode, value) array_value_insert(&bytecode->values, value)
+#define Compiler_PatchInstructionJump(bytecode, operand_index) Bytecode_patch_instruction_jump(bytecode, operand_index)
 
-void bytecode_init(Bytecode* bytecode);
-int bytecode_insert_instruction_1byte(Bytecode* bytecode, OpCode opcode, int line_number);
-int bytecode_insert_instruction_2bytes(Bytecode* bytecode, OpCode opcode, uint8_t operand, int line_number);
-int bytecode_insert_instruction_constant(Bytecode* bytecode, Value value, int line_number);
-// TODO: rename to bytecode_emit_instruction_jump(...)
-int bytecode_insert_instruction_jump(Bytecode* bytecode, OpCode opcode, int line);
-void bytecode_emit_instruction_loop(Bytecode* bytecode, int loop_start_index, int line_number);
-bool bytecode_patch_instruction_jump(Bytecode* bytecode, int operand_index);
-void bytecode_disassemble(Bytecode* bytecode, const char* name);
-int bytecode_disassemble_instruction(Bytecode* bytecode, int offset);
-void bytecode_emitter_begin();
-Bytecode bytecode_emitter_end();
-void bytecode_free(Bytecode* bytecode);
+
+void Bytecode_init(Bytecode* bytecode);
+int Bytecode_insert_instruction_1byte(Bytecode* bytecode, OpCode opcode, int line_number);
+int Bytecode_insert_instruction_2bytes(Bytecode* bytecode, OpCode opcode, uint8_t operand, int line_number);
+int Bytecode_insert_instruction_constant(Bytecode* bytecode, Value value, int line_number);
+int Bytecode_insert_instruction_jump(Bytecode* bytecode, OpCode opcode, int line);
+void Bytecode_emit_instruction_loop(Bytecode* bytecode, int loop_start_index, int line_number);
+bool Bytecode_patch_instruction_jump(Bytecode* bytecode, int operand_index);
+void Bytecode_disassemble(Bytecode* bytecode, const char* name);
+int Bytecode_disassemble_instruction(Bytecode* bytecode, int offset);
+void Bytecode_emitter_begin();
+Bytecode Bytecode_emitter_end();
+void Bytecode_free(Bytecode* bytecode);
 
 //
 // Object
@@ -333,6 +339,11 @@ typedef enum
     ObjectKind_String,
     ObjectKind_Function
 } ObjectKind;
+
+typedef enum {
+    FunctionKind_Script,
+    FunctionKind_Function
+} FunctionKind;
 
 struct Object
 {
@@ -573,6 +584,19 @@ typedef struct {
 
 void scope_init(Scope* scope);
 
+// 
+// Compiler
+// 
+
+typedef struct Compiler {
+    ObjectFunction* function;
+    FunctionKind function_kind;
+    Scope scope;
+} Compiler;
+
+void Compiler_init(Compiler* compiler, FunctionKind function_kind, Compiler** compiler_current);
+ObjectFunction* Compiler_end(Compiler* compiler, Compiler** compiler_current, int line_number);
+
 //
 // Parser
 //
@@ -660,6 +684,7 @@ typedef struct
     Token token_current;
     Token token_previous;
     Lexer* lexer;
+    Compiler* compiler;
     Scope scope;
     bool had_error;
     bool panic_mode;
@@ -668,15 +693,15 @@ typedef struct
     //
     int interpolation_count_nesting;
     int interpolation_count_value_pushed;
+    int continue_jump_to;
     StackBreakpoint breakpoints;
     StackBlock blocks;
-    int continue_jump_to;
 } Parser;
 
 #define parser_init(parser, source_code) parser_initialize(parser, source_code, NULL)
 
 void parser_initialize(Parser* parser, const char* source_code, Lexer* lexer);
-ArrayStatement* parser_parse(Parser* parser);
+ObjectFunction* parser_parse(Parser* parser, ArrayStatement** return_statements);
 
 
 //
@@ -754,18 +779,12 @@ typedef enum
     Interpreter_Runtime_Error
 } InterpreterResult;
 
-typedef enum {
-    FunctionKind_Script,
-    FunctionKind_Function
-} FunctionKind;
 
 typedef struct
 {
-    StackValue stack_value;
-
     Bytecode* bytecode;
-    // ObjectFunction* function;
-    // FunctionKind function_kind;
+
+    StackValue stack_value;
 
     // Instruction Pointer
     //

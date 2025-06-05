@@ -1,5 +1,7 @@
 #include "kriolu.h"
 
+void virtual_machine_runtime_error(VirtualMachine* vm, const char* format, ...);
+
 //
 // Globals
 //
@@ -14,19 +16,6 @@ void virtual_machine_init(VirtualMachine* vm) {
     hash_table_init(&vm->string_database);
 }
 
-void virtual_machine_runtime_error(VirtualMachine* vm, const char* format, ...)
-{
-    va_list args;
-    va_start(args, format);
-    vfprintf(stderr, format, args);
-    va_end(args);
-    fputs("\n", stderr);
-
-    size_t instruction = vm->ip - vm->bytecode->instructions.items - 1;
-    int line = vm->bytecode->lines.items[instruction];
-    fprintf(stderr, "[line %d] in script\n", line);
-    stack_value_reset(&vm->stack_value);
-}
 
 InterpreterResult virtual_machine_interpret(VirtualMachine* vm, Bytecode* bytecode)
 {
@@ -53,7 +42,7 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm, Bytecode* byteco
 
 #ifdef DEBUG_TRACE_EXECUTION
         stack_value_trace(&vm->stack_value);
-        bytecode_disassemble_instruction(
+        Bytecode_disassemble_instruction(
             vm->bytecode,
             (int)(vm->ip - vm->bytecode->instructions.items)
         );
@@ -372,6 +361,20 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm, Bytecode* byteco
 #undef READ_CONSTANT
 #undef READ_CONSTANT_3BYTE
 #undef READ_STRING
+}
+
+void virtual_machine_runtime_error(VirtualMachine* vm, const char* format, ...)
+{
+    va_list args;
+    va_start(args, format);
+    vfprintf(stderr, format, args);
+    va_end(args);
+    fputs("\n", stderr);
+
+    size_t instruction = vm->ip - vm->bytecode->instructions.items - 1;
+    int line = vm->bytecode->lines.items[instruction];
+    fprintf(stderr, "[line %d] in script\n", line);
+    stack_value_reset(&vm->stack_value);
 }
 
 void virtual_machine_free(VirtualMachine* vm)

@@ -6,13 +6,13 @@
 
 Bytecode g_bytecode;
 
-void bytecode_init(Bytecode* bytecode) {
+void Bytecode_init(Bytecode* bytecode) {
     array_instruction_init(&bytecode->instructions);
     array_value_init(&bytecode->values);
     array_line_init(&bytecode->lines);
 }
 
-int bytecode_insert_instruction_1byte(Bytecode* bytecode, OpCode opcode, int line_number) {
+int Bytecode_insert_instruction_1byte(Bytecode* bytecode, OpCode opcode, int line_number) {
     int opcode_index = array_instruction_insert(&bytecode->instructions, opcode);
     int line_opcode_index = array_line_insert(&bytecode->lines, line_number);
 
@@ -22,7 +22,7 @@ int bytecode_insert_instruction_1byte(Bytecode* bytecode, OpCode opcode, int lin
     return bytecode->instructions.count - 1;
 }
 
-int bytecode_insert_instruction_2bytes(Bytecode* bytecode, OpCode opcode, uint8_t operand, int line_number) {
+int Bytecode_insert_instruction_2bytes(Bytecode* bytecode, OpCode opcode, uint8_t operand, int line_number) {
     int opcode_index = array_instruction_insert(&bytecode->instructions, opcode);
     int line_opcode_index = array_line_insert(&bytecode->lines, line_number);
 
@@ -37,7 +37,7 @@ int bytecode_insert_instruction_2bytes(Bytecode* bytecode, OpCode opcode, uint8_
     return bytecode->instructions.count - 1;
 }
 
-static int bytecode_insert_instruction_4bytes(Bytecode* bytecode, OpCode opcode, uint8_t byte1, uint8_t byte2, uint8_t byte3, int line_number) {
+static int Bytecode_insert_instruction_4bytes(Bytecode* bytecode, OpCode opcode, uint8_t byte1, uint8_t byte2, uint8_t byte3, int line_number) {
     int opcode_index = array_instruction_insert(&bytecode->instructions, opcode);
     int line_opcode_index = array_line_insert(&bytecode->lines, line_number);
 
@@ -52,12 +52,12 @@ static int bytecode_insert_instruction_4bytes(Bytecode* bytecode, OpCode opcode,
     return bytecode->instructions.count - 1;
 }
 
-int bytecode_insert_instruction_constant(Bytecode* bytecode, Value value, int line_number) {
+int Bytecode_insert_instruction_constant(Bytecode* bytecode, Value value, int line_number) {
     int value_index = array_value_insert(&bytecode->values, value);
     assert(value_index > -1);
 
     if (value_index < 256) {
-        return bytecode_insert_instruction_2bytes(
+        return Bytecode_insert_instruction_2bytes(
             bytecode,
             OpCode_Constant,       // OpCode
             (uint8_t)value_index,  // Operand
@@ -69,7 +69,7 @@ int bytecode_insert_instruction_constant(Bytecode* bytecode, Value value, int li
     uint8_t byte2 = (value_index >> 8 & 0xff);
     uint8_t byte3 = (value_index >> 16 & 0xff);
 
-    return bytecode_insert_instruction_4bytes(
+    return Bytecode_insert_instruction_4bytes(
         bytecode,
         OpCode_Constant,          // OpCode
         byte1, byte2, byte3,      // Operand
@@ -79,29 +79,29 @@ int bytecode_insert_instruction_constant(Bytecode* bytecode, Value value, int li
 
 // Jumps Forward
 //
-int bytecode_insert_instruction_jump(Bytecode* bytecode, OpCode opcode, int line) {
-    bytecode_insert_instruction_1byte(bytecode, opcode, line);
-    bytecode_insert_instruction_1byte(bytecode, 0xff, line);
-    bytecode_insert_instruction_1byte(bytecode, 0xff, line);
+int Bytecode_insert_instruction_jump(Bytecode* bytecode, OpCode opcode, int line) {
+    Bytecode_insert_instruction_1byte(bytecode, opcode, line);
+    Bytecode_insert_instruction_1byte(bytecode, 0xff, line);
+    Bytecode_insert_instruction_1byte(bytecode, 0xff, line);
 
     return bytecode->instructions.count - 2;
 }
 
 // Jumps Backwards
 //
-void bytecode_emit_instruction_loop(Bytecode* bytecode, int loop_start_index, int line_number) {
+void Bytecode_emit_instruction_loop(Bytecode* bytecode, int loop_start_index, int line_number) {
     // instruction_array_current_position + loop_instruction_size(3 bytes) - increment_index_in_instruction_array
     //
     int offset = bytecode->instructions.count + 3 - loop_start_index;
     uint8_t operand_byte1 = ((offset >> 8) & 0xff);
     uint8_t operand_byte2 = (offset & 0xff);
 
-    bytecode_insert_instruction_1byte(bytecode, OpCode_Loop, line_number);
-    bytecode_insert_instruction_1byte(bytecode, operand_byte1, line_number);
-    bytecode_insert_instruction_1byte(bytecode, operand_byte2, line_number);
+    Bytecode_insert_instruction_1byte(bytecode, OpCode_Loop, line_number);
+    Bytecode_insert_instruction_1byte(bytecode, operand_byte1, line_number);
+    Bytecode_insert_instruction_1byte(bytecode, operand_byte2, line_number);
 }
 
-bool bytecode_patch_instruction_jump(Bytecode* bytecode, int operand_index) {
+bool Bytecode_patch_instruction_jump(Bytecode* bytecode, int operand_index) {
     int jump_to_index = bytecode->instructions.count - operand_index - 2;
     if (jump_to_index > UINT16_MAX) return true;
 
@@ -111,13 +111,13 @@ bool bytecode_patch_instruction_jump(Bytecode* bytecode, int operand_index) {
     return false;
 }
 
-static int bytecode_debug_instruction_byte(const char* opcode_text, int ret_offset_increment)
+static int Bytecode_debug_instruction_byte(const char* opcode_text, int ret_offset_increment)
 {
     printf("%s\n", opcode_text);
     return ret_offset_increment;
 }
 
-static int bytecode_debug_instruction_2bytes(Bytecode* bytecode, const char* opcode_text, int ret_offset_increment)
+static int Bytecode_debug_instruction_2bytes(Bytecode* bytecode, const char* opcode_text, int ret_offset_increment)
 {
     uint8_t operand = bytecode->instructions.items[ret_offset_increment - 1];
     Value value = bytecode->values.items[operand];
@@ -135,7 +135,7 @@ static int bytecode_debug_instruction_2bytes(Bytecode* bytecode, const char* opc
     return ret_offset_increment;
 }
 
-static int bytecode_debug_instruction_local(Bytecode* bytecode, const char* opcode_text, int ret_offset_increment)
+static int Bytecode_debug_instruction_local(Bytecode* bytecode, const char* opcode_text, int ret_offset_increment)
 {
     uint8_t operand = bytecode->instructions.items[ret_offset_increment - 1];
 
@@ -146,7 +146,7 @@ static int bytecode_debug_instruction_local(Bytecode* bytecode, const char* opco
 
 // TODO: rename to bytecode_debug_instruction_jump(bytecode, text, sign, offset);
 //
-static int bytecode_debug_instruction_3bytes(Bytecode* bytecode, const char* opcode_text, int ret_offset_increment) {
+static int Bytecode_debug_instruction_3bytes(Bytecode* bytecode, const char* opcode_text, int ret_offset_increment) {
     uint8_t operand_byte1 = bytecode->instructions.items[ret_offset_increment - 2];
     uint8_t operand_byte2 = bytecode->instructions.items[ret_offset_increment - 1];
     uint16_t operand_value = (uint16_t)((operand_byte1 << 8) | operand_byte2);
@@ -157,7 +157,7 @@ static int bytecode_debug_instruction_3bytes(Bytecode* bytecode, const char* opc
     return ret_offset_increment;
 }
 
-static int bytecode_debug_instruction_jump(Bytecode* bytecode, const char* text, int sign, int ret_offset_increment) {
+static int Bytecode_debug_instruction_jump(Bytecode* bytecode, const char* text, int sign, int ret_offset_increment) {
     uint8_t operand_byte1 = bytecode->instructions.items[ret_offset_increment - 2];
     uint8_t operand_byte2 = bytecode->instructions.items[ret_offset_increment - 1];
     uint16_t operand_value = (uint16_t)((operand_byte1 << 8) | operand_byte2);
@@ -168,7 +168,7 @@ static int bytecode_debug_instruction_jump(Bytecode* bytecode, const char* text,
     return ret_offset_increment;
 }
 
-static int bytecode_debug_instruction_4bytes(Bytecode* bytecode, const char* opcode_text, int ret_offset_increment)
+static int Bytecode_debug_instruction_4bytes(Bytecode* bytecode, const char* opcode_text, int ret_offset_increment)
 {
     uint8_t operand_byte1 = bytecode->instructions.items[ret_offset_increment - 3];
     uint8_t operand_byte2 = bytecode->instructions.items[ret_offset_increment - 2];
@@ -183,7 +183,7 @@ static int bytecode_debug_instruction_4bytes(Bytecode* bytecode, const char* opc
     return ret_offset_increment;
 }
 
-int bytecode_disassemble_instruction(Bytecode* bytecode, int offset)
+int Bytecode_disassemble_instruction(Bytecode* bytecode, int offset)
 {
     // TODO:                                 Operand
     // Offset    Line         OpCode         index value
@@ -202,68 +202,68 @@ int bytecode_disassemble_instruction(Bytecode* bytecode, int offset)
 
     OpCode opcode = bytecode->instructions.items[offset];
     if (opcode == OpCode_Constant)
-        return bytecode_debug_instruction_2bytes(bytecode, "OPCODE_CONSTANT", (offset + 2));
+        return Bytecode_debug_instruction_2bytes(bytecode, "OPCODE_CONSTANT", (offset + 2));
     if (opcode == OpCode_Interpolation)
-        return bytecode_debug_instruction_2bytes(bytecode, "OPCODE_INTERPOLATION", (offset + 2));
+        return Bytecode_debug_instruction_2bytes(bytecode, "OPCODE_INTERPOLATION", (offset + 2));
     if (opcode == OpCode_Constant_Long)
-        return bytecode_debug_instruction_4bytes(bytecode, "OPCODE_CONSTANT_LONG", (offset + 4));
+        return Bytecode_debug_instruction_4bytes(bytecode, "OPCODE_CONSTANT_LONG", (offset + 4));
     if (opcode == OpCode_True)
-        return bytecode_debug_instruction_byte("OPCODE_TRUE", (offset + 1));
+        return Bytecode_debug_instruction_byte("OPCODE_TRUE", (offset + 1));
     if (opcode == OpCode_False)
-        return bytecode_debug_instruction_byte("OPCODE_FALSE", (offset + 1));
+        return Bytecode_debug_instruction_byte("OPCODE_FALSE", (offset + 1));
     if (opcode == OpCode_Pop)
-        return bytecode_debug_instruction_byte("OPCODE_POP", (offset + 1));
+        return Bytecode_debug_instruction_byte("OPCODE_POP", (offset + 1));
     if (opcode == OpCode_Define_Global)
-        return bytecode_debug_instruction_2bytes(bytecode, "OPCODE_DEFINE_GLOBAL", (offset + 2));
+        return Bytecode_debug_instruction_2bytes(bytecode, "OPCODE_DEFINE_GLOBAL", (offset + 2));
     if (opcode == OpCode_Read_Global)
-        return bytecode_debug_instruction_2bytes(bytecode, "OPCODE_READ_GLOBAL", (offset + 2));
+        return Bytecode_debug_instruction_2bytes(bytecode, "OPCODE_READ_GLOBAL", (offset + 2));
     if (opcode == OpCode_Assign_Global)
-        return bytecode_debug_instruction_2bytes(bytecode, "OPCODE_ASSIGN_GLOBAL", (offset + 2));
+        return Bytecode_debug_instruction_2bytes(bytecode, "OPCODE_ASSIGN_GLOBAL", (offset + 2));
     if (opcode == OpCode_Read_Local)
-        return bytecode_debug_instruction_local(bytecode, "OPCODE_READ_LOCAL", (offset + 2));
+        return Bytecode_debug_instruction_local(bytecode, "OPCODE_READ_LOCAL", (offset + 2));
     if (opcode == OpCode_Assign_Local)
-        return bytecode_debug_instruction_local(bytecode, "OPCODE_ASSIGN_LOCAL", (offset + 2));
+        return Bytecode_debug_instruction_local(bytecode, "OPCODE_ASSIGN_LOCAL", (offset + 2));
     if (opcode == OpCode_Nil)
-        return bytecode_debug_instruction_byte("OPCODE_NIL", (offset + 1));
+        return Bytecode_debug_instruction_byte("OPCODE_NIL", (offset + 1));
     if (opcode == OpCode_Negation)
-        return bytecode_debug_instruction_byte("OPCODE_NEGATION", (offset + 1));
+        return Bytecode_debug_instruction_byte("OPCODE_NEGATION", (offset + 1));
     if (opcode == OpCode_Not)
-        return bytecode_debug_instruction_byte("OPCODE_NOT", (offset + 1));
+        return Bytecode_debug_instruction_byte("OPCODE_NOT", (offset + 1));
     if (opcode == OpCode_Addition)
-        return bytecode_debug_instruction_byte("OPCODE_ADDITION", (offset + 1));
+        return Bytecode_debug_instruction_byte("OPCODE_ADDITION", (offset + 1));
     if (opcode == OpCode_Subtraction)
-        return bytecode_debug_instruction_byte("OPCODE_SUBTRACTION", (offset + 1));
+        return Bytecode_debug_instruction_byte("OPCODE_SUBTRACTION", (offset + 1));
     if (opcode == OpCode_Multiplication)
-        return bytecode_debug_instruction_byte("OPCODE_MULTIPLICATION", (offset + 1));
+        return Bytecode_debug_instruction_byte("OPCODE_MULTIPLICATION", (offset + 1));
     if (opcode == OpCode_Division)
-        return bytecode_debug_instruction_byte("OPCODE_DIVISION", (offset + 1));
+        return Bytecode_debug_instruction_byte("OPCODE_DIVISION", (offset + 1));
     if (opcode == OpCode_Exponentiation)
-        return bytecode_debug_instruction_byte("OPCODE_EXPONENTIATION", (offset + 1));
+        return Bytecode_debug_instruction_byte("OPCODE_EXPONENTIATION", (offset + 1));
     if (opcode == OpCode_Negation)
-        return bytecode_debug_instruction_byte("OPCODE_NEGATION", (offset + 1));
+        return Bytecode_debug_instruction_byte("OPCODE_NEGATION", (offset + 1));
     if (opcode == OpCode_Equal_To)
-        return bytecode_debug_instruction_byte("OPCODE_EQUAL_TO", (offset + 1));
+        return Bytecode_debug_instruction_byte("OPCODE_EQUAL_TO", (offset + 1));
     if (opcode == OpCode_Greater_Than)
-        return bytecode_debug_instruction_byte("OPCODE_GREATER_THAN", (offset + 1));
+        return Bytecode_debug_instruction_byte("OPCODE_GREATER_THAN", (offset + 1));
     if (opcode == OpCode_Less_Than)
-        return bytecode_debug_instruction_byte("OPCODE_LESS_THAN", (offset + 1));
+        return Bytecode_debug_instruction_byte("OPCODE_LESS_THAN", (offset + 1));
     if (opcode == OpCode_Print)
-        return bytecode_debug_instruction_byte("OPCODE_PRINT", (offset + 1));
+        return Bytecode_debug_instruction_byte("OPCODE_PRINT", (offset + 1));
     if (opcode == OpCode_Jump_If_False)
-        return bytecode_debug_instruction_jump(bytecode, "OPCODE_JUMP_IF_FALSE", 1, (offset + 3));
+        return Bytecode_debug_instruction_jump(bytecode, "OPCODE_JUMP_IF_FALSE", 1, (offset + 3));
     if (opcode == OpCode_Jump)
-        return bytecode_debug_instruction_jump(bytecode, "OPCODE_JUMP", 1, (offset + 3));
+        return Bytecode_debug_instruction_jump(bytecode, "OPCODE_JUMP", 1, (offset + 3));
     if (opcode == OpCode_Loop)
-        return bytecode_debug_instruction_jump(bytecode, "OPCODE_LOOP", -1, (offset + 3));
+        return Bytecode_debug_instruction_jump(bytecode, "OPCODE_LOOP", -1, (offset + 3));
     if (opcode == OpCode_Return)
-        return bytecode_debug_instruction_byte("OPCODE_RETURN", (offset + 1));
+        return Bytecode_debug_instruction_byte("OPCODE_RETURN", (offset + 1));
 
     assert(false && "Unsupported OpCode. Handle the OpCode by adding a if statement.");
     printf("Unknown OpCode %d\n", opcode);
     return (offset + 1);
 }
 
-void bytecode_disassemble(Bytecode* bytecode, const char* name)
+void Bytecode_disassemble(Bytecode* bytecode, const char* name)
 {
     printf("===== %s =====\n", name);
     printf("                                     Operand  \n");
@@ -272,24 +272,24 @@ void bytecode_disassemble(Bytecode* bytecode, const char* name)
 
     for (int offset = 0; offset < bytecode->instructions.count;)
     {
-        offset = bytecode_disassemble_instruction(bytecode, offset);
+        offset = Bytecode_disassemble_instruction(bytecode, offset);
     }
 }
 
-void bytecode_emitter_begin()
+void Bytecode_emitter_begin()
 {
-    bytecode_init(&g_bytecode);
+    Bytecode_init(&g_bytecode);
 }
 
-Bytecode bytecode_emitter_end(int line_number)
+Bytecode Bytecode_emitter_end(int line_number)
 {
     Bytecode ret = g_bytecode; // copy
-    bytecode_init(&g_bytecode); // reset global variable
+    Bytecode_init(&g_bytecode); // reset global variable
 
     return ret; // return copy
 }
 
-void bytecode_free(Bytecode* bytecode)
+void Bytecode_free(Bytecode* bytecode)
 {
     array_instruction_free(&bytecode->instructions);
     array_line_free(&bytecode->lines);
