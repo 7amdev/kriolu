@@ -322,9 +322,9 @@ void Bytecode_emit_instruction_loop(Bytecode* bytecode, int loop_start_index, in
 bool Bytecode_patch_instruction_jump(Bytecode* bytecode, int operand_index);
 void Bytecode_disassemble(Bytecode* bytecode, const char* name);
 int Bytecode_disassemble_instruction(Bytecode* bytecode, int offset);
-void Bytecode_emitter_begin();
-Bytecode Bytecode_emitter_end();
 void Bytecode_free(Bytecode* bytecode);
+// void Bytecode_emitter_begin();
+// Bytecode Bytecode_emitter_end();
 
 //
 // Object
@@ -588,10 +588,13 @@ void scope_init(Scope* scope);
 // Compiler
 // 
 
+// TODO: rename to ParserFunction
 typedef struct Compiler {
     ObjectFunction* function;
     FunctionKind function_kind;
-    Scope scope;
+    StackLocal locals;
+    int depth;
+    // Scope scope; // TODO: remove this by expanding it.
 } Compiler;
 
 void Compiler_init(Compiler* compiler, FunctionKind function_kind, Compiler** compiler_current);
@@ -684,8 +687,8 @@ typedef struct
     Token token_current;
     Token token_previous;
     Lexer* lexer;
-    Compiler* compiler;
-    Scope scope;
+    Compiler* compiler; // TODO: change line to ParserFunction* function
+    // Scope scope;
     bool had_error;
     bool panic_mode;
 
@@ -771,6 +774,8 @@ void hash_table_free(HashTable* table);
 //
 
 // #define DEBUG_TRACE_EXECUTION
+#define FRAME_MAX 64
+#define FRAME_STACK_MAX (FRAME_MAX * UINT8_COUNT)
 
 typedef enum
 {
@@ -779,12 +784,33 @@ typedef enum
     Interpreter_Runtime_Error
 } InterpreterResult;
 
+typedef struct {
+    ObjectFunction* function;
+    uint8_t* ip;
+    Value* frame_start; // base_pointer
+} FunctionCall;
 
-typedef struct
-{
-    Bytecode* bytecode;
+typedef struct {
+    FunctionCall items[FRAME_STACK_MAX];
+    int top;
+} StackFunctionCall;
 
-    StackValue stack_value;
+void StackFunctionCall_reset(StackFunctionCall* function_calls);
+FunctionCall* StackFunctionCall_push(
+    StackFunctionCall* function_calls,
+    ObjectFunction* function,
+    uint8_t* ip,
+    Value* frame_start
+);
+FunctionCall* StackFunctionCall_pop(StackFunctionCall* function_calls);
+FunctionCall* StackFunctionCall_peek(StackFunctionCall* function_calls, int offset);
+bool StackFunctionCall_is_empty(StackFunctionCall* function_calls);
+bool StackFunctionCall_is_full(StackFunctionCall* function_calls);
+
+typedef struct {
+    StackFunctionCall function_calls;
+
+    StackValue stack_value; // TODO: rename to stack_values
 
     // Instruction Pointer
     //
@@ -809,11 +835,11 @@ typedef struct
 extern VirtualMachine g_vm;
 
 #define vm_init() virtual_machine_init(&g_vm)
-#define vm_interpret(bytecode) virtual_machine_interpret(&g_vm, bytecode)
+#define vm_interpret(script) virtual_machine_interpret(&g_vm, script)
 #define vm_free() virtual_machine_free(&g_vm)
 
 void virtual_machine_init(VirtualMachine* vm);
-InterpreterResult virtual_machine_interpret(VirtualMachine* vm, Bytecode* bytecode);
+InterpreterResult virtual_machine_interpret(VirtualMachine* vm, ObjectFunction* script);
 void virtual_machine_free(VirtualMachine* vm);
 
 

@@ -2,11 +2,15 @@
 
 void Compiler_init(Compiler* compiler, FunctionKind function_kind, Compiler** compiler_current) {
     compiler->function = NULL;
-    scope_init(&compiler->scope);
+    StackLocal_init(&compiler->locals, UINT8_COUNT);
     compiler->function = ObjectFunction_allocate();
     compiler->function_kind = function_kind;
+    compiler->depth = 0;
 
-    StackLocal_push(&compiler->scope.locals, (Token) { 0 }, 0);
+    StackLocal_push(&compiler->locals, (Token) { 0 }, 0);
+
+    // Mark this compiler as global and current
+    // 
     *compiler_current = compiler;
 }
 
@@ -33,4 +37,4 @@ ObjectFunction* Compiler_end(Compiler* compiler, Compiler** compiler_current, in
 
 
     return function;
-}
+    }

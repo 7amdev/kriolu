@@ -12,23 +12,32 @@ void virtual_machine_init(VirtualMachine* vm) {
     vm->objects = NULL; // TODO: remove this??
 
     stack_value_reset(&vm->stack_value);
+    StackFunctionCall_reset(&vm->function_calls);
     hash_table_init(&vm->global_database);
     hash_table_init(&vm->string_database);
 }
 
 
-InterpreterResult virtual_machine_interpret(VirtualMachine* vm, Bytecode* bytecode)
-{
-    vm->bytecode = bytecode;
-    vm->ip = vm->bytecode->instructions.items;
+InterpreterResult virtual_machine_interpret(VirtualMachine* vm, ObjectFunction* script) {
+    if (script == NULL) return Interpreter_Compiler_error;
 
-    assert(vm->bytecode->instructions.items != NULL);
+    Value value = value_make_object(script);
+    stack_value_push(&vm->stack_value, value);
 
-#define READ_BYTE_THEN_INCREMENT() (*vm->ip++) // uint8_t instruction = (vm->ip += 1, vm->ip[-1])
-#define READ_2BYTE() (vm->ip += 2, (uint16_t)((vm->ip[-2] << 8) | vm->ip[-1])) 
-#define READ_3BYTE_THEN_INCREMENT() (((((*vm->ip++) << 8) | (*vm->ip++)) << 8) | (*vm->ip++))
-#define READ_CONSTANT() (vm->bytecode->values.items[READ_BYTE_THEN_INCREMENT()])
-#define READ_CONSTANT_3BYTE() (vm->bytecode->values.items[READ_3BYTE_THEN_INCREMENT()])
+    StackFunctionCall_push(
+        &vm->function_calls,
+        script,
+        script->bytecode.instructions.items,
+        vm->stack_value.items
+    );
+
+    FunctionCall* function_call = StackFunctionCall_peek(&vm->function_calls, 0);
+
+#define READ_BYTE_THEN_INCREMENT() (*function_call->ip++) // uint8_t instruction = (vm->ip += 1, vm->ip[-1])
+#define READ_2BYTE() (function_call->ip += 2, (uint16_t)((function_call->ip[-2] << 8) | function_call->ip[-1])) 
+#define READ_3BYTE_THEN_INCREMENT() (((((*function_call->ip++) << 8) | (*function_call->ip++)) << 8) | (*function_call->ip++))
+#define READ_CONSTANT() (function_call->function->bytecode.values.items[READ_BYTE_THEN_INCREMENT()])
+#define READ_CONSTANT_3BYTE() (function_call->function->bytecode.values.items[READ_3BYTE_THEN_INCREMENT()])
 #define READ_STRING() value_as_string(READ_CONSTANT())
 
 #ifdef DEBUG_TRACE_EXECUTION
@@ -43,8 +52,9 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm, Bytecode* byteco
 #ifdef DEBUG_TRACE_EXECUTION
         stack_value_trace(&vm->stack_value);
         Bytecode_disassemble_instruction(
-            vm->bytecode,
-            (int)(vm->ip - vm->bytecode->instructions.items)
+            &function_call->function->bytecode,
+            (int)(function_call->ip - function_call->function->bytecode.instructions.items)
+            // (int)(vm->ip - vm->bytecode->instructions.items)
         );
 #endif
 
@@ -118,14 +128,29 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm, Bytecode* byteco
         case OpCode_Read_Local:
         {
             uint8_t local_slot_index = READ_BYTE_THEN_INCREMENT();
-            Value local = vm->stack_value.items[local_slot_index];
+
+            // Value local = *(frame_call->framestart + local_slot_index);
+            //
+            Value local = function_call->frame_start[local_slot_index];
             stack_value_push(&vm->stack_value, local);
+
+            // stack_value_push(&vm->stack_value, local);
+            // stack_value_push(&function_call->function->bytecode.values, local);
             break;
         }
         case OpCode_Assign_Local:
         {
             uint8_t local_slot_index = READ_BYTE_THEN_INCREMENT();
-            vm->stack_value.items[local_slot_index] = stack_value_peek(&vm->stack_value, 0);
+            // vm->stack_value.items[local_slot_index] = stack_value_peek(&vm->stack_value, 0);
+
+            // *(function_call->frame_start + local_slot_index) = ...
+            //
+            function_call->frame_start[local_slot_index] = stack_value_peek(
+                // &function_call->function->bytecode.values,
+                &vm->stack_value,
+                0
+            );
+
             break;
         }
         case OpCode_Nil:
@@ -328,20 +353,20 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm, Bytecode* byteco
         {
             uint16_t offset = READ_2BYTE(); // TODO: change name to INCREMENT_BY_2BYTES_THEN_READ()
             if (value_is_falsey(stack_value_peek(&vm->stack_value, 0)))
-                vm->ip += offset;
+                function_call->ip += offset;
 
             break;
         }
         case OpCode_Jump:
         {
             uint16_t offset = READ_2BYTE();
-            vm->ip += offset;
+            function_call->ip += offset;
             break;
         }
         case OpCode_Loop:
         {
             uint16_t offset = READ_2BYTE();
-            vm->ip -= offset;
+            function_call->ip -= offset;
             break;
         }
         case OpCode_Return:
@@ -371,8 +396,9 @@ void virtual_machine_runtime_error(VirtualMachine* vm, const char* format, ...)
     va_end(args);
     fputs("\n", stderr);
 
-    size_t instruction = vm->ip - vm->bytecode->instructions.items - 1;
-    int line = vm->bytecode->lines.items[instruction];
+    FunctionCall* function_call = StackFunctionCall_peek(&vm->function_calls, 0);
+    size_t instruction = function_call->ip - function_call->function->bytecode.instructions.items - 1;
+    int line = function_call->function->bytecode.lines.items[instruction];
     fprintf(stderr, "[line %d] in script\n", line);
     stack_value_reset(&vm->stack_value);
 }

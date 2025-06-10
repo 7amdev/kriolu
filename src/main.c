@@ -93,11 +93,11 @@ int main(int argc, const char* argv[]) {
         Bytecode bytecode;
         parser_init(&parser, source_code);
 
-        Bytecode_emitter_begin();
+        // Bytecode_emitter_begin();
         ObjectFunction* script = parser_parse(&parser, NULL);
-        bytecode = Bytecode_emitter_end();
+        // bytecode = Bytecode_emitter_end();
 
-        Bytecode_disassemble(&bytecode, "Script");
+        Bytecode_disassemble(&script->bytecode, "Script");
         Bytecode_free(&bytecode);
 
         return 0;
@@ -105,18 +105,20 @@ int main(int argc, const char* argv[]) {
 
     Parser parser;
     Bytecode bytecode;
+    VirtualMachine vm;
     parser_init(&parser, source_code);
     vm_init();
 
-    Bytecode_emitter_begin();
+    // Bytecode_emitter_begin();
     ObjectFunction* script = parser_parse(&parser, NULL);
-    bytecode = Bytecode_emitter_end();
+    // bytecode = Bytecode_emitter_end();
 
-    // VirtualMachine vm;
-    // VirtualMachine_init(&vm, value_as_function(script));
+    virtual_machine_init(&vm);
+    virtual_machine_interpret(&vm, script);
+
     // [Optional] stack_value_push(&vm, value_as_function(script));
     // VirtualMachine_interpret(&vm);
-    vm_interpret(&bytecode);
+    // vm_interpret(script);
 
     Bytecode_free(&bytecode);
     vm_free();

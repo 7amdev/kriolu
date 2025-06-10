@@ -4,7 +4,7 @@
 // Globals
 //
 
-Bytecode g_bytecode;
+// Bytecode g_bytecode;
 
 void Bytecode_init(Bytecode* bytecode) {
     array_instruction_init(&bytecode->instructions);
@@ -276,18 +276,18 @@ void Bytecode_disassemble(Bytecode* bytecode, const char* name)
     }
 }
 
-void Bytecode_emitter_begin()
-{
-    Bytecode_init(&g_bytecode);
-}
+// void Bytecode_emitter_begin()
+// {
+//     Bytecode_init(&g_bytecode);
+// }
 
-Bytecode Bytecode_emitter_end(int line_number)
-{
-    Bytecode ret = g_bytecode; // copy
-    Bytecode_init(&g_bytecode); // reset global variable
+// Bytecode Bytecode_emitter_end(int line_number)
+// {
+//     Bytecode ret = g_bytecode; // copy
+//     Bytecode_init(&g_bytecode); // reset global variable
 
-    return ret; // return copy
-}
+//     return ret; // return copy
+// }
 
 void Bytecode_free(Bytecode* bytecode)
 {
