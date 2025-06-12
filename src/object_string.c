@@ -8,6 +8,13 @@ ObjectString* ObjectString_allocate(char* characters, int length, uint32_t hash)
     return object_string;
 }
 
+ObjectString* ObjectString_is_interned(HashTable* table, String string) {
+    uint32_t hash = string_hash(string);
+    ObjectString* object_string = hash_table_get_key(&g_vm.string_database, string, hash);
+
+    return object_string;
+}
+
 ObjectString* ObjectString_allocate_if_not_interned(HashTable* table, const char* characters, int length) {
     assert(characters);
 
@@ -15,9 +22,7 @@ ObjectString* ObjectString_allocate_if_not_interned(HashTable* table, const char
     uint32_t hash = string_hash(source_string);
     ObjectString* string = hash_table_get_key(&g_vm.string_database, source_string, hash);
     if (string == NULL) {
-        // TODO: change name to string_copy(source_string)
-        //
-        source_string = string_make_and_copy_characters(characters, length);
+        source_string = string_copy(characters, length);
         hash = string_hash(source_string);
         string = ObjectString_AllocateAndIntern(source_string.characters, source_string.length, hash);
     }

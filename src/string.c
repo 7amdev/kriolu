@@ -4,11 +4,11 @@ String* string_allocate(const char* characters, int length)
 {
     String* string = (String*)malloc(sizeof(String));
     assert(string);
-    string_initialize(string, characters, length);
+    string_init(string, characters, length);
     return string;
 }
 
-void string_initialize(String* string, const char* characters, int length)
+void string_init(String* string, const char* characters, int length)
 {
     string->characters = (char*)malloc(sizeof(char) * length + 1);
     assert(string->characters);
@@ -34,12 +34,12 @@ String string_make_from_format(const char* format, ...)
     vsnprintf(buffer, 8092, format, args);
     va_end(args);
 
-    String string = string_make_and_copy_characters(buffer, strlen(buffer));
+    String string = string_copy(buffer, strlen(buffer));
 
     return string;
 }
 
-String string_make_and_copy_characters(const char* characters, int length)
+String string_copy(const char* characters, int length)
 {
     String string = { 0 };
     string.characters = (char*)malloc(sizeof(char) * length + 1);
@@ -51,7 +51,7 @@ String string_make_and_copy_characters(const char* characters, int length)
     return string;
 }
 
-String string_copy(String other)
+String string_copy_from_other(String other)
 {
     String string = { 0 };
     string.characters = (char*)malloc(sizeof(char) * other.length + 1);

@@ -35,12 +35,12 @@ Local StackLocal_pop(StackLocal* locals) {
     return local;
 }
 
-Local StackLocal_peek(StackLocal* local, int offset) {
+Local* StackLocal_peek(StackLocal* local, int offset) {
     int index = local->top - 1 - offset;
     assert(index > -1);
     assert(index < local->capacity);
 
-    return local->items[index];
+    return &local->items[index];
 }
 
 int StackLocal_get_local_index_by_token(StackLocal* locals, Token* token, Local** local_out) {

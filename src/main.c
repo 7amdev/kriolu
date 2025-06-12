@@ -76,7 +76,7 @@ int main(int argc, const char* argv[]) {
 
     if (is_flag_parser) {
         Parser parser;
-        parser_init(&parser, source_code);
+        parser_init(&parser, source_code, NULL);
 
         ArrayStatement* statements = NULL;
         parser_parse(&parser, &statements);
@@ -91,7 +91,7 @@ int main(int argc, const char* argv[]) {
     if (is_flag_bytecode) {
         Parser parser;
         Bytecode bytecode;
-        parser_init(&parser, source_code);
+        parser_init(&parser, source_code, NULL);
 
         // Bytecode_emitter_begin();
         ObjectFunction* script = parser_parse(&parser, NULL);
@@ -106,19 +106,21 @@ int main(int argc, const char* argv[]) {
     Parser parser;
     Bytecode bytecode;
     VirtualMachine vm;
-    parser_init(&parser, source_code);
+
+    // TODO: parser should have a Virtual Machine Initialized to
+    //       InternString while parsing Identifiers
+    // NOTE(IMPORTANT): To avoid dependency on VM, parser can have a 
+    //       HashTable* string_database that stores all the strings
+    //       and when its finished i can return it to the VM_INIT. 
+    parser_init(&parser, source_code, NULL);
     vm_init();
 
-    // Bytecode_emitter_begin();
     ObjectFunction* script = parser_parse(&parser, NULL);
-    // bytecode = Bytecode_emitter_end();
 
     virtual_machine_init(&vm);
+    // TODO: should i use &g_vm instead because 
+    // string_database contains the parsed indetifiers.
     virtual_machine_interpret(&vm, script);
-
-    // [Optional] stack_value_push(&vm, value_as_function(script));
-    // VirtualMachine_interpret(&vm);
-    // vm_interpret(script);
 
     Bytecode_free(&bytecode);
     vm_free();

@@ -120,8 +120,7 @@ void lexer_destroy_static(Lexer* lexer);
 
 // String is a sequence of characters.
 //
-typedef struct
-{
+typedef struct {
     char* characters;
     int length;
 } String;
@@ -136,11 +135,11 @@ typedef struct
     (String) { .characters = (char *)string, .length = strlen(string) }
 
 String* string_allocate(const char* characters, int length);
+void string_init(String* string, const char* characters, int length);
 String string_make(const char* characters, int length);
 String string_make_from_format(const char* format, ...);
-String string_make_and_copy_characters(const char* characters, int length);
-void string_initialize(String* string, const char* characters, int length);
-String string_copy(String other);
+String string_copy(const char* characters, int length);
+String string_copy_from_other(String other);
 String string_concatenate(String a, String b);
 uint32_t string_hash(String string);
 bool string_equal(String a, String b);
@@ -383,6 +382,7 @@ void Object_free(Object* object);
 inline bool object_validate_kind_from_value(Value value, ObjectKind object_kind) {
     return value_is_object(value) && value_as_object(value)->kind == object_kind;
 }
+
 #define ObjectString_AllocateAndIntern(characters, length, hash) ObjectString_allocate_and_intern(&g_vm.string_database, characters, length, hash)
 #define ObjectString_AllocateIfNotInterned(characters, length) ObjectString_allocate_if_not_interned(&g_vm.string_database, characters, length)
 
@@ -391,6 +391,7 @@ ObjectString* ObjectString_allocate_if_not_interned(HashTable* table, const char
 ObjectString* ObjectString_allocate_and_intern(HashTable* table, char* characters, int length, uint32_t hash);
 void ObjectString_init(ObjectString* object_string, char* characters, int length, uint32_t hash);
 String ObjectString_to_string(ObjectString* object_string);
+ObjectString* ObjectString_is_interned(HashTable* table, String string);
 void ObjectString_free(ObjectString* string);
 
 
@@ -510,6 +511,7 @@ enum
     StatementKind_Pa,
     StatementKind_Sai,
     StatementKind_Salta,
+    StatementKind_Funson,
 
     StatementKind_Max
 };
@@ -573,7 +575,7 @@ typedef struct {
 void  StackLocal_init(StackLocal* locals, int capacity);
 Local StackLocal_push(StackLocal* locals, Token token, int scope_depth);
 Local StackLocal_pop(StackLocal* local);
-Local StackLocal_peek(StackLocal* local, int offset);
+Local* StackLocal_peek(StackLocal* local, int offset);
 int   StackLocal_get_local_index_by_token(StackLocal* locals, Token* token, Local** local_out);
 bool  StackLocal_is_full(StackLocal* locals);
 
@@ -590,14 +592,15 @@ void scope_init(Scope* scope);
 
 // TODO: rename to ParserFunction
 typedef struct Compiler {
+    struct Compiler* previous; // LinkedList acting as a Stack
+
     ObjectFunction* function;
     FunctionKind function_kind;
     StackLocal locals;
-    int depth;
-    // Scope scope; // TODO: remove this by expanding it.
+    int depth; // Scope depth
 } Compiler;
 
-void Compiler_init(Compiler* compiler, FunctionKind function_kind, Compiler** compiler_current);
+void Compiler_init(Compiler* compiler, FunctionKind function_kind, Compiler** compiler_current, ObjectString* function_name);
 ObjectFunction* Compiler_end(Compiler* compiler, Compiler** compiler_current, int line_number);
 
 //
@@ -634,7 +637,8 @@ typedef enum {
 
     BlockType_Clean,
     BlockType_Loop,
-    BlockType_If
+    BlockType_If,
+    BlockType_Function
 } BlockType;
 
 typedef struct {
@@ -701,9 +705,9 @@ typedef struct
     StackBlock blocks;
 } Parser;
 
-#define parser_init(parser, source_code) parser_initialize(parser, source_code, NULL)
+// #define parser_init(parser, source_code) parser_init(parser, source_code, NULL)
 
-void parser_initialize(Parser* parser, const char* source_code, Lexer* lexer);
+void parser_init(Parser* parser, const char* source_code, Lexer* lexer);
 ObjectFunction* parser_parse(Parser* parser, ArrayStatement** return_statements);
 
 
@@ -817,7 +821,6 @@ typedef struct {
     uint8_t* ip;
 
     // A linked list of all objects created at runtime
-    // TODO: move this variable to object.c module
     //
     Object* objects;
 

@@ -71,7 +71,7 @@ int Bytecode_insert_instruction_constant(Bytecode* bytecode, Value value, int li
 
     return Bytecode_insert_instruction_4bytes(
         bytecode,
-        OpCode_Constant,          // OpCode
+        OpCode_Constant_Long,     // OpCode
         byte1, byte2, byte3,      // Operand
         line_number
     );
@@ -270,8 +270,7 @@ void Bytecode_disassemble(Bytecode* bytecode, const char* name)
     printf("Offset Line         OpCode         index value\n");
     printf("------ ---- ---------------------- ----- -----\n");
 
-    for (int offset = 0; offset < bytecode->instructions.count;)
-    {
+    for (int offset = 0; offset < bytecode->instructions.count;) {
         offset = Bytecode_disassemble_instruction(bytecode, offset);
     }
 }

@@ -1,11 +1,16 @@
 #include "kriolu.h"
 
-void Compiler_init(Compiler* compiler, FunctionKind function_kind, Compiler** compiler_current) {
+// TODO: rename file to parser_function.c
+// TODO: rename type prefix to ParserFunction_init 
+
+void Compiler_init(Compiler* compiler, FunctionKind function_kind, Compiler** compiler_current, ObjectString* function_name) {
+    compiler->previous = *compiler_current; // Saves the current Compiler stored in parser->compiler
     compiler->function = NULL;
     StackLocal_init(&compiler->locals, UINT8_COUNT);
     compiler->function = ObjectFunction_allocate();
     compiler->function_kind = function_kind;
     compiler->depth = 0;
+    compiler->function->name = function_name;
 
     StackLocal_push(&compiler->locals, (Token) { 0 }, 0);
 
@@ -17,12 +22,15 @@ void Compiler_init(Compiler* compiler, FunctionKind function_kind, Compiler** co
 ObjectFunction* Compiler_end(Compiler* compiler, Compiler** compiler_current, int line_number) {
     ObjectFunction* function = (*compiler_current)->function;
 
-    // emitReturn
     Compiler_CompileInstruction_1Byte(
         &function->bytecode,
         OpCode_Return,
         line_number
     );
+
+    // restore parser->compiler to the previous state
+    //
+    *compiler_current = compiler->previous;
 
 #ifdef DEBUG_COMPILER_BYTECODE
     if (!parser->had_error) {
@@ -35,6 +43,5 @@ ObjectFunction* Compiler_end(Compiler* compiler, Compiler** compiler_current, in
     }
 #endif
 
-
     return function;
-    }
+}
