@@ -238,7 +238,8 @@ int main(void) {
         ObjectString* dedup_key = deduplicaton_keys[i];
         String string_key = ObjectString_to_string(dedup_key);
         Value dedup_value = { 0 };
-        ObjectString* key_in_database = hash_table_get_key(&keys_db, string_key, string_hash(string_key));
+        // ObjectString* key_in_database = hash_table_get_key(&keys_db, string_key, string_hash(string_key));
+        ObjectString* key_in_database = hash_table_get_key(&keys_db, ObjectString_from_string(string_key));
         if (key_in_database != NULL) dedup_key = key_in_database;
 
         bool found = hash_table_get_value(&key_value_table, dedup_key, &dedup_value);

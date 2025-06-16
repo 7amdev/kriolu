@@ -15,7 +15,7 @@ bool filename_ends_with(const char* filename, const char* extension);
 void token_print(Token token);
 
 int main(int argc, const char* argv[]) {
-    const char* source_code = NULL;
+    char* source_code = NULL;
 
     if (argc < 2) {
         fprintf(stderr, "Error: few arguments to run.\n\n");
@@ -74,9 +74,13 @@ int main(int argc, const char* argv[]) {
         return 0;
     }
 
+    Parser parser;
+    Bytecode bytecode;
+    VirtualMachine vm;
+
     if (is_flag_parser) {
-        Parser parser;
-        parser_init(&parser, source_code, NULL);
+        virtual_machine_init(&vm);
+        parser_init(&parser, source_code, NULL, &vm.string_database, &vm.objects);
 
         ArrayStatement* statements = NULL;
         parser_parse(&parser, &statements);
@@ -89,13 +93,10 @@ int main(int argc, const char* argv[]) {
     }
 
     if (is_flag_bytecode) {
-        Parser parser;
-        Bytecode bytecode;
-        parser_init(&parser, source_code, NULL);
+        virtual_machine_init(&vm);
+        parser_init(&parser, source_code, NULL, &vm.string_database, &vm.objects);
 
-        // Bytecode_emitter_begin();
         ObjectFunction* script = parser_parse(&parser, NULL);
-        // bytecode = Bytecode_emitter_end();
 
         Bytecode_disassemble(&script->bytecode, "Script");
         Bytecode_free(&bytecode);
@@ -103,27 +104,15 @@ int main(int argc, const char* argv[]) {
         return 0;
     }
 
-    Parser parser;
-    Bytecode bytecode;
-    VirtualMachine vm;
-
-    // TODO: parser should have a Virtual Machine Initialized to
-    //       InternString while parsing Identifiers
-    // NOTE(IMPORTANT): To avoid dependency on VM, parser can have a 
-    //       HashTable* string_database that stores all the strings
-    //       and when its finished i can return it to the VM_INIT. 
-    parser_init(&parser, source_code, NULL);
-    vm_init();
+    virtual_machine_init(&vm);
+    parser_init(&parser, source_code, NULL, &vm.string_database, &vm.objects);
 
     ObjectFunction* script = parser_parse(&parser, NULL);
 
-    virtual_machine_init(&vm);
-    // TODO: should i use &g_vm instead because 
-    // string_database contains the parsed indetifiers.
     virtual_machine_interpret(&vm, script);
 
     Bytecode_free(&bytecode);
-    vm_free();
+    // vm_free();
 
     return 0;
 }

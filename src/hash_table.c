@@ -81,27 +81,37 @@ bool hash_table_get_value(HashTable* table, ObjectString* key, Value* value_out)
     return true;
 }
 
-ObjectString* hash_table_get_key(HashTable* table, String string, uint32_t hash)
-{
+ObjectString* hash_table_get_key(HashTable* table, ObjectString key) {
     if (table->count == 0)
         return NULL;
 
-    uint32_t index = hash % table->capacity;
-    for (;;) {
-        Entry* entry = &table->entries[index];
-        if (hash_table_is_an_empty_entry(entry))
-            return NULL;
+    Entry* entry = hash_table_find_entry_by_key(table->entries, &key, table->capacity);
+    if (entry == NULL) return NULL;
 
-        if (entry->key->length == string.length &&
-            entry->key->hash == hash &&
-            memcmp(entry->key->characters, string.characters, entry->key->length) == 0
-            ) {
-            return entry->key;
-        }
-
-        index = (index + 1) % table->capacity;
-    }
+    return entry->key;
 }
+
+// ObjectString* hash_table_get_key(HashTable* table, String string, uint32_t hash)
+// {
+//     if (table->count == 0)
+//         return NULL;
+
+//     uint32_t index = hash % table->capacity;
+//     for (;;) {
+//         Entry* entry = &table->entries[index];
+//         if (hash_table_is_an_empty_entry(entry))
+//             return NULL;
+
+//         if (entry->key->length == string.length &&
+//             entry->key->hash == hash &&
+//             memcmp(entry->key->characters, string.characters, entry->key->length) == 0
+//             ) {
+//             return entry->key;
+//         }
+
+//         index = (index + 1) % table->capacity;
+//     }
+// }
 
 bool hash_table_delete(HashTable* table, ObjectString* key)
 {

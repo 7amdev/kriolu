@@ -99,7 +99,7 @@ bool string_equal(String a, String b)
 void string_free(String* string)
 {
     free(string->characters);
-    free(string);
     string->characters = NULL;
     string->length = 0;
+    free(string);
 }

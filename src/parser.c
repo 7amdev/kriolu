@@ -44,7 +44,7 @@ static uint8_t parser_store_identifier_into_bytecode(Parser* parser, const char*
 // Globals
 //
 
-void parser_init(Parser* parser, const char* source_code, Lexer* lexer) {
+void parser_init(Parser* parser, const char* source_code, Lexer* lexer, HashTable* string_database, Object** object_head) {
     parser->token_current = (Token){ 0 };  // token_error
     parser->token_previous = (Token){ 0 }; // token_error
     parser->panic_mode = false;
@@ -59,7 +59,8 @@ void parser_init(Parser* parser, const char* source_code, Lexer* lexer) {
     parser->interpolation_count_nesting = 0;
     parser->interpolation_count_value_pushed = 0;
     parser->continue_jump_to = -1;
-    // scope_init(&parser->scope);
+    parser->string_database = string_database;
+    parser->object_head = object_head;
     StackBreak_init(&parser->breakpoints);
     StackBlock_init(&parser->blocks);
 }
@@ -70,7 +71,7 @@ ObjectFunction* parser_parse(Parser* parser, ArrayStatement** return_statements)
     ArrayStatement* statements = array_statement_allocate();
 
     parser_advance(parser);
-    Compiler_init(&compiler, FunctionKind_Script, &parser->compiler, NULL);
+    Compiler_init(&compiler, FunctionKind_Script, &parser->compiler, NULL, parser->object_head);
 
     for (;;) {
         if (parser->token_current.kind == Token_Eof) break;
@@ -491,15 +492,15 @@ static int parser_parse_identifier(Parser* parser, const char* error_message) {
     parser_consume(parser, Token_Identifier, error_message);
 
     if (parser->compiler->depth == 0) { // Parse Global Function Name 
-        // ObjectString* identifier_string = ObjectString_AllocateIfNotInterned(parser->token_previous.start, parser->token_previous.length);
+        // ObjectString* identifier_string = ObjectString_allocate_if_not_interned(parser->string_database,parser->token_previous.start, parser->token_previous.length);
 
         String token = { 0 };
         // TODO: debug token length and the character terminator
         string_init(&token, parser->token_previous.start, parser->token_previous.length);
-        ObjectString* identifier_string = ObjectString_is_interned(&g_vm.string_database, token);
+        ObjectString* identifier_string = ObjectString_is_interned(parser->string_database, token);
         if (identifier_string == NULL) {
             uint32_t token_hash = string_hash(token);
-            identifier_string = ObjectString_allocate_and_intern(&g_vm.string_database, token.characters, token.length, token_hash);
+            identifier_string = ObjectString_allocate_and_intern(parser->string_database, token.characters, token.length, token_hash, parser->object_head);
         }
         Value value_string = value_make_object_string(identifier_string);
         value_index = Compiler_CompileValue(parser_get_current_bytecode(parser), value_string);
@@ -555,8 +556,8 @@ static Statement* parser_parse_function_declaration(Parser* parser) {
 
 static void parser_parse_function_paramenters_and_body(Parser* parser) {
     Compiler compiler;
-    ObjectString* function_name = ObjectString_AllocateIfNotInterned(parser->token_previous.start, parser->token_previous.length);
-    Compiler_init(&compiler, FunctionKind_Function, &parser->compiler, function_name);
+    ObjectString* function_name = ObjectString_allocate_if_not_interned(parser->string_database, parser->token_previous.start, parser->token_previous.length, parser->object_head);
+    Compiler_init(&compiler, FunctionKind_Function, &parser->compiler, function_name, parser->object_head);
     parser_begin_scope(parser);
 
     parser_consume(parser, Token_Left_Parenthesis, "Expect a '(' after the function name.");
@@ -625,7 +626,7 @@ static Statement* parser_parse_variable_declaration(Parser* parser) {
             -1 // Mark Local as Uninitialized 
         );
 
-        statement.variable_declaration.identifier = ObjectString_AllocateIfNotInterned(parser->token_previous.start, parser->token_previous.length);
+        statement.variable_declaration.identifier = ObjectString_allocate_if_not_interned(parser->string_database, parser->token_previous.start, parser->token_previous.length, parser->object_head);
 
         // Check for assignment
         // 
@@ -657,7 +658,7 @@ static Statement* parser_parse_variable_declaration(Parser* parser) {
 
     uint8_t global_index = 0;
 
-    statement.variable_declaration.identifier = ObjectString_AllocateIfNotInterned(parser->token_previous.start, parser->token_previous.length);
+    statement.variable_declaration.identifier = ObjectString_allocate_if_not_interned(parser->string_database, parser->token_previous.start, parser->token_previous.length, parser->object_head);
     Value value_string = value_make_object_string(statement.variable_declaration.identifier);
     int value_index = Compiler_CompileValue(parser_get_current_bytecode(parser), value_string);
     if (value_index > UINT8_MAX) {
@@ -691,7 +692,7 @@ static Statement* parser_parse_variable_declaration(Parser* parser) {
 }
 
 static uint8_t parser_store_identifier_into_bytecode(Parser* parser, const char* start, int length) {
-    ObjectString* object_string = ObjectString_AllocateIfNotInterned(start, length);
+    ObjectString* object_string = ObjectString_allocate_if_not_interned(parser->string_database, start, length, parser->object_head);
     Value value_string = value_make_object_string(object_string);
     int value_index = Compiler_CompileValue(parser_get_current_bytecode(parser), value_string);
     if (value_index > UINT8_MAX) {
@@ -879,7 +880,7 @@ static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bo
         // allocate a new one and store it in the global string database for
         // future reference.
         //
-        ObjectString* string = ObjectString_AllocateIfNotInterned(parser->token_previous.start + 1, parser->token_previous.length - 2);
+        ObjectString* string = ObjectString_allocate_if_not_interned(parser->string_database, parser->token_previous.start + 1, parser->token_previous.length - 2, parser->object_head);
 
         Value v_string = value_make_object(string);
         Expression e_string = expression_make_string(string);
@@ -894,7 +895,7 @@ static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bo
             if (parser->token_previous.kind != Token_String_Interpolation)
                 break;
 
-            ObjectString* string = ObjectString_AllocateIfNotInterned(parser->token_previous.start + 1, parser->token_previous.length - 2);
+            ObjectString* string = ObjectString_allocate_if_not_interned(parser->string_database, parser->token_previous.start + 1, parser->token_previous.length - 2, parser->object_head);
             Value v_string = value_make_object(string);
             Expression e_string = expression_make_string(string);
 
@@ -966,7 +967,7 @@ static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bo
         Local* local_found = NULL;
         // int operand = StackLocal_get_local_index_by_token(&parser->scope.locals, &parser->token_previous, &local_found);
         int operand = StackLocal_get_local_index_by_token(&parser->compiler->locals, &parser->token_previous, &local_found);
-        ObjectString* variable_name = ObjectString_AllocateIfNotInterned(parser->token_previous.start, parser->token_previous.length);
+        ObjectString* variable_name = ObjectString_allocate_if_not_interned(parser->string_database, parser->token_previous.start, parser->token_previous.length, parser->object_head);
 
         if (operand != -1) {
             opcode_assign = OpCode_Assign_Local;

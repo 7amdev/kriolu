@@ -1,15 +1,15 @@
 #include "kriolu.h"
 
-ObjectFunction* ObjectFunction_allocate() {
+ObjectFunction* ObjectFunction_allocate(Object** object_head) {
     ObjectFunction* function = calloc(1, sizeof(ObjectFunction));
     assert(function);
-    ObjectFunction_init(function, NULL, &function->bytecode, 0);
+    ObjectFunction_init(function, NULL, &function->bytecode, 0, object_head);
 
     return function;
 }
 
-void ObjectFunction_init(ObjectFunction* function, ObjectString* name, Bytecode* bytecode, int arity) {
-    Object_init((Object*)function, ObjectKind_Function);
+void ObjectFunction_init(ObjectFunction* function, ObjectString* name, Bytecode* bytecode, int arity, Object** object_head) {
+    Object_init((Object*)function, ObjectKind_Function, object_head);
     assert(function->object.kind == ObjectKind_Function);
     function->arity = arity;
     function->name = name;

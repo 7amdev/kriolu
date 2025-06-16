@@ -3,15 +3,15 @@
 // TODO: rename file to parser_function.c
 // TODO: rename type prefix to ParserFunction_init 
 
-void Compiler_init(Compiler* compiler, FunctionKind function_kind, Compiler** compiler_current, ObjectString* function_name) {
+void Compiler_init(Compiler* compiler, FunctionKind function_kind, Compiler** compiler_current, ObjectString* function_name, Object** object_head) {
     compiler->previous = *compiler_current; // Saves the current Compiler stored in parser->compiler
     compiler->function = NULL;
-    StackLocal_init(&compiler->locals, UINT8_COUNT);
-    compiler->function = ObjectFunction_allocate();
+    compiler->function = ObjectFunction_allocate(object_head);
     compiler->function_kind = function_kind;
     compiler->depth = 0;
     compiler->function->name = function_name;
 
+    StackLocal_init(&compiler->locals, UINT8_COUNT);
     StackLocal_push(&compiler->locals, (Token) { 0 }, 0);
 
     // Mark this compiler as global and current

@@ -1,1 +1,0 @@
-verdadi e 1 e falsu e 3 e 4;

@@ -1,30 +1,24 @@
 #include "kriolu.h"
 
-Object* Object_allocate(ObjectKind kind, size_t size)
+Object* Object_allocate(ObjectKind kind, size_t size, Object** object_head)
 {
     Object* object = (Object*)calloc(1, sizeof(Object));
     assert(object);
 
-    Object_init(object, kind);
+    Object_init(object, kind, object_head);
     return object;
 }
 
-void Object_init(Object* object, ObjectKind kind)
+void Object_init(Object* object, ObjectKind kind, Object** object_head)
 {
     object->kind = kind;
 
     // Linked List
-    // g_vm.objects -> NULL
-    // g_vm.objects -> object_1.next -> NULL
     //
-    // object.next -> object_1
-    // g_vm.objects -> object.next -> object_1.next -> NULL
-    //
-    // TODO: change g_vm.objects to g_objects declared in object.c
-    //       to maintain encapsulation
-    //
-    object->next = g_vm.objects;
-    g_vm.objects = object;
+    if (object_head != NULL) {
+        object->next = *object_head;
+        *object_head = object;
+    }
 }
 
 void Object_clear(Object* object)

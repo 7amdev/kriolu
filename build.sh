@@ -13,5 +13,5 @@ rm -f kriolu
 mkdir build
 cd build
 cl $flags ../src/*.c //Fe:$outputFile $trace
-mv kriolu ../
+# mv kriolu ../
 cd -

@@ -9,7 +9,7 @@ void virtual_machine_runtime_error(VirtualMachine* vm, const char* format, ...);
 VirtualMachine g_vm;
 
 void virtual_machine_init(VirtualMachine* vm) {
-    vm->objects = NULL; // TODO: remove this??
+    vm->objects = NULL;
 
     stack_value_reset(&vm->stack_value);
     StackFunctionCall_reset(&vm->function_calls);
@@ -17,6 +17,9 @@ void virtual_machine_init(VirtualMachine* vm) {
     hash_table_init(&vm->string_database);
 }
 
+static inline bool object_validate_kind_from_value(Value value, ObjectKind object_kind) {
+    return (value_is_object(value) && value_as_object(value)->kind == object_kind);
+}
 
 InterpreterResult virtual_machine_interpret(VirtualMachine* vm, ObjectFunction* script) {
     if (script == NULL) return Interpreter_Compiler_error;
@@ -54,7 +57,6 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm, ObjectFunction* 
         Bytecode_disassemble_instruction(
             &function_call->function->bytecode,
             (int)(function_call->ip - function_call->function->bytecode.instructions.items)
-            // (int)(vm->ip - vm->bytecode->instructions.items)
         );
 #endif
 
@@ -221,11 +223,14 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm, ObjectFunction* 
 
                 String final = string_concatenate(s_a, s_b);
                 uint32_t hash = string_hash(final);
-                ObjectString* string = hash_table_get_key(&g_vm.string_database, final, hash);
-                bool found_string_in_database = (string != NULL);
-                if (found_string_in_database) string_free(&final);
+                // ObjectString* string = hash_table_get_key(&vm->string_database, final, hash);
+                ObjectString* string = hash_table_get_key(&vm->string_database, ObjectString_from_string(final));
+                if (string == NULL) {
+                    string = ObjectString_allocate_and_intern(&vm->string_database, final.characters, final.length, hash, &vm->objects);
+                } else {
+                    string_free(&final);
+                }
 
-                string = ObjectString_AllocateAndIntern(final.characters, final.length, hash);
                 stack_value_push(&vm->stack_value, value_make_object(string));
             } else {
                 virtual_machine_runtime_error(vm, "Operands must be 2(two) numbers or 2(two) strings.");

@@ -276,7 +276,6 @@ bool value_is_falsey(Value value);
 bool value_is_equal(Value a, Value b);
 void value_print(Value value);
 
-
 void array_value_init(ArrayValue* values);
 uint32_t array_value_insert(ArrayValue* values, Value value);
 void array_value_free(ArrayValue* values);
@@ -374,29 +373,29 @@ typedef struct
     int arity; // Number of parameters
 } ObjectFunction;
 
-Object* Object_allocate(ObjectKind kind, size_t size);
-void Object_init(Object* object, ObjectKind kind);
+Object* Object_allocate(ObjectKind kind, size_t size, Object** object_head);
+void Object_init(Object* object, ObjectKind kind, Object** object_head);
 void Object_clear(Object* object);
 void Object_print(Object* object);
 void Object_free(Object* object);
-inline bool object_validate_kind_from_value(Value value, ObjectKind object_kind) {
-    return value_is_object(value) && value_as_object(value)->kind == object_kind;
-}
+// inline bool object_validate_kind_from_value(Value value, ObjectKind object_kind);
+// inline bool object_validate_kind_from_value(Value value, ObjectKind object_kind) {
+//     return (value_is_object(value) && value_as_object(value)->kind == object_kind);
+// }
 
-#define ObjectString_AllocateAndIntern(characters, length, hash) ObjectString_allocate_and_intern(&g_vm.string_database, characters, length, hash)
-#define ObjectString_AllocateIfNotInterned(characters, length) ObjectString_allocate_if_not_interned(&g_vm.string_database, characters, length)
-
-ObjectString* ObjectString_allocate(char* characters, int length, uint32_t hash);
-ObjectString* ObjectString_allocate_if_not_interned(HashTable* table, const char* characters, int length);
-ObjectString* ObjectString_allocate_and_intern(HashTable* table, char* characters, int length, uint32_t hash);
-void ObjectString_init(ObjectString* object_string, char* characters, int length, uint32_t hash);
+ObjectString* ObjectString_allocate(char* characters, int length, uint32_t hash, Object** object_head);
+ObjectString* ObjectString_allocate_if_not_interned(HashTable* table, const char* characters, int length, Object** object_head);
+ObjectString* ObjectString_allocate_and_intern(HashTable* table, char* characters, int length, uint32_t hash, Object** object_head);
+void ObjectString_init(ObjectString* object_string, char* characters, int length, uint32_t hash, Object** object_head);
 String ObjectString_to_string(ObjectString* object_string);
+ObjectString ObjectString_from_string(String string);
 ObjectString* ObjectString_is_interned(HashTable* table, String string);
 void ObjectString_free(ObjectString* string);
 
 
-ObjectFunction* ObjectFunction_allocate();
-void ObjectFunction_init(ObjectFunction* function, ObjectString* name, Bytecode* bytecode, int arity);
+ObjectFunction* ObjectFunction_allocate(Object** object_head);
+void ObjectFunction_init(ObjectFunction* function, ObjectString* name, Bytecode* bytecode, int arity, Object** object_head);
+void ObjectFunction_free(ObjectFunction* function);
 
 //
 // Abstract Syntax Tree
@@ -600,7 +599,7 @@ typedef struct Compiler {
     int depth; // Scope depth
 } Compiler;
 
-void Compiler_init(Compiler* compiler, FunctionKind function_kind, Compiler** compiler_current, ObjectString* function_name);
+void Compiler_init(Compiler* compiler, FunctionKind function_kind, Compiler** compiler_current, ObjectString* function_name, Object** object_head);
 ObjectFunction* Compiler_end(Compiler* compiler, Compiler** compiler_current, int line_number);
 
 //
@@ -692,12 +691,13 @@ typedef struct
     Token token_previous;
     Lexer* lexer;
     Compiler* compiler; // TODO: change line to ParserFunction* function
-    // Scope scope;
     bool had_error;
     bool panic_mode;
 
     // Bookkeeping
     //
+    HashTable* string_database;
+    Object** object_head;
     int interpolation_count_nesting;
     int interpolation_count_value_pushed;
     int continue_jump_to;
@@ -705,9 +705,7 @@ typedef struct
     StackBlock blocks;
 } Parser;
 
-// #define parser_init(parser, source_code) parser_init(parser, source_code, NULL)
-
-void parser_init(Parser* parser, const char* source_code, Lexer* lexer);
+void parser_init(Parser* parser, const char* source_code, Lexer* lexer, HashTable* string_database, Object** object_head);
 ObjectFunction* parser_parse(Parser* parser, ArrayStatement** return_statements);
 
 
@@ -769,7 +767,7 @@ void hash_table_init(HashTable* table);
 void hash_table_copy(HashTable* from, HashTable* to); // tableAddAll
 bool hash_table_set_value(HashTable* table, ObjectString* key, Value value);
 bool hash_table_get_value(HashTable* table, ObjectString* key, Value* value_out);
-ObjectString* hash_table_get_key(HashTable* table, String string, uint32_t hash);
+ObjectString* hash_table_get_key(HashTable* table, ObjectString key);
 bool hash_table_delete(HashTable* table, ObjectString* key);
 void hash_table_free(HashTable* table);
 
@@ -836,10 +834,6 @@ typedef struct {
 } VirtualMachine;
 
 extern VirtualMachine g_vm;
-
-#define vm_init() virtual_machine_init(&g_vm)
-#define vm_interpret(script) virtual_machine_interpret(&g_vm, script)
-#define vm_free() virtual_machine_free(&g_vm)
 
 void virtual_machine_init(VirtualMachine* vm);
 InterpreterResult virtual_machine_interpret(VirtualMachine* vm, ObjectFunction* script);
