@@ -16,7 +16,7 @@ bool token_is_identifier_equal(Token* a, Token* b) {
     if (a->kind != Token_Identifier) return false;
     if (b->kind != Token_Identifier) return false;
     if (a->length != b->length)      return false;
-    if (a->kind != a->kind)          return false;
+    if (a->kind != b->kind)          return false;
 
     return memcmp(a->start, b->start, a->length) == 0;
 }
