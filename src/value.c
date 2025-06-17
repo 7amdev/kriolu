@@ -51,8 +51,7 @@ void array_value_init(ArrayValue* values)
 
 uint32_t array_value_insert(ArrayValue* values, Value value)
 {
-    if (values->capacity < values->count + 1)
-    {
+    if (values->capacity < values->count + 1) {
         values->capacity = values->capacity < 8 ? 8 : 2 * values->capacity;
         values->items = (Value*)realloc(values->items, values->capacity * sizeof(Value));
         assert(values->items);

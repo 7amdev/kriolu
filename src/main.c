@@ -75,8 +75,7 @@ int main(int argc, const char* argv[]) {
     }
 
     Parser parser;
-    Bytecode bytecode;
-    VirtualMachine vm;
+    VirtualMachine vm = { 0 };
 
     if (is_flag_parser) {
         virtual_machine_init(&vm);
@@ -99,7 +98,7 @@ int main(int argc, const char* argv[]) {
         ObjectFunction* script = parser_parse(&parser, NULL);
 
         Bytecode_disassemble(&script->bytecode, "Script");
-        Bytecode_free(&bytecode);
+        // Bytecode_free(&bytecode);
 
         return 0;
     }
@@ -111,7 +110,7 @@ int main(int argc, const char* argv[]) {
 
     virtual_machine_interpret(&vm, script);
 
-    Bytecode_free(&bytecode);
+    // Bytecode_free(&bytecode);
     // vm_free();
 
     return 0;
