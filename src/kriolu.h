@@ -767,7 +767,8 @@ void hash_table_init(HashTable* table);
 void hash_table_copy(HashTable* from, HashTable* to); // tableAddAll
 bool hash_table_set_value(HashTable* table, ObjectString* key, Value value);
 bool hash_table_get_value(HashTable* table, ObjectString* key, Value* value_out);
-ObjectString* hash_table_get_key(HashTable* table, ObjectString key);
+// ObjectString* hash_table_get_key(HashTable* table, ObjectString key);
+ObjectString* hash_table_get_key(HashTable* table, String string, uint32_t hash);
 bool hash_table_delete(HashTable* table, ObjectString* key);
 void hash_table_free(HashTable* table);
 

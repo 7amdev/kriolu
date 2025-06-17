@@ -1,13 +1,5 @@
-imprimi "Hello " + "World!";
+funson soma(a, b) {
+   imprimi a + b;
+}
 
-// mimoria a = "Hello";
-// si (a == "Hello") {
-//     imprimi "verdadi";
-// } sinou { 
-//     imprimi "falsu";
-// }
-
-// funson soma(a, b) {
-//    imprimi a + b;
-// }
-// imprimi soma;
+imprimi soma;
