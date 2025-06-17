@@ -223,8 +223,7 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm, ObjectFunction* 
 
                 String final = string_concatenate(s_a, s_b);
                 uint32_t hash = string_hash(final);
-                // ObjectString* string = hash_table_get_key(&vm->string_database, final, hash);
-                ObjectString* string = hash_table_get_key(&vm->string_database, ObjectString_from_string(final));
+                ObjectString* string = hash_table_get_key(&vm->string_database, final, hash);
                 if (string == NULL) {
                     string = ObjectString_allocate_and_intern(&vm->string_database, final.characters, final.length, hash, &vm->objects);
                 } else {
