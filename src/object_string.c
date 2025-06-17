@@ -11,7 +11,7 @@ ObjectString* ObjectString_allocate(char* characters, int length, uint32_t hash,
 // TODO: Convert this function to a macro
 ObjectString* ObjectString_is_interned(HashTable* table, String string) {
     uint32_t hash = string_hash(string);
-    ObjectString* object_string = hash_table_get_key(table, ObjectString_from_string(string));
+    ObjectString* object_string = hash_table_get_key(table, string, hash);
 
     return object_string;
 }
@@ -20,11 +20,8 @@ ObjectString* ObjectString_allocate_if_not_interned(HashTable* table, const char
     assert(characters);
 
     String source_string = string_make(characters, length);
-    // uint32_t hash = string_hash(source_string);
-    // ObjectString* string = hash_table_get_key(table, object_string);
-
-    // ObjectString object_string = ObjectString_from_string(source_string);
-    ObjectString* string = hash_table_get_key(table, ObjectString_from_string(source_string));
+    uint32_t hash = string_hash(source_string);
+    ObjectString* string = hash_table_get_key(table, source_string, hash);
     if (string == NULL) {
         source_string = string_copy(characters, length);
         uint32_t hash = string_hash(source_string);
