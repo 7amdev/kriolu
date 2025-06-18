@@ -17,16 +17,19 @@ static Statement* parser_instruction_while(Parser* parser);
 static Statement* parser_instruction_for(Parser* parser);
 static Statement* parser_instruction_break(Parser* parser);
 static Statement* parser_instruction_continue(Parser* parser);
+static Statement* parser_instruction_return(Parser* parser);
 static Statement* parser_parse_function_declaration(Parser* parser);
+static Expression* parser_parse_operator_function_call(Parser* parser, Expression* left_operand);
 static Statement* parser_parse_variable_declaration(Parser* parser);
 static int parser_parse_identifier(Parser* parser, const char* error_message);
 static void parser_initialize_local_identifier(Parser* parser);
-static void parser_parse_function_paramenters_and_body(Parser* parser);
+static ObjectFunction* parser_parse_function_paramenters_and_body(Parser* parser, FunctionKind function_kind);
 static Expression* parser_parse_expression(Parser* parser, OperatorPrecedence operator_precedence_previous);
 static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bool can_assign);
 static Expression* parser_parse_operators_logical(Parser* parser, Expression* left_operand);
 static Expression* parser_parse_operators_arithmetic(Parser* parser, Expression* left_operand);
 static Expression* parser_parse_operators_relational(Parser* parser, Expression* left_operand);
+static void parser_compile_return(Parser* parser);
 static bool parser_is_operator_arithmetic(Parser* parser);
 static bool parser_is_operator_logical(Parser* parser);
 static bool parser_is_operator_relational(Parser* parser);
@@ -83,14 +86,7 @@ ObjectFunction* parser_parse(Parser* parser, ArrayStatement** return_statements)
         // TODO: free statement here
     }
 
-    ObjectFunction* compiled_script = Compiler_end(&compiler, &parser->compiler, parser->token_current.line_number);
-    // parser_end_parsing(parser);
-
-// #ifdef DEBUG_COMPILER_BYTECODE
-//     if (!parser->had_error) {
-//         bytecode_disassemble(&compiled_script->bytecode, "Script");
-//     }
-// #endif
+    ObjectFunction* compiled_script = Compiler_end(&compiler, &parser->compiler, parser->had_error, parser->token_current.line_number);
 
     if (return_statements != NULL) *return_statements = statements;
     return parser->had_error ? NULL : compiled_script;
@@ -218,6 +214,8 @@ static Statement* parser_parse_statement(Parser* parser, BlockType block_type)
         statement = parser_instruction_break(parser);
     else if (parser_match_then_advance(parser, Token_Salta))
         statement = parser_instruction_continue(parser);
+    else if (parser_match_then_advance(parser, Token_Divolvi))
+        statement = parser_instruction_return(parser);
     else statement = parser_parse_statement_expression(parser);
 
     if (parser->panic_mode)
@@ -477,12 +475,50 @@ static Statement* parser_instruction_continue(Parser* parser) {
         return NULL;
     }
 
-    Compiler_CompileInstruction_Loop(parser_get_current_bytecode(parser), parser->continue_jump_to, parser->token_previous.line_number);
+    Compiler_CompileInstruction_Loop(
+        parser_get_current_bytecode(parser),
+        parser->continue_jump_to,
+        parser->token_previous.line_number
+    );
 
     parser_consume(parser, Token_Semicolon, "Expected ';' after token 'salta'.");
 
     Statement statement = { 0 };
     statement.kind = StatementKind_Salta;
+    return statement_allocate(statement);
+}
+
+static void parser_compile_return(Parser* parser) {
+    Compiler_CompileInstruction_1Byte(
+        parser_get_current_bytecode(parser),
+        OpCode_Nil,
+        parser->token_current.line_number
+    );
+    Compiler_CompileInstruction_1Byte(
+        parser_get_current_bytecode(parser),
+        OpCode_Return,
+        parser->token_current.line_number
+    );
+}
+
+static Statement* parser_instruction_return(Parser* parser) {
+    if (parser->compiler->function_kind == FunctionKind_Script)
+        parser_error(parser, &parser->token_previous, "Can't return from top-level code.");
+
+    if (parser->token_current.kind == Token_Semicolon) {
+        parser_compile_return(parser);
+    } else {
+        Expression* expression = parser_parse_expression(parser, OperatorPrecedence_Assignment);
+        parser_consume(parser, Token_Semicolon, "Expect ';' after expression.");
+        Compiler_CompileInstruction_1Byte(
+            parser_get_current_bytecode(parser),
+            OpCode_Return,
+            parser->token_current.line_number
+        );
+    }
+
+    Statement statement = { 0 };
+    statement.kind = StatementKind_Return;
     return statement_allocate(statement);
 }
 
@@ -493,9 +529,7 @@ static int parser_parse_identifier(Parser* parser, const char* error_message) {
 
     if (parser->compiler->depth == 0) { // Parse Global Function Name 
         // ObjectString* identifier_string = ObjectString_allocate_if_not_interned(parser->string_database,parser->token_previous.start, parser->token_previous.length);
-
         String token = { 0 };
-        // TODO: debug token length and the character terminator
         string_init(&token, parser->token_previous.start, parser->token_previous.length);
         ObjectString* identifier_string = ObjectString_is_interned(parser->string_database, token);
         if (identifier_string == NULL) {
@@ -536,17 +570,28 @@ static Statement* parser_parse_function_declaration(Parser* parser) {
     Statement statement = { 0 };
     statement.kind = StatementKind_Funson;
 
-    int value_index = parser_parse_identifier(parser, "Expect function name identifier.");
+    int function_name_index = parser_parse_identifier(parser, "Expect function name identifier.");
     parser_initialize_local_identifier(parser);
-    parser_parse_function_paramenters_and_body(parser);
+    ObjectFunction* parsed_function = parser_parse_function_paramenters_and_body(parser, FunctionKind_Function);
 
-    // Define Global Identifier
+    Value function = value_make_object(parsed_function);
+    Compiler_CompileInstruction_Constant(
+        parser_get_current_bytecode(parser),
+        function,
+        parser->token_previous.line_number
+    );
+
+    // UPVALUE Support
+    // Loop for every upvalue_count
+    //     Compiler_CompileInstruction_2Bytes(is_local, index);
+
+    // Define Function Identifier
     //
     if (parser->compiler->depth == 0) {
         Compiler_CompileInstruction_2Bytes(
             parser_get_current_bytecode(parser),
             OpCode_Define_Global,
-            value_index,
+            function_name_index,
             parser->token_previous.line_number
         );
     }
@@ -554,10 +599,39 @@ static Statement* parser_parse_function_declaration(Parser* parser) {
     return statement_allocate(statement);
 }
 
-static void parser_parse_function_paramenters_and_body(Parser* parser) {
+static Statement* parser_parse_method_declaration(Parser* parser) {
+    // int method_name_index = parser_parse_identifier(parser, "Expect Method name identifier.");
+
+    // FunctionKind function_kind = FunctionKind_Method;
+    // if (parser.previous.length == 4 && memcmp(parser.previous.start, "init", 4) == 0)
+    //     function_kind = FunctionKind_Initializer;
+    // ObjectFunction* function = parser_parse_function_paramenters_and_body(parser, function_kind);
+
+    // Value value = value_make_object(function);
+    // Compiler_CompileInstruction_Constant(
+    //     parser_get_current_bytecode(parser),
+    //     value,
+    //     parser->token_previous.line_number
+    // );
+    // 
+    // Loop for every upvalue_count
+    //     Compiler_CompileInstruction_2Bytes(is_local, index);
+
+    // Define Method 
+    //
+    // Compiler_CompileInstruction_2Bytes(
+    //     parser_get_current_bytecode(parser),
+    //     OpCode_Define_Method,
+    //     method_name_index,
+    //     parser->token_previous.line_number
+    // );
+    return NULL;
+}
+
+static ObjectFunction* parser_parse_function_paramenters_and_body(Parser* parser, FunctionKind function_kind) {
     Compiler compiler;
     ObjectString* function_name = ObjectString_allocate_if_not_interned(parser->string_database, parser->token_previous.start, parser->token_previous.length, parser->object_head);
-    Compiler_init(&compiler, FunctionKind_Function, &parser->compiler, function_name, parser->object_head);
+    Compiler_init(&compiler, function_kind, &parser->compiler, function_name, parser->object_head);
     parser_begin_scope(parser);
 
     parser_consume(parser, Token_Left_Parenthesis, "Expect a '(' after the function name.");
@@ -580,24 +654,25 @@ static void parser_parse_function_paramenters_and_body(Parser* parser) {
                 );
             } else {
                 parser_initialize_local_identifier(parser);
-                // Local* local = &parser->compiler->locals.items[parser->compiler->locals.top - 1];
-                // local->scope_depth = parser->compiler->depth;
             }
         } while (parser_match_then_advance(parser, Token_Comma));
-        // while (parser->token_current.kind == Token_Comma);
     }
     parser_consume(parser, Token_Right_Parenthesis, "Expect a ')' after parameters.");
     parser_consume(parser, Token_Left_Brace, "Expect a '{' after parameters.");
 
     Statement* statement_block = parser_parse_instruction_block(parser, BlockType_Function);
 
-    ObjectFunction* function = Compiler_end(&compiler, &parser->compiler, parser->token_previous.line_number);
-    Value value = value_make_object(function);
-    Compiler_CompileInstruction_Constant(
-        parser_get_current_bytecode(parser),
-        value,
-        parser->token_previous.line_number
-    );
+    ObjectFunction* function = Compiler_end(&compiler, &parser->compiler, parser->had_error, parser->token_previous.line_number);
+
+    // Value value = value_make_object(function);
+    // Compiler_CompileInstruction_Constant(
+    //     parser_get_current_bytecode(parser),
+    //     value,
+    //     parser->token_previous.line_number
+    // );
+
+    return function;
+
 }
 
 static Statement* parser_parse_variable_declaration(Parser* parser) {
@@ -774,6 +849,7 @@ static OperatorMetadata parser_get_operator_metadata(TokenKind kind)
     }
     case Token_Asterisk:
     case Token_Slash: {
+        // TODO: case: Token_Module:
         OperatorMetadata operator_metadata = { 0 };
         operator_metadata.precedence = OperatorPrecedence_Multiplication_And_Division;
         operator_metadata.is_left_associative = true;
@@ -796,8 +872,9 @@ static OperatorMetadata parser_get_operator_metadata(TokenKind kind)
     }
     case Token_Dot:
     case Token_Left_Parenthesis: {
+        // TODO: case Token_Left_Bracket: -- Array Subscript
         OperatorMetadata operator_metadata = { 0 };
-        operator_metadata.precedence = OperatorPrecedence_Grouping_Call_And_Get;
+        operator_metadata.precedence = OperatorPrecedence_Grouping_FunctionCall_And_ObjectGet;
         operator_metadata.is_left_associative = true;
         operator_metadata.is_right_associative = false;
         return operator_metadata;
@@ -827,6 +904,8 @@ static Expression* parser_parse_expression(Parser* parser, OperatorPrecedence op
             expression = parser_parse_operators_logical(parser, expression);
         } else if (parser_is_operator_relational(parser)) {
             expression = parser_parse_operators_relational(parser, expression);
+        } else if (parser->token_previous.kind == Token_Left_Parenthesis) {
+            expression = parser_parse_operator_function_call(parser, expression);
         }
 
         operator_current = parser_get_operator_metadata(parser->token_current.kind);
@@ -965,7 +1044,7 @@ static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bo
         uint8_t opcode_assign = OpCode_Invalid;
         uint8_t opcode_read = OpCode_Invalid;
         Local* local_found = NULL;
-        // int operand = StackLocal_get_local_index_by_token(&parser->scope.locals, &parser->token_previous, &local_found);
+
         int operand = StackLocal_get_local_index_by_token(&parser->compiler->locals, &parser->token_previous, &local_found);
         ObjectString* variable_name = ObjectString_allocate_if_not_interned(parser->string_database, parser->token_previous.start, parser->token_previous.length, parser->object_head);
 
@@ -1032,12 +1111,13 @@ static bool parser_is_operator_logical(Parser* parser) {
 
 static bool parser_is_operator_relational(Parser* parser) {
     TokenKind token_kind = parser->token_previous.kind;
-    return (token_kind == Token_Equal_Equal ||
-            token_kind == Token_Not_Equal ||
-            token_kind == Token_Less ||
-            token_kind == Token_Less_Equal ||
-            token_kind == Token_Greater ||
-            token_kind == Token_Greater_Equal);
+    return (
+        token_kind == Token_Equal_Equal ||
+        token_kind == Token_Not_Equal ||
+        token_kind == Token_Less ||
+        token_kind == Token_Less_Equal ||
+        token_kind == Token_Greater ||
+        token_kind == Token_Greater_Equal);
 }
 
 static Expression* parser_parse_operators_logical(Parser* parser, Expression* left_operand) {
@@ -1170,6 +1250,32 @@ static Expression* parser_parse_operators_relational(Parser* parser, Expression*
     }
 
     assert(false && "Error: Unhandled Relational Operator.");
+    return NULL;
+}
+
+static uint8_t parser_parse_arguments(Parser* parser) {
+    uint8_t argument_count = 0;
+    if (parser->token_current.kind != Token_Right_Parenthesis) {
+        do {
+            Expression* expression = parser_parse_expression(parser, OperatorPrecedence_Grouping_FunctionCall_And_ObjectGet);
+            if (argument_count == 255) {
+                parser_error(parser, &parser->token_previous, "Can't have more than 255 arguments.");
+            }
+            argument_count += 1;
+        } while (parser_match_then_advance(parser, Token_Comma));
+    }
+    parser_consume(parser, Token_Right_Parenthesis, "Expect ')' after arguments");
+    return argument_count;
+}
+
+static Expression* parser_parse_operator_function_call(Parser* parser, Expression* left_operand) {
+    uint8_t argument_count = parser_parse_arguments(parser);
+    Compiler_CompileInstruction_2Bytes(
+        parser_get_current_bytecode(parser),
+        OpCode_Function_Call, // OpCode
+        argument_count,       // Operand
+        parser->token_previous.line_number
+    );
     return NULL;
 }
 

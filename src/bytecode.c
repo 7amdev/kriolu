@@ -223,6 +223,8 @@ int Bytecode_disassemble_instruction(Bytecode* bytecode, int offset)
         return Bytecode_debug_instruction_local(bytecode, "OPCODE_READ_LOCAL", (offset + 2));
     if (opcode == OpCode_Assign_Local)
         return Bytecode_debug_instruction_local(bytecode, "OPCODE_ASSIGN_LOCAL", (offset + 2));
+    if (opcode == OpCode_Function_Call)
+        return Bytecode_debug_instruction_2bytes(bytecode, "OPCODE_FUNCTION_CALL", (offset + 2));
     if (opcode == OpCode_Nil)
         return Bytecode_debug_instruction_byte("OPCODE_NIL", (offset + 1));
     if (opcode == OpCode_Negation)

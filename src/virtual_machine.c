@@ -31,7 +31,8 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm, ObjectFunction* 
         &vm->function_calls,
         script,
         script->bytecode.instructions.items,
-        vm->stack_value.items
+        vm->stack_value.top, // TODO: change it to &vm->stack_value.top
+        0
     );
 
     FunctionCall* function_call = StackFunctionCall_peek(&vm->function_calls, 0);
@@ -154,6 +155,33 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm, ObjectFunction* 
             );
 
             break;
+        }
+        case OpCode_Function_Call:
+        {
+            int argument_count = READ_BYTE_THEN_INCREMENT();
+            Value function = stack_value_peek(&vm->stack_value, argument_count);
+
+            block
+            {
+                if (!value_is_object(function)) goto error_function_call;
+                if (value_get_object_type(function) != ObjectKind_Function) goto error_function_call;
+
+                StackFunctionCall_push(
+                    &vm->function_calls,
+                    value_as_function(function),
+                    value_as_function(function)->bytecode.instructions.items,
+                    vm->stack_value.top,
+                    argument_count
+                );
+
+                function_call = StackFunctionCall_peek(&vm->function_calls, 0);
+            }
+
+            break;
+
+        error_function_call:
+            virtual_machine_runtime_error(vm, "Can only call functions and classes.");
+            return Interpreter_Runtime_Error;
         }
         case OpCode_Nil:
         {

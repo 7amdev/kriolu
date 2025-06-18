@@ -198,6 +198,7 @@ enum
     OpCode_Read_Local,   // print x;
     OpCode_Assign_Local,  // x = 7;
     OpCode_Loop,
+    OpCode_Function_Call,
 
     OpCode_Return
 };
@@ -268,7 +269,7 @@ typedef struct
 #define value_is_string(value) object_validate_kind_from_value(value, ObjectKind_String)
 #define value_is_function(value) object_validate_kind_from_value(value, ObjectKind_Function)
 
-#define value_get_object_type(value) (value_as_object(value)->type)
+#define value_get_object_type(value) value_as_object(value)->kind
 #define value_get_string_chars(value) (value_as_string(value)->characters)
 
 bool value_negate_logically(Value value);
@@ -600,7 +601,7 @@ typedef struct Compiler {
 } Compiler;
 
 void Compiler_init(Compiler* compiler, FunctionKind function_kind, Compiler** compiler_current, ObjectString* function_name, Object** object_head);
-ObjectFunction* Compiler_end(Compiler* compiler, Compiler** compiler_current, int line_number);
+ObjectFunction* Compiler_end(Compiler* compiler, Compiler** compiler_current, bool parser_has_error, int line_number);
 
 //
 // Parser
@@ -620,7 +621,7 @@ typedef enum
     OperatorPrecedence_Negate,                      // Unary:  -
     OperatorPrecedence_Exponentiation,              // ^   ex: -2^2 = -1 * 2^2 = -4
     OperatorPrecedence_Not,                         // Unary: ka
-    OperatorPrecedence_Grouping_Call_And_Get,       // . (
+    OperatorPrecedence_Grouping_FunctionCall_And_ObjectGet,       // . (
 
     OperatorPrecedence_Max
 } OperatorPrecedence;
@@ -799,12 +800,7 @@ typedef struct {
 } StackFunctionCall;
 
 void StackFunctionCall_reset(StackFunctionCall* function_calls);
-FunctionCall* StackFunctionCall_push(
-    StackFunctionCall* function_calls,
-    ObjectFunction* function,
-    uint8_t* ip,
-    Value* frame_start
-);
+FunctionCall* StackFunctionCall_push(StackFunctionCall* function_calls, ObjectFunction* function, uint8_t* ip, Value* stack_value_top, int argument_count);
 FunctionCall* StackFunctionCall_pop(StackFunctionCall* function_calls);
 FunctionCall* StackFunctionCall_peek(StackFunctionCall* function_calls, int offset);
 bool StackFunctionCall_is_empty(StackFunctionCall* function_calls);

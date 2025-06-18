@@ -19,8 +19,16 @@ void Compiler_init(Compiler* compiler, FunctionKind function_kind, Compiler** co
     *compiler_current = compiler;
 }
 
-ObjectFunction* Compiler_end(Compiler* compiler, Compiler** compiler_current, int line_number) {
+ObjectFunction* Compiler_end(Compiler* compiler, Compiler** compiler_current, bool parser_has_error, int line_number) {
     ObjectFunction* function = (*compiler_current)->function;
+
+    // TODO: parser_compile_return(...);
+    // REVIEW
+    Compiler_CompileInstruction_1Byte(
+        &function->bytecode,
+        OpCode_Nil,
+        line_number
+    );
 
     Compiler_CompileInstruction_1Byte(
         &function->bytecode,
@@ -28,12 +36,12 @@ ObjectFunction* Compiler_end(Compiler* compiler, Compiler** compiler_current, in
         line_number
     );
 
-    // restore parser->compiler to the previous state
+    // Restore parser->compiler to the previous state
     //
     *compiler_current = compiler->previous;
 
 #ifdef DEBUG_COMPILER_BYTECODE
-    if (!parser->had_error) {
+    if (!parser_has_error) {
         Bytecode_disassemble(
             &function->bytecode,
             function->name != NULL
