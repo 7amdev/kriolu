@@ -15,7 +15,7 @@ assert_lexer() {
         file_ref_name=$(basename $file_test_path .k)
         file_ref_contents=$(cat $TEST_DIR/lexer/$file_ref_name.expected)
 
-        lexer_output=$(./kriolu.exe "$file_test_path" "-lexer" )
+        lexer_output=$(./build/kriolu.exe "$file_test_path" "-lexer" )
         diff_output=$(diff -c -w <(echo "$lexer_output") <(echo "$file_ref_contents")) 
         diff_status="$?"
 
@@ -43,7 +43,7 @@ assert_parser() {
         file_ref_name=$(basename $file_test_path .k)
         file_ref_contents=$(cat $TEST_DIR/parser/$file_ref_name.expected)
 
-        parser_output=$(./kriolu.exe "$file_test_path" "-parser")
+        parser_output=$(./build/kriolu.exe "$file_test_path" "-parser")
         diff_output=$(diff -c -w <(echo "$parser_output") <(echo "$file_ref_contents")) 
         diff_status="$?"
 

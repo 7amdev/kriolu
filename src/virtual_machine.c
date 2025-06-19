@@ -31,7 +31,7 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm, ObjectFunction* 
         &vm->function_calls,
         script,
         script->bytecode.instructions.items,
-        vm->stack_value.top, // TODO: change it to &vm->stack_value.top
+        vm->stack_value.top,
         0
     );
 
@@ -410,11 +410,17 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm, ObjectFunction* 
         }
         case OpCode_Return:
         {
-            // Value constant = stack_value_pop(&vm->stack_value);
-            // value_print(constant); // printf("%g", constant);
-            // printf("\n");
+            Value returned_value = stack_value_pop(&vm->stack_value);
+            FunctionCall* returned_function_call = StackFunctionCall_pop(&vm->function_calls);
+            if (StackFunctionCall_is_empty(&vm->function_calls)) {
+                stack_value_pop(&vm->stack_value);
+                return Interpreter_Ok;
+            }
 
-            return Interpreter_Ok;
+            vm->stack_value.top = returned_function_call->frame_start;
+            stack_value_push(&vm->stack_value, returned_value);
+            function_call = StackFunctionCall_peek(&vm->function_calls, 0);
+            break;
         }
         }
     }
@@ -434,11 +440,6 @@ void virtual_machine_runtime_error(VirtualMachine* vm, const char* format, ...)
     vfprintf(stderr, format, args);
     va_end(args);
     fputs("\n", stderr);
-
-    // FunctionCall* function_call = StackFunctionCall_peek(&vm->function_calls, 0);
-    // size_t instruction = function_call->ip - function_call->function->bytecode.instructions.items - 1;
-    // int line = function_call->function->bytecode.lines.items[instruction];
-    // fprintf(stderr, "[line %d] in script\n", line);
 
     for (int i = 0; i < vm->function_calls.top; i++) {
         FunctionCall* function_call = StackFunctionCall_peek(&vm->function_calls, i);

@@ -813,7 +813,7 @@ typedef struct {
 
     // Instruction Pointer
     //
-    uint8_t* ip;
+    // uint8_t* ip;
 
     // A linked list of all objects created at runtime
     //

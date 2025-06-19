@@ -494,6 +494,7 @@ static void parser_compile_return(Parser* parser) {
         OpCode_Nil,
         parser->token_current.line_number
     );
+
     Compiler_CompileInstruction_1Byte(
         parser_get_current_bytecode(parser),
         OpCode_Return,
