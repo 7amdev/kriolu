@@ -8,6 +8,7 @@ void StackFunctionCall_reset(StackFunctionCall* function_calls) {
 //       rename frame_start -> stack_value_top
 FunctionCall* StackFunctionCall_push(StackFunctionCall* function_calls, ObjectFunction* function, uint8_t* ip, Value* stack_value_top, int argument_count) {
     assert(function_calls->top < FRAME_STACK_MAX);
+    if (function_calls->top == FRAME_STACK_MAX) return NULL;
 
     FunctionCall* new_function_call = &function_calls->items[function_calls->top];
 

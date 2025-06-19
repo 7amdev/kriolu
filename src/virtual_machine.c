@@ -137,22 +137,15 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm, ObjectFunction* 
             Value local = function_call->frame_start[local_slot_index];
             stack_value_push(&vm->stack_value, local);
 
-            // stack_value_push(&vm->stack_value, local);
-            // stack_value_push(&function_call->function->bytecode.values, local);
             break;
         }
         case OpCode_Assign_Local:
         {
             uint8_t local_slot_index = READ_BYTE_THEN_INCREMENT();
-            // vm->stack_value.items[local_slot_index] = stack_value_peek(&vm->stack_value, 0);
 
             // *(function_call->frame_start + local_slot_index) = ...
             //
-            function_call->frame_start[local_slot_index] = stack_value_peek(
-                // &function_call->function->bytecode.values,
-                &vm->stack_value,
-                0
-            );
+            function_call->frame_start[local_slot_index] = stack_value_peek(&vm->stack_value, 0);
 
             break;
         }
@@ -165,8 +158,18 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm, ObjectFunction* 
             {
                 if (!value_is_object(function)) goto error_function_call;
                 if (value_get_object_type(function) != ObjectKind_Function) goto error_function_call;
+                if (argument_count != value_as_function(function)->arity) {
+                    virtual_machine_runtime_error(
+                        vm,
+                        "Expected %d arguments but got %d.",
+                        value_as_function(function)->arity,
+                        argument_count
+                    );
 
-                StackFunctionCall_push(
+                    return Interpreter_Runtime_Error;
+                }
+
+                function_call = StackFunctionCall_push(
                     &vm->function_calls,
                     value_as_function(function),
                     value_as_function(function)->bytecode.instructions.items,
@@ -174,7 +177,11 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm, ObjectFunction* 
                     argument_count
                 );
 
-                function_call = StackFunctionCall_peek(&vm->function_calls, 0);
+                if (function_call == NULL) {
+                    virtual_machine_runtime_error(vm, "Function Call Stack Overflow.");
+                    return Interpreter_Runtime_Error;
+                }
+
             }
 
             break;
@@ -428,10 +435,24 @@ void virtual_machine_runtime_error(VirtualMachine* vm, const char* format, ...)
     va_end(args);
     fputs("\n", stderr);
 
-    FunctionCall* function_call = StackFunctionCall_peek(&vm->function_calls, 0);
-    size_t instruction = function_call->ip - function_call->function->bytecode.instructions.items - 1;
-    int line = function_call->function->bytecode.lines.items[instruction];
-    fprintf(stderr, "[line %d] in script\n", line);
+    // FunctionCall* function_call = StackFunctionCall_peek(&vm->function_calls, 0);
+    // size_t instruction = function_call->ip - function_call->function->bytecode.instructions.items - 1;
+    // int line = function_call->function->bytecode.lines.items[instruction];
+    // fprintf(stderr, "[line %d] in script\n", line);
+
+    for (int i = 0; i < vm->function_calls.top; i++) {
+        FunctionCall* function_call = StackFunctionCall_peek(&vm->function_calls, i);
+        ObjectFunction* function = function_call->function;
+        size_t instruction = function_call->ip - function->bytecode.instructions.items - 1;
+        int line = function->bytecode.lines.items[instruction];
+        fprintf(stderr, "[line %d] in ", line);
+        if (function->name == NULL) {
+            fprintf(stderr, "script\n");
+        } else {
+            fprintf(stderr, "%s()\n", function->name->characters);
+        }
+    }
+
     stack_value_reset(&vm->stack_value);
 }
 
