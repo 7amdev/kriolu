@@ -582,6 +582,7 @@ static Statement* parser_parse_function_declaration(Parser* parser) {
         parser->token_previous.line_number
     );
 
+    // TODO:
     // UPVALUE Support
     // Loop for every upvalue_count
     //     Compiler_CompileInstruction_2Bytes(is_local, index);
@@ -1085,8 +1086,9 @@ static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bo
 
         // Get variable value
         //
-        Expression expression = expression_make_variable(variable_name);
         Compiler_CompileInstruction_2Bytes(parser_get_current_bytecode(parser), opcode_read, operand, parser->token_previous.line_number);
+
+        Expression expression = expression_make_variable(variable_name);
         return expression_allocate(expression);
     }
 

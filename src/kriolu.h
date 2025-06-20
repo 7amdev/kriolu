@@ -17,6 +17,7 @@
 // #define block(condition) for (int i = 0;i < 1 && (condition); ++i)
 #define block for (int i = 0;i < 1; ++i)
 #define DEBUG_LOG_PARSER
+#define DEBUG_COMPILER_BYTECODE
 
 //
 // Token
@@ -319,6 +320,7 @@ int Bytecode_insert_instruction_constant(Bytecode* bytecode, Value value, int li
 int Bytecode_insert_instruction_jump(Bytecode* bytecode, OpCode opcode, int line);
 void Bytecode_emit_instruction_loop(Bytecode* bytecode, int loop_start_index, int line_number);
 bool Bytecode_patch_instruction_jump(Bytecode* bytecode, int operand_index);
+void Bytecode_disassemble_header(char* title_name);
 void Bytecode_disassemble(Bytecode* bytecode, const char* name);
 int Bytecode_disassemble_instruction(Bytecode* bytecode, int offset);
 void Bytecode_free(Bytecode* bytecode);

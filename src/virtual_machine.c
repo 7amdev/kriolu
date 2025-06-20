@@ -2,6 +2,10 @@
 
 void virtual_machine_runtime_error(VirtualMachine* vm, const char* format, ...);
 
+static inline bool object_validate_kind_from_value(Value value, ObjectKind object_kind) {
+    return (value_is_object(value) && value_as_object(value)->kind == object_kind);
+}
+
 //
 // Globals
 //
@@ -17,9 +21,6 @@ void virtual_machine_init(VirtualMachine* vm) {
     hash_table_init(&vm->string_database);
 }
 
-static inline bool object_validate_kind_from_value(Value value, ObjectKind object_kind) {
-    return (value_is_object(value) && value_as_object(value)->kind == object_kind);
-}
 
 InterpreterResult virtual_machine_interpret(VirtualMachine* vm, ObjectFunction* script) {
     if (script == NULL) return Interpreter_Compiler_error;
@@ -35,20 +36,20 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm, ObjectFunction* 
         0
     );
 
-    FunctionCall* function_call = StackFunctionCall_peek(&vm->function_calls, 0);
+    FunctionCall* current_function_call = StackFunctionCall_peek(&vm->function_calls, 0);
 
-#define READ_BYTE_THEN_INCREMENT() (*function_call->ip++) // uint8_t instruction = (vm->ip += 1, vm->ip[-1])
-#define READ_2BYTE() (function_call->ip += 2, (uint16_t)((function_call->ip[-2] << 8) | function_call->ip[-1])) 
-#define READ_3BYTE_THEN_INCREMENT() (((((*function_call->ip++) << 8) | (*function_call->ip++)) << 8) | (*function_call->ip++))
-#define READ_CONSTANT() (function_call->function->bytecode.values.items[READ_BYTE_THEN_INCREMENT()])
-#define READ_CONSTANT_3BYTE() (function_call->function->bytecode.values.items[READ_3BYTE_THEN_INCREMENT()])
+#define READ_BYTE_THEN_INCREMENT() (*current_function_call->ip++) // uint8_t instruction = (vm->ip += 1, vm->ip[-1])
+#define READ_2BYTE() (current_function_call->ip += 2, (uint16_t)((current_function_call->ip[-2] << 8) | current_function_call->ip[-1])) 
+#define READ_3BYTE_THEN_INCREMENT() (((((*current_function_call->ip++) << 8) | (*current_function_call->ip++)) << 8) | (*current_function_call->ip++))
+#define READ_CONSTANT() (current_function_call->function->bytecode.values.items[READ_BYTE_THEN_INCREMENT()])
+#define READ_CONSTANT_3BYTE() (current_function_call->function->bytecode.values.items[READ_3BYTE_THEN_INCREMENT()])
 #define READ_STRING() value_as_string(READ_CONSTANT())
 
 #ifdef DEBUG_TRACE_EXECUTION
-    printf("                                     Operand  \n");
-    printf("Offset Line         OpCode         index value\n");
-    printf("------ ---- ---------------------- ----- -----\n");
-#endif
+    ObjectString* function_name = current_function_call->function->name;
+    char* title = function_name == NULL ? "Script" : function_name->characters;
+    Bytecode_disassemble_header(title);
+#endif 
 
     for (;;)
     {
@@ -56,8 +57,8 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm, ObjectFunction* 
 #ifdef DEBUG_TRACE_EXECUTION
         stack_value_trace(&vm->stack_value);
         Bytecode_disassemble_instruction(
-            &function_call->function->bytecode,
-            (int)(function_call->ip - function_call->function->bytecode.instructions.items)
+            &current_function_call->function->bytecode,
+            (int)(current_function_call->ip - current_function_call->function->bytecode.instructions.items)
         );
 #endif
 
@@ -134,7 +135,7 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm, ObjectFunction* 
 
             // Value local = *(frame_call->framestart + local_slot_index);
             //
-            Value local = function_call->frame_start[local_slot_index];
+            Value local = current_function_call->frame_start[local_slot_index];
             stack_value_push(&vm->stack_value, local);
 
             break;
@@ -143,9 +144,9 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm, ObjectFunction* 
         {
             uint8_t local_slot_index = READ_BYTE_THEN_INCREMENT();
 
-            // *(function_call->frame_start + local_slot_index) = ...
+            // *(current_function_call->frame_start + local_slot_index) = ...
             //
-            function_call->frame_start[local_slot_index] = stack_value_peek(&vm->stack_value, 0);
+            current_function_call->frame_start[local_slot_index] = stack_value_peek(&vm->stack_value, 0);
 
             break;
         }
@@ -169,7 +170,7 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm, ObjectFunction* 
                     return Interpreter_Runtime_Error;
                 }
 
-                function_call = StackFunctionCall_push(
+                current_function_call = StackFunctionCall_push(
                     &vm->function_calls,
                     value_as_function(function),
                     value_as_function(function)->bytecode.instructions.items,
@@ -177,12 +178,19 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm, ObjectFunction* 
                     argument_count
                 );
 
-                if (function_call == NULL) {
+                if (current_function_call == NULL) {
                     virtual_machine_runtime_error(vm, "Function Call Stack Overflow.");
                     return Interpreter_Runtime_Error;
                 }
 
             }
+
+#ifdef DEBUG_TRACE_EXECUTION
+            ObjectString* function_name = current_function_call->function->name;
+            char* title = function_name == NULL ? "Script" : function_name->characters;
+            printf("\n");
+            Bytecode_disassemble_header(title);
+#endif 
 
             break;
 
@@ -392,20 +400,20 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm, ObjectFunction* 
         {
             uint16_t offset = READ_2BYTE(); // TODO: change name to INCREMENT_BY_2BYTES_THEN_READ()
             if (value_is_falsey(stack_value_peek(&vm->stack_value, 0)))
-                function_call->ip += offset;
+                current_function_call->ip += offset;
 
             break;
         }
         case OpCode_Jump:
         {
             uint16_t offset = READ_2BYTE();
-            function_call->ip += offset;
+            current_function_call->ip += offset;
             break;
         }
         case OpCode_Loop:
         {
             uint16_t offset = READ_2BYTE();
-            function_call->ip -= offset;
+            current_function_call->ip -= offset;
             break;
         }
         case OpCode_Return:
@@ -419,7 +427,15 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm, ObjectFunction* 
 
             vm->stack_value.top = returned_function_call->frame_start;
             stack_value_push(&vm->stack_value, returned_value);
-            function_call = StackFunctionCall_peek(&vm->function_calls, 0);
+            current_function_call = StackFunctionCall_peek(&vm->function_calls, 0);
+
+#ifdef DEBUG_TRACE_EXECUTION
+            ObjectString* function_name = current_function_call->function->name;
+            char* title = function_name == NULL ? "Script" : function_name->characters;
+            printf("\n");
+            Bytecode_disassemble_header(title);
+#endif 
+
             break;
         }
         }

@@ -265,13 +265,22 @@ int Bytecode_disassemble_instruction(Bytecode* bytecode, int offset)
     return (offset + 1);
 }
 
-void Bytecode_disassemble(Bytecode* bytecode, const char* name)
-{
-    printf("===== %s =====\n", name);
+void Bytecode_disassemble_header(char* title_name) {
+    int title_length = strlen(title_name) + 2;
+    int title_width = 46;
+    int title_padding = (46 - title_length) / 2;
+
+    for (int i = 0; i < title_padding; i++) printf("=");
+    printf(" %s ", title_name == NULL ? "script" : title_name);
+    for (int i = 0; i < title_padding; i++) printf("=");
+    printf("\n");
     printf("                                     Operand  \n");
     printf("Offset Line         OpCode         index value\n");
     printf("------ ---- ---------------------- ----- -----\n");
+}
 
+void Bytecode_disassemble(Bytecode* bytecode, const char* name) {
+    Bytecode_disassemble_header(name);
     for (int offset = 0; offset < bytecode->instructions.count;) {
         offset = Bytecode_disassemble_instruction(bytecode, offset);
     }
