@@ -1,42 +1,49 @@
 #include "kriolu.h"
 
-void virtual_machine_runtime_error(VirtualMachine* vm, const char* format, ...);
-
-static inline bool object_validate_kind_from_value(Value value, ObjectKind object_kind) {
-    return (value_is_object(value) && value_as_object(value)->kind == object_kind);
-}
-
 //
 // Globals
 //
+// VirtualMachine g_vm;
 
-VirtualMachine g_vm;
+//
+// Forward Declaration 
+// 
 
-void virtual_machine_init(VirtualMachine* vm) {
+void VirtualMachine_runtime_error(VirtualMachine* vm, const char* format, ...);
+static void VirtualMachine_define_native_function(VirtualMachine* vm, const char* key, FunctionNative* value);
+static bool VirtualMachine_call_function(VirtualMachine* vm, Value function, int argument_count);
+static inline bool object_validate_kind_from_value(Value value, ObjectKind object_kind);
+static Value FunctionNative_clock(int argument_count, Value* arguments);
+
+//
+// Function Declarations
+//
+
+void VirtualMachine_init(VirtualMachine* vm) {
     vm->objects = NULL;
 
     stack_value_reset(&vm->stack_value);
     StackFunctionCall_reset(&vm->function_calls);
     hash_table_init(&vm->global_database);
     hash_table_init(&vm->string_database);
+
+    VirtualMachine_define_native_function(vm, "rilogio", &FunctionNative_clock);
 }
 
 
-InterpreterResult virtual_machine_interpret(VirtualMachine* vm, ObjectFunction* script) {
+InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* script) {
     if (script == NULL) return Interpreter_Compiler_error;
 
     Value value = value_make_object(script);
     stack_value_push(&vm->stack_value, value);
 
-    StackFunctionCall_push(
+    FunctionCall* current_function_call = StackFunctionCall_push(
         &vm->function_calls,
         script,
         script->bytecode.instructions.items,
         vm->stack_value.top,
         0
     );
-
-    FunctionCall* current_function_call = StackFunctionCall_peek(&vm->function_calls, 0);
 
 #define READ_BYTE_THEN_INCREMENT() (*current_function_call->ip++) // uint8_t instruction = (vm->ip += 1, vm->ip[-1])
 #define READ_2BYTE() (current_function_call->ip += 2, (uint16_t)((current_function_call->ip[-2] << 8) | current_function_call->ip[-1])) 
@@ -110,7 +117,7 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm, ObjectFunction* 
             Value value;
 
             if (hash_table_get_value(&vm->global_database, variable_name, &value) == false) {
-                virtual_machine_runtime_error(vm, "Undefined variable '%s'.", variable_name->characters);
+                VirtualMachine_runtime_error(vm, "Undefined variable '%s'.", variable_name->characters);
                 return Interpreter_Runtime_Error;
             }
 
@@ -124,7 +131,7 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm, ObjectFunction* 
             bool is_new = hash_table_set_value(&vm->global_database, variable_name, value);
             if (is_new) {
                 hash_table_delete(&vm->global_database, variable_name);
-                virtual_machine_runtime_error(vm, "Undefined variable '%s'.", variable_name->characters);
+                VirtualMachine_runtime_error(vm, "Undefined variable '%s'.", variable_name->characters);
                 return Interpreter_Runtime_Error;
             }
             break;
@@ -154,49 +161,12 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm, ObjectFunction* 
         {
             int argument_count = READ_BYTE_THEN_INCREMENT();
             Value function = stack_value_peek(&vm->stack_value, argument_count);
-
-            block
-            {
-                if (!value_is_object(function)) goto error_function_call;
-                if (value_get_object_type(function) != ObjectKind_Function) goto error_function_call;
-                if (argument_count != value_as_function(function)->arity) {
-                    virtual_machine_runtime_error(
-                        vm,
-                        "Expected %d arguments but got %d.",
-                        value_as_function(function)->arity,
-                        argument_count
-                    );
-
-                    return Interpreter_Runtime_Error;
-                }
-
-                current_function_call = StackFunctionCall_push(
-                    &vm->function_calls,
-                    value_as_function(function),
-                    value_as_function(function)->bytecode.instructions.items,
-                    vm->stack_value.top,
-                    argument_count
-                );
-
-                if (current_function_call == NULL) {
-                    virtual_machine_runtime_error(vm, "Function Call Stack Overflow.");
-                    return Interpreter_Runtime_Error;
-                }
-
+            if (!VirtualMachine_call_function(vm, function, argument_count)) {
+                return Interpreter_Runtime_Error;
             }
 
-#ifdef DEBUG_TRACE_EXECUTION
-            ObjectString* function_name = current_function_call->function->name;
-            char* title = function_name == NULL ? "Script" : function_name->characters;
-            printf("\n");
-            Bytecode_disassemble_header(title);
-#endif 
-
+            current_function_call = StackFunctionCall_peek(&vm->function_calls, 0);
             break;
-
-        error_function_call:
-            virtual_machine_runtime_error(vm, "Can only call functions and classes.");
-            return Interpreter_Runtime_Error;
         }
         case OpCode_Nil:
         {
@@ -207,7 +177,7 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm, ObjectFunction* 
         {
             if (!value_is_number(stack_value_peek(&vm->stack_value, 0)))
             {
-                virtual_machine_runtime_error(vm, "Operand must be a number.");
+                VirtualMachine_runtime_error(vm, "Operand must be a number.");
                 return Interpreter_Runtime_Error;
             }
 
@@ -275,7 +245,7 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm, ObjectFunction* 
 
                 stack_value_push(&vm->stack_value, value_make_object(string));
             } else {
-                virtual_machine_runtime_error(vm, "Operands must be 2(two) numbers or 2(two) strings.");
+                VirtualMachine_runtime_error(vm, "Operands must be 2(two) numbers or 2(two) strings.");
                 return Interpreter_Runtime_Error;
             }
 
@@ -286,7 +256,7 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm, ObjectFunction* 
             if (!value_is_number(stack_value_peek(&vm->stack_value, 0)) ||
                 !value_is_number(stack_value_peek(&vm->stack_value, 1)))
             {
-                virtual_machine_runtime_error(vm, "Operands must be numbers.");
+                VirtualMachine_runtime_error(vm, "Operands must be numbers.");
                 return Interpreter_Runtime_Error;
             }
 
@@ -303,7 +273,7 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm, ObjectFunction* 
             if (!value_is_number(stack_value_peek(&vm->stack_value, 0)) ||
                 !value_is_number(stack_value_peek(&vm->stack_value, 1)))
             {
-                virtual_machine_runtime_error(vm, "Operands must be numbers.");
+                VirtualMachine_runtime_error(vm, "Operands must be numbers.");
                 return Interpreter_Runtime_Error;
             }
 
@@ -320,7 +290,7 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm, ObjectFunction* 
             if (!value_is_number(stack_value_peek(&vm->stack_value, 0)) ||
                 !value_is_number(stack_value_peek(&vm->stack_value, 1)))
             {
-                virtual_machine_runtime_error(vm, "Operands must be numbers.");
+                VirtualMachine_runtime_error(vm, "Operands must be numbers.");
                 return Interpreter_Runtime_Error;
             }
 
@@ -337,7 +307,7 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm, ObjectFunction* 
             if (!value_is_number(stack_value_peek(&vm->stack_value, 0)) ||
                 !value_is_number(stack_value_peek(&vm->stack_value, 1)))
             {
-                virtual_machine_runtime_error(vm, "Operands must be numbers.");
+                VirtualMachine_runtime_error(vm, "Operands must be numbers.");
                 return Interpreter_Runtime_Error;
             }
 
@@ -362,7 +332,7 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm, ObjectFunction* 
             if (!value_is_number(stack_value_peek(&vm->stack_value, 0)) ||
                 !value_is_number(stack_value_peek(&vm->stack_value, 1)))
             {
-                virtual_machine_runtime_error(vm, "Operands must be numbers.");
+                VirtualMachine_runtime_error(vm, "Operands must be numbers.");
                 return Interpreter_Runtime_Error;
             }
 
@@ -378,7 +348,7 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm, ObjectFunction* 
             if (!value_is_number(stack_value_peek(&vm->stack_value, 0)) ||
                 !value_is_number(stack_value_peek(&vm->stack_value, 1)))
             {
-                virtual_machine_runtime_error(vm, "Operands must be numbers.");
+                VirtualMachine_runtime_error(vm, "Operands must be numbers.");
                 return Interpreter_Runtime_Error;
             }
 
@@ -449,7 +419,7 @@ InterpreterResult virtual_machine_interpret(VirtualMachine* vm, ObjectFunction* 
 #undef READ_STRING
 }
 
-void virtual_machine_runtime_error(VirtualMachine* vm, const char* format, ...)
+void VirtualMachine_runtime_error(VirtualMachine* vm, const char* format, ...)
 {
     va_list args;
     va_start(args, format);
@@ -473,7 +443,7 @@ void virtual_machine_runtime_error(VirtualMachine* vm, const char* format, ...)
     stack_value_reset(&vm->stack_value);
 }
 
-void virtual_machine_free(VirtualMachine* vm)
+void VirtualMachine_free(VirtualMachine* vm)
 {
     Object* object = vm->objects;
     while (object != NULL) {
@@ -481,6 +451,77 @@ void virtual_machine_free(VirtualMachine* vm)
         Object_free(object);
         object = next;
     }
+
     hash_table_free(&vm->global_database);
     hash_table_free(&vm->string_database);
+}
+
+static void VirtualMachine_define_native_function(VirtualMachine* vm, const char* function_name, FunctionNative* function) {
+    ObjectString* key = ObjectString_allocate_if_not_interned(&vm->string_database, function_name, strlen(function_name), &vm->objects);
+    ObjectFunctionNative* value = ObjectFunctionNative_allocate(function, &vm->objects);
+    stack_value_push(&vm->stack_value, value_make_object(key));
+    stack_value_push(&vm->stack_value, value_make_object(value));
+    { // Define or set a key/value pair in the global hashtable
+        ObjectString* key = value_as_string(stack_value_peek(&vm->stack_value, 1));
+        Value value = stack_value_peek(&vm->stack_value, 0);
+        hash_table_set_value(&vm->global_database, key, value);
+    }
+    stack_value_pop(&vm->stack_value);
+    stack_value_pop(&vm->stack_value);
+}
+
+static bool VirtualMachine_call_function(VirtualMachine* vm, Value function, int argument_count) {
+    if (value_is_object(function)) {
+        switch (value_get_object_type(function))
+        {
+        case ObjectKind_Function: {
+            if (argument_count != value_as_function(function)->arity) {
+                VirtualMachine_runtime_error(vm, "Expected %d arguments but got %d.", value_as_function(function)->arity, argument_count);
+                return false;
+            }
+
+            if (StackFunctionCall_is_empty(&vm->function_calls)) {
+                VirtualMachine_runtime_error(vm, "Function Call Stack Overflow.");
+                return false;
+            }
+
+            StackFunctionCall_push(
+                &vm->function_calls,
+                value_as_function(function),
+                value_as_function(function)->bytecode.instructions.items,
+                vm->stack_value.top,
+                argument_count
+            );
+
+#ifdef DEBUG_TRACE_EXECUTION
+            ObjectString* function_name = value_as_function(function)->name;
+            char* title = function_name == NULL ? "Script" : function_name->characters;
+            printf("\n");
+            Bytecode_disassemble_header(title);
+#endif 
+
+            return true;
+        }
+        case ObjectKind_Function_Native: {
+            FunctionNative* native = value_as_function_native(function);
+            Value returned_value = native(argument_count, vm->stack_value.top - argument_count);
+            vm->stack_value.top -= argument_count + 1;
+            stack_value_push(&vm->stack_value, returned_value);
+
+            return true;
+        }
+        default: break;
+        }
+    }
+
+    VirtualMachine_runtime_error(vm, "Can only call functions and classes.");
+    return false;
+}
+
+static inline bool object_validate_kind_from_value(Value value, ObjectKind object_kind) {
+    return (value_is_object(value) && value_as_object(value)->kind == object_kind);
+}
+
+static Value FunctionNative_clock(int argument_count, Value* arguments) {
+    return value_make_number((double)clock() / CLOCKS_PER_SEC);
 }

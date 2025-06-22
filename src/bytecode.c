@@ -280,24 +280,11 @@ void Bytecode_disassemble_header(char* title_name) {
 }
 
 void Bytecode_disassemble(Bytecode* bytecode, const char* name) {
-    Bytecode_disassemble_header(name);
+    Bytecode_disassemble_header((char*)name);
     for (int offset = 0; offset < bytecode->instructions.count;) {
         offset = Bytecode_disassemble_instruction(bytecode, offset);
     }
 }
-
-// void Bytecode_emitter_begin()
-// {
-//     Bytecode_init(&g_bytecode);
-// }
-
-// Bytecode Bytecode_emitter_end(int line_number)
-// {
-//     Bytecode ret = g_bytecode; // copy
-//     Bytecode_init(&g_bytecode); // reset global variable
-
-//     return ret; // return copy
-// }
 
 void Bytecode_free(Bytecode* bytecode)
 {

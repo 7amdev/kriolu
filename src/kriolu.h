@@ -10,6 +10,8 @@
 #include <math.h>
 #include <stdarg.h>
 
+#include "time.h"
+
 // 
 // Utils
 // 
@@ -17,7 +19,7 @@
 // #define block(condition) for (int i = 0;i < 1 && (condition); ++i)
 #define block for (int i = 0;i < 1; ++i)
 #define DEBUG_LOG_PARSER
-#define DEBUG_COMPILER_BYTECODE
+// #define DEBUG_COMPILER_BYTECODE
 
 //
 // Token
@@ -262,6 +264,7 @@ typedef struct
 #define value_as_object(value) ((value).as.object)
 #define value_as_string(value) ((ObjectString *)value_as_object(value))
 #define value_as_function(value) ((ObjectFunction *)value_as_object(value))
+#define value_as_function_native(value) (((ObjectFunctionNative*)value_as_object(value))->function)
 
 #define value_is_boolean(value) ((value).kind == Value_Boolean)
 #define value_is_number(value) ((value).kind == Value_Number)
@@ -269,6 +272,7 @@ typedef struct
 #define value_is_nil(value) ((value).kind == Value_Nil)
 #define value_is_string(value) object_validate_kind_from_value(value, ObjectKind_String)
 #define value_is_function(value) object_validate_kind_from_value(value, ObjectKind_Function)
+#define value_is_function_native(value) object_validate_kind_from_value(value, ObjectKind_Function_Native)
 
 #define value_get_object_type(value) value_as_object(value)->kind
 #define value_get_string_chars(value) (value_as_string(value)->characters)
@@ -338,13 +342,10 @@ typedef enum
     ObjectKind_Invalid,
 
     ObjectKind_String,
-    ObjectKind_Function
+    ObjectKind_Function,
+    ObjectKind_Function_Native
 } ObjectKind;
 
-typedef enum {
-    FunctionKind_Script,
-    FunctionKind_Function
-} FunctionKind;
 
 struct Object
 {
@@ -364,7 +365,6 @@ typedef struct
     char* characters;
     int length;
     uint32_t hash;
-
 } ObjectString;
 
 typedef struct
@@ -375,6 +375,13 @@ typedef struct
     ObjectString* name;
     int arity; // Number of parameters
 } ObjectFunction;
+
+typedef Value FunctionNative(int argument_count, Value* arguments);
+typedef struct {
+    Object object;
+
+    FunctionNative* function;
+} ObjectFunctionNative;
 
 Object* Object_allocate(ObjectKind kind, size_t size, Object** object_head);
 void Object_init(Object* object, ObjectKind kind, Object** object_head);
@@ -399,6 +406,10 @@ void ObjectString_free(ObjectString* string);
 ObjectFunction* ObjectFunction_allocate(Object** object_head);
 void ObjectFunction_init(ObjectFunction* function, ObjectString* name, Bytecode* bytecode, int arity, Object** object_head);
 void ObjectFunction_free(ObjectFunction* function);
+
+ObjectFunctionNative* ObjectFunctionNative_allocate(FunctionNative* function, Object** object_head);
+void ObjectFunctionNative_init(ObjectFunctionNative* native, FunctionNative* function, Object** object_head);
+void ObjectFunctionNative_free(ObjectFunctionNative* native);
 
 //
 // Abstract Syntax Tree
@@ -591,6 +602,11 @@ void scope_init(Scope* scope);
 // 
 // Compiler
 // 
+
+typedef enum {
+    FunctionKind_Script,
+    FunctionKind_Function
+} FunctionKind;
 
 // TODO: rename to ParserFunction
 typedef struct Compiler {
@@ -813,10 +829,6 @@ typedef struct {
 
     StackValue stack_value; // TODO: rename to stack_values
 
-    // Instruction Pointer
-    //
-    // uint8_t* ip;
-
     // A linked list of all objects created at runtime
     //
     Object* objects;
@@ -832,11 +844,11 @@ typedef struct {
     // TODO: add a varible to track total bytes allocated
 } VirtualMachine;
 
-extern VirtualMachine g_vm;
+// extern VirtualMachine g_vm;
 
-void virtual_machine_init(VirtualMachine* vm);
-InterpreterResult virtual_machine_interpret(VirtualMachine* vm, ObjectFunction* script);
-void virtual_machine_free(VirtualMachine* vm);
+void VirtualMachine_init(VirtualMachine* vm);
+InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* script);
+void VirtualMachine_free(VirtualMachine* vm);
 
 
 #endif

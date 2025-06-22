@@ -1260,7 +1260,7 @@ static uint8_t parser_parse_arguments(Parser* parser) {
     uint8_t argument_count = 0;
     if (parser->token_current.kind != Token_Right_Parenthesis) {
         do {
-            Expression* expression = parser_parse_expression(parser, OperatorPrecedence_Grouping_FunctionCall_And_ObjectGet);
+            Expression* expression = parser_parse_expression(parser, OperatorPrecedence_Assignment);
             if (argument_count == 255) {
                 parser_error(parser, &parser->token_previous, "Can't have more than 255 arguments.");
             }

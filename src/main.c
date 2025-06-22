@@ -78,7 +78,7 @@ int main(int argc, const char* argv[]) {
     VirtualMachine vm = { 0 };
 
     if (is_flag_parser) {
-        virtual_machine_init(&vm);
+        VirtualMachine_init(&vm);
         parser_init(&parser, source_code, NULL, &vm.string_database, &vm.objects);
 
         ArrayStatement* statements = NULL;
@@ -92,7 +92,7 @@ int main(int argc, const char* argv[]) {
     }
 
     if (is_flag_bytecode) {
-        virtual_machine_init(&vm);
+        VirtualMachine_init(&vm);
         parser_init(&parser, source_code, NULL, &vm.string_database, &vm.objects);
 
         ObjectFunction* script = parser_parse(&parser, NULL);
@@ -103,12 +103,12 @@ int main(int argc, const char* argv[]) {
         return 0;
     }
 
-    virtual_machine_init(&vm);
+    VirtualMachine_init(&vm);
     parser_init(&parser, source_code, NULL, &vm.string_database, &vm.objects);
 
     ObjectFunction* script = parser_parse(&parser, NULL);
 
-    virtual_machine_interpret(&vm, script);
+    VirtualMachine_interpret(&vm, script);
 
     // Bytecode_free(&bytecode);
     // vm_free();

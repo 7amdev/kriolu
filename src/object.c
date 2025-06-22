@@ -45,6 +45,9 @@ void Object_print(Object* object)
         }
         printf("<fn %s>", function->name->characters);
     } break;
+    case ObjectKind_Function_Native: {
+        printf("<fn native>");
+    } break;
     }
 }
 
@@ -58,6 +61,9 @@ void Object_free(Object* object)
     } break;
     case ObjectKind_Function: {
         ObjectFunction_free((ObjectFunction*)object);
+    } break;
+    case ObjectKind_Function_Native: {
+        ObjectFunctionNative_free((ObjectFunctionNative*)object);
     } break;
     }
 }
