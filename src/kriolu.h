@@ -226,6 +226,8 @@ typedef struct Object Object;
 
 typedef enum
 {
+    Value_Invalid,
+
     Value_Boolean,
     Value_Nil,
     Value_Number,
@@ -252,6 +254,7 @@ typedef struct
     int capacity;
 } ArrayValue;
 
+#define value_make_invalid() ((Value){.kind = Value_Invalid, .as = {.number = 0}})
 #define value_make_boolean(value) ((Value){.kind = Value_Boolean, .as = {.boolean = value}})
 #define value_make_number(value) ((Value){.kind = Value_Number, .as = {.number = value}})
 #define value_make_object(value) ((Value){.kind = Value_Object, .as = {.object = (Object *)value}})
@@ -266,6 +269,7 @@ typedef struct
 #define value_as_function(value) ((ObjectFunction *)value_as_object(value))
 #define value_as_function_native(value) (((ObjectFunctionNative*)value_as_object(value))->function)
 
+#define value_is_invalid(value) ((value).kind == Value_Invalid)
 #define value_is_boolean(value) ((value).kind == Value_Boolean)
 #define value_is_number(value) ((value).kind == Value_Number)
 #define value_is_object(value) ((value).kind == Value_Object)
@@ -376,7 +380,8 @@ typedef struct
     int arity; // Number of parameters
 } ObjectFunction;
 
-typedef Value FunctionNative(int argument_count, Value* arguments);
+typedef struct VirtualMachine VirtualMachine;
+typedef Value FunctionNative(VirtualMachine* vm, int argument_count, Value* arguments);
 typedef struct {
     Object object;
 
@@ -824,7 +829,9 @@ FunctionCall* StackFunctionCall_peek(StackFunctionCall* function_calls, int offs
 bool StackFunctionCall_is_empty(StackFunctionCall* function_calls);
 bool StackFunctionCall_is_full(StackFunctionCall* function_calls);
 
-typedef struct {
+// Forward Declared in line: 379 
+//
+struct VirtualMachine {
     StackFunctionCall function_calls;
 
     StackValue stack_value; // TODO: rename to stack_values
@@ -842,9 +849,7 @@ typedef struct {
     HashTable string_database;
 
     // TODO: add a varible to track total bytes allocated
-} VirtualMachine;
-
-// extern VirtualMachine g_vm;
+};
 
 void VirtualMachine_init(VirtualMachine* vm);
 InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* script);

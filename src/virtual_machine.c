@@ -10,10 +10,10 @@
 // 
 
 void VirtualMachine_runtime_error(VirtualMachine* vm, const char* format, ...);
-static void VirtualMachine_define_native_function(VirtualMachine* vm, const char* key, FunctionNative* value);
+static void VirtualMachine_define_function_native(VirtualMachine* vm, const char* key, FunctionNative* value);
 static bool VirtualMachine_call_function(VirtualMachine* vm, Value function, int argument_count);
 static inline bool object_validate_kind_from_value(Value value, ObjectKind object_kind);
-static Value FunctionNative_clock(int argument_count, Value* arguments);
+static Value FunctionNative_clock(VirtualMachine* vm, int argument_count, Value* arguments);
 
 //
 // Function Declarations
@@ -27,7 +27,7 @@ void VirtualMachine_init(VirtualMachine* vm) {
     hash_table_init(&vm->global_database);
     hash_table_init(&vm->string_database);
 
-    VirtualMachine_define_native_function(vm, "rilogio", &FunctionNative_clock);
+    VirtualMachine_define_function_native(vm, "rilogio", &FunctionNative_clock);
 }
 
 
@@ -456,7 +456,7 @@ void VirtualMachine_free(VirtualMachine* vm)
     hash_table_free(&vm->string_database);
 }
 
-static void VirtualMachine_define_native_function(VirtualMachine* vm, const char* function_name, FunctionNative* function) {
+static void VirtualMachine_define_function_native(VirtualMachine* vm, const char* function_name, FunctionNative* function) {
     ObjectString* key = ObjectString_allocate_if_not_interned(&vm->string_database, function_name, strlen(function_name), &vm->objects);
     ObjectFunctionNative* value = ObjectFunctionNative_allocate(function, &vm->objects);
     stack_value_push(&vm->stack_value, value_make_object(key));
@@ -504,7 +504,9 @@ static bool VirtualMachine_call_function(VirtualMachine* vm, Value function, int
         }
         case ObjectKind_Function_Native: {
             FunctionNative* native = value_as_function_native(function);
-            Value returned_value = native(argument_count, vm->stack_value.top - argument_count);
+            Value returned_value = native(vm, argument_count, vm->stack_value.top - argument_count);
+            if (value_is_invalid(returned_value)) return false;
+
             vm->stack_value.top -= argument_count + 1;
             stack_value_push(&vm->stack_value, returned_value);
 
@@ -522,6 +524,10 @@ static inline bool object_validate_kind_from_value(Value value, ObjectKind objec
     return (value_is_object(value) && value_as_object(value)->kind == object_kind);
 }
 
-static Value FunctionNative_clock(int argument_count, Value* arguments) {
+static Value FunctionNative_clock(VirtualMachine* vm, int argument_count, Value* arguments) {
+    if (argument_count > 0) {
+        VirtualMachine_runtime_error(vm, "Function 'relogio' doesn't accept arguments.");
+        return value_make_invalid();
+    }
     return value_make_number((double)clock() / CLOCKS_PER_SEC);
 }
