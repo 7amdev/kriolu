@@ -266,8 +266,9 @@ typedef struct
 #define value_as_nil(value) ((value).as.number)
 #define value_as_object(value) ((value).as.object)
 #define value_as_string(value) ((ObjectString *)value_as_object(value))
-#define value_as_function(value) ((ObjectFunction *)value_as_object(value))
-#define value_as_function_native(value) (((ObjectFunctionNative*)value_as_object(value))->function)
+#define value_as_function_object(value) ((ObjectFunction *)value_as_object(value))
+#define value_as_function_native(value) ((ObjectFunctionNative*)value_as_object(value))
+// #define value_as_function_native(value) (((ObjectFunctionNative*)value_as_object(value))->function)
 
 #define value_is_invalid(value) ((value).kind == Value_Invalid)
 #define value_is_boolean(value) ((value).kind == Value_Boolean)
@@ -386,6 +387,7 @@ typedef struct {
     Object object;
 
     FunctionNative* function;
+    int arity;
 } ObjectFunctionNative;
 
 Object* Object_allocate(ObjectKind kind, size_t size, Object** object_head);
@@ -412,8 +414,8 @@ ObjectFunction* ObjectFunction_allocate(Object** object_head);
 void ObjectFunction_init(ObjectFunction* function, ObjectString* name, Bytecode* bytecode, int arity, Object** object_head);
 void ObjectFunction_free(ObjectFunction* function);
 
-ObjectFunctionNative* ObjectFunctionNative_allocate(FunctionNative* function, Object** object_head);
-void ObjectFunctionNative_init(ObjectFunctionNative* native, FunctionNative* function, Object** object_head);
+ObjectFunctionNative* ObjectFunctionNative_allocate(FunctionNative* function, Object** object_head, int arity);
+void ObjectFunctionNative_init(ObjectFunctionNative* native, FunctionNative* function, Object** object_head, int arity);
 void ObjectFunctionNative_free(ObjectFunctionNative* native);
 
 //

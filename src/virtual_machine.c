@@ -10,7 +10,7 @@
 // 
 
 void VirtualMachine_runtime_error(VirtualMachine* vm, const char* format, ...);
-static void VirtualMachine_define_function_native(VirtualMachine* vm, const char* key, FunctionNative* value);
+static void VirtualMachine_define_function_native(VirtualMachine* vm, const char* function_name, FunctionNative* function, int arity);
 static bool VirtualMachine_call_function(VirtualMachine* vm, Value function, int argument_count);
 static inline bool object_validate_kind_from_value(Value value, ObjectKind object_kind);
 static Value FunctionNative_clock(VirtualMachine* vm, int argument_count, Value* arguments);
@@ -27,7 +27,7 @@ void VirtualMachine_init(VirtualMachine* vm) {
     hash_table_init(&vm->global_database);
     hash_table_init(&vm->string_database);
 
-    VirtualMachine_define_function_native(vm, "rilogio", &FunctionNative_clock);
+    VirtualMachine_define_function_native(vm, "rilogio", &FunctionNative_clock, 0);
 }
 
 
@@ -456,9 +456,9 @@ void VirtualMachine_free(VirtualMachine* vm)
     hash_table_free(&vm->string_database);
 }
 
-static void VirtualMachine_define_function_native(VirtualMachine* vm, const char* function_name, FunctionNative* function) {
+static void VirtualMachine_define_function_native(VirtualMachine* vm, const char* function_name, FunctionNative* function, int arity) {
     ObjectString* key = ObjectString_allocate_if_not_interned(&vm->string_database, function_name, strlen(function_name), &vm->objects);
-    ObjectFunctionNative* value = ObjectFunctionNative_allocate(function, &vm->objects);
+    ObjectFunctionNative* value = ObjectFunctionNative_allocate(function, &vm->objects, arity);
     stack_value_push(&vm->stack_value, value_make_object(key));
     stack_value_push(&vm->stack_value, value_make_object(value));
     { // Define or set a key/value pair in the global hashtable
@@ -470,13 +470,13 @@ static void VirtualMachine_define_function_native(VirtualMachine* vm, const char
     stack_value_pop(&vm->stack_value);
 }
 
-static bool VirtualMachine_call_function(VirtualMachine* vm, Value function, int argument_count) {
-    if (value_is_object(function)) {
-        switch (value_get_object_type(function))
+static bool VirtualMachine_call_function(VirtualMachine* vm, Value value, int argument_count) {
+    if (value_is_object(value)) {
+        switch (value_get_object_type(value))
         {
         case ObjectKind_Function: {
-            if (argument_count != value_as_function(function)->arity) {
-                VirtualMachine_runtime_error(vm, "Expected %d arguments but got %d.", value_as_function(function)->arity, argument_count);
+            if (argument_count != value_as_function_object(value)->arity) {
+                VirtualMachine_runtime_error(vm, "Expected %d arguments but got %d.", value_as_function_object(value)->arity, argument_count);
                 return false;
             }
 
@@ -487,14 +487,14 @@ static bool VirtualMachine_call_function(VirtualMachine* vm, Value function, int
 
             StackFunctionCall_push(
                 &vm->function_calls,
-                value_as_function(function),
-                value_as_function(function)->bytecode.instructions.items,
+                value_as_function_object(value),
+                value_as_function_object(value)->bytecode.instructions.items,
                 vm->stack_value.top,
                 argument_count
             );
 
 #ifdef DEBUG_TRACE_EXECUTION
-            ObjectString* function_name = value_as_function(function)->name;
+            ObjectString* function_name = value_as_function_object(value)->name;
             char* title = function_name == NULL ? "Script" : function_name->characters;
             printf("\n");
             Bytecode_disassemble_header(title);
@@ -503,7 +503,13 @@ static bool VirtualMachine_call_function(VirtualMachine* vm, Value function, int
             return true;
         }
         case ObjectKind_Function_Native: {
-            FunctionNative* native = value_as_function_native(function);
+            ObjectFunctionNative* function_native = value_as_function_native(value);
+            if (argument_count != function_native->arity) {
+                VirtualMachine_runtime_error(vm, "Expected %d arguments but got %d.", function_native->arity, argument_count);
+                return false;
+            }
+
+            FunctionNative* native = function_native->function;
             Value returned_value = native(vm, argument_count, vm->stack_value.top - argument_count);
             if (value_is_invalid(returned_value)) return false;
 
