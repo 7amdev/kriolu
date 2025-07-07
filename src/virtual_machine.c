@@ -427,6 +427,8 @@ void VirtualMachine_runtime_error(VirtualMachine* vm, const char* format, ...)
     va_end(args);
     fputs("\n", stderr);
 
+    // NOTE: Prints the FunctionCalls Stack
+    // 
     for (int i = 0; i < vm->function_calls.top; i++) {
         FunctionCall* function_call = StackFunctionCall_peek(&vm->function_calls, i);
         ObjectFunction* function = function_call->function;
@@ -511,7 +513,7 @@ static bool VirtualMachine_call_function(VirtualMachine* vm, Value value, int ar
 
             FunctionNative* native = function_native->function;
             Value returned_value = native(vm, argument_count, vm->stack_value.top - argument_count);
-            if (value_is_invalid(returned_value)) return false;
+            if (value_is_runtime_error(returned_value)) return false;
 
             vm->stack_value.top -= argument_count + 1;
             stack_value_push(&vm->stack_value, returned_value);
@@ -533,7 +535,7 @@ static inline bool object_validate_kind_from_value(Value value, ObjectKind objec
 static Value FunctionNative_clock(VirtualMachine* vm, int argument_count, Value* arguments) {
     if (argument_count > 0) {
         VirtualMachine_runtime_error(vm, "Function 'relogio' doesn't accept arguments.");
-        return value_make_invalid();
+        return value_make_Runtime_Error();
     }
     return value_make_number((double)clock() / CLOCKS_PER_SEC);
 }

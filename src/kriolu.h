@@ -226,7 +226,7 @@ typedef struct Object Object;
 
 typedef enum
 {
-    Value_Invalid,
+    Value_Runtime_Error,
 
     Value_Boolean,
     Value_Nil,
@@ -254,7 +254,7 @@ typedef struct
     int capacity;
 } ArrayValue;
 
-#define value_make_invalid() ((Value){.kind = Value_Invalid, .as = {.number = 0}})
+#define value_make_Runtime_Error() ((Value){.kind = Value_Runtime_Error, .as = {.number = 0}})
 #define value_make_boolean(value) ((Value){.kind = Value_Boolean, .as = {.boolean = value}})
 #define value_make_number(value) ((Value){.kind = Value_Number, .as = {.number = value}})
 #define value_make_object(value) ((Value){.kind = Value_Object, .as = {.object = (Object *)value}})
@@ -270,7 +270,7 @@ typedef struct
 #define value_as_function_native(value) ((ObjectFunctionNative*)value_as_object(value))
 // #define value_as_function_native(value) (((ObjectFunctionNative*)value_as_object(value))->function)
 
-#define value_is_invalid(value) ((value).kind == Value_Invalid)
+#define value_is_runtime_error(value) ((value).kind == Value_Runtime_Error)
 #define value_is_boolean(value) ((value).kind == Value_Boolean)
 #define value_is_number(value) ((value).kind == Value_Number)
 #define value_is_object(value) ((value).kind == Value_Object)
@@ -340,6 +340,7 @@ void Bytecode_free(Bytecode* bytecode);
 // Object
 //
 
+typedef struct VirtualMachine VirtualMachine;
 typedef struct HashTable HashTable;
 
 typedef enum
@@ -381,7 +382,6 @@ typedef struct
     int arity; // Number of parameters
 } ObjectFunction;
 
-typedef struct VirtualMachine VirtualMachine;
 typedef Value FunctionNative(VirtualMachine* vm, int argument_count, Value* arguments);
 typedef struct {
     Object object;
@@ -793,7 +793,6 @@ void hash_table_init(HashTable* table);
 void hash_table_copy(HashTable* from, HashTable* to); // tableAddAll
 bool hash_table_set_value(HashTable* table, ObjectString* key, Value value);
 bool hash_table_get_value(HashTable* table, ObjectString* key, Value* value_out);
-// ObjectString* hash_table_get_key(HashTable* table, ObjectString key);
 ObjectString* hash_table_get_key(HashTable* table, String string, uint32_t hash);
 bool hash_table_delete(HashTable* table, ObjectString* key);
 void hash_table_free(HashTable* table);
@@ -831,7 +830,7 @@ FunctionCall* StackFunctionCall_peek(StackFunctionCall* function_calls, int offs
 bool StackFunctionCall_is_empty(StackFunctionCall* function_calls);
 bool StackFunctionCall_is_full(StackFunctionCall* function_calls);
 
-// Forward Declared in line: 379 
+// Forward Declared in line: 343 in Object's section
 //
 struct VirtualMachine {
     StackFunctionCall function_calls;
@@ -840,7 +839,7 @@ struct VirtualMachine {
 
     // A linked list of all objects created at runtime
     //
-    Object* objects;
+    Object* objects; // TODO: rename to 'first' or 'head'
 
     // Stores global variables 
     //
@@ -856,6 +855,5 @@ struct VirtualMachine {
 void VirtualMachine_init(VirtualMachine* vm);
 InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* script);
 void VirtualMachine_free(VirtualMachine* vm);
-
 
 #endif

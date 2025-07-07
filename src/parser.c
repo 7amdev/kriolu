@@ -9,7 +9,6 @@ static void parser_synchronize(Parser* parser);
 static void parser_error(Parser* parser, Token* token, const char* message);
 static Bytecode* parser_get_current_bytecode(Parser* parser);
 static Statement* parser_parse_statement(Parser* parser, BlockType block_type);
-static Statement* parser_parse_statement_expression(Parser* parser);
 static Statement* parser_parse_instruction_print(Parser* parser);
 static Statement* parser_parse_instruction_block(Parser* parser, BlockType is_pure_block);
 static Statement* parser_parse_instruction_if(Parser* parser);
@@ -18,14 +17,15 @@ static Statement* parser_instruction_for(Parser* parser);
 static Statement* parser_instruction_break(Parser* parser);
 static Statement* parser_instruction_continue(Parser* parser);
 static Statement* parser_instruction_return(Parser* parser);
-static Statement* parser_parse_function_declaration(Parser* parser);
-static Expression* parser_parse_operator_function_call(Parser* parser, Expression* left_operand);
-static Statement* parser_parse_variable_declaration(Parser* parser);
+static Statement* parser_parse_declaration_function(Parser* parser);
+static Statement* parser_parse_declaration_variable(Parser* parser);
 static int parser_parse_identifier(Parser* parser, const char* error_message);
 static void parser_initialize_local_identifier(Parser* parser);
 static ObjectFunction* parser_parse_function_paramenters_and_body(Parser* parser, FunctionKind function_kind);
+static Statement* parser_parse_statement_expression(Parser* parser); // TODO: rename to ???
 static Expression* parser_parse_expression(Parser* parser, OperatorPrecedence operator_precedence_previous);
 static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bool can_assign);
+static Expression* parser_parse_operator_function_call(Parser* parser, Expression* left_operand);
 static Expression* parser_parse_operators_logical(Parser* parser, Expression* left_operand);
 static Expression* parser_parse_operators_arithmetic(Parser* parser, Expression* left_operand);
 static Expression* parser_parse_operators_relational(Parser* parser, Expression* left_operand);
@@ -193,9 +193,9 @@ static Statement* parser_parse_statement(Parser* parser, BlockType block_type)
     Statement* statement = { 0 };
 
     if (parser_match_then_advance(parser, Token_Funson))
-        statement = parser_parse_function_declaration(parser);
+        statement = parser_parse_declaration_function(parser);
     else if (parser_match_then_advance(parser, Token_Mimoria))
-        statement = parser_parse_variable_declaration(parser);
+        statement = parser_parse_declaration_variable(parser);
     else if (parser_match_then_advance(parser, Token_Imprimi))
         statement = parser_parse_instruction_print(parser);
     else if (parser_match_then_advance(parser, Token_Si))
@@ -394,7 +394,7 @@ static Statement* parser_instruction_for(Parser* parser) {
     if (parser_match_then_advance(parser, Token_Semicolon)) {
         // Do nothing. There is no initializer.
     } else if (parser_match_then_advance(parser, Token_Mimoria)) {
-        initializer = parser_parse_variable_declaration(parser);
+        initializer = parser_parse_declaration_variable(parser);
     } else {
         initializer = parser_parse_statement_expression(parser);
     }
@@ -567,7 +567,7 @@ static void parser_initialize_local_identifier(Parser* parser) {
     local->scope_depth = parser->compiler->depth;
 }
 
-static Statement* parser_parse_function_declaration(Parser* parser) {
+static Statement* parser_parse_declaration_function(Parser* parser) {
     Statement statement = { 0 };
     statement.kind = StatementKind_Funson;
 
@@ -677,7 +677,7 @@ static ObjectFunction* parser_parse_function_paramenters_and_body(Parser* parser
 
 }
 
-static Statement* parser_parse_variable_declaration(Parser* parser) {
+static Statement* parser_parse_declaration_variable(Parser* parser) {
     Statement statement = { 0 };
     statement.kind = StatementKind_Variable_Declaration;
 
