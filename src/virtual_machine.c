@@ -36,11 +36,17 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
 
     Value value = value_make_object(script);
     stack_value_push(&vm->stack_value, value);
+    ObjectClosure* closure = ObjectClosure_allocate(script, &vm->objects);
+    stack_value_pop(&vm->stack_value);
+    Value v_closure = value_make_object(closure);
+    stack_value_push(&vm->stack_value, v_closure);
 
     FunctionCall* current_function_call = StackFunctionCall_push(
         &vm->function_calls,
-        script,
-        script->bytecode.instructions.items,
+        // script,
+        // script->bytecode.instructions.items,
+        closure,
+        closure->function->bytecode.instructions.items,
         vm->stack_value.top,
         0
     );
@@ -48,12 +54,12 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
 #define READ_BYTE_THEN_INCREMENT() (*current_function_call->ip++) // uint8_t instruction = (vm->ip += 1, vm->ip[-1])
 #define READ_2BYTE() (current_function_call->ip += 2, (uint16_t)((current_function_call->ip[-2] << 8) | current_function_call->ip[-1])) 
 #define READ_3BYTE_THEN_INCREMENT() (((((*current_function_call->ip++) << 8) | (*current_function_call->ip++)) << 8) | (*current_function_call->ip++))
-#define READ_CONSTANT() (current_function_call->function->bytecode.values.items[READ_BYTE_THEN_INCREMENT()])
-#define READ_CONSTANT_3BYTE() (current_function_call->function->bytecode.values.items[READ_3BYTE_THEN_INCREMENT()])
+#define READ_CONSTANT() (current_function_call->closure->function->bytecode.values.items[READ_BYTE_THEN_INCREMENT()])
+#define READ_CONSTANT_3BYTE() (current_function_call->closure->function->bytecode.values.items[READ_3BYTE_THEN_INCREMENT()])
 #define READ_STRING() value_as_string(READ_CONSTANT())
 
 #ifdef DEBUG_TRACE_EXECUTION
-    ObjectString* function_name = current_function_call->function->name;
+    ObjectString* function_name = current_function_call->closure->function->name;
     char* title = function_name == NULL ? "Script" : function_name->characters;
     Bytecode_disassemble_header(title);
 #endif 
@@ -64,8 +70,8 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
 #ifdef DEBUG_TRACE_EXECUTION
         stack_value_trace(&vm->stack_value);
         Bytecode_disassemble_instruction(
-            &current_function_call->function->bytecode,
-            (int)(current_function_call->ip - current_function_call->function->bytecode.instructions.items)
+            &current_function_call->closure->function->bytecode,
+            (int)(current_function_call->ip - current_function_call->closure->function->bytecode.instructions.items)
         );
 #endif
 
@@ -86,6 +92,20 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
         {
             Value constant = READ_CONSTANT_3BYTE();
             stack_value_push(&vm->stack_value, constant);
+            break;
+        }
+        case OpCode_Closure:
+        {
+            ObjectFunction* function = value_as_function_object(READ_CONSTANT());
+            ObjectClosure* closure = ObjectClosure_allocate(function, &vm->objects);
+            stack_value_push(&vm->stack_value, value_make_object(closure));
+            break;
+        }
+        case OpCode_Closure_Long:
+        {
+            ObjectFunction* function = value_as_function_object(READ_CONSTANT_3BYTE());
+            ObjectClosure* closure = ObjectClosure_allocate(function, &vm->objects);
+            stack_value_push(&vm->stack_value, value_make_object(closure));
             break;
         }
         case OpCode_True:
@@ -400,7 +420,7 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
             current_function_call = StackFunctionCall_peek(&vm->function_calls, 0);
 
 #ifdef DEBUG_TRACE_EXECUTION
-            ObjectString* function_name = current_function_call->function->name;
+            ObjectString* function_name = current_function_call->closure->function->name;
             char* title = function_name == NULL ? "Script" : function_name->characters;
             printf("\n");
             Bytecode_disassemble_header(title);
@@ -431,7 +451,7 @@ void VirtualMachine_runtime_error(VirtualMachine* vm, const char* format, ...)
     // 
     for (int i = 0; i < vm->function_calls.top; i++) {
         FunctionCall* function_call = StackFunctionCall_peek(&vm->function_calls, i);
-        ObjectFunction* function = function_call->function;
+        ObjectFunction* function = function_call->closure->function;
         size_t instruction = function_call->ip - function->bytecode.instructions.items - 1;
         int line = function->bytecode.lines.items[instruction];
         fprintf(stderr, "[line %d] in ", line);
@@ -476,9 +496,10 @@ static bool VirtualMachine_call_function(VirtualMachine* vm, Value value, int ar
     if (value_is_object(value)) {
         switch (value_get_object_type(value))
         {
-        case ObjectKind_Function: {
-            if (argument_count != value_as_function_object(value)->arity) {
-                VirtualMachine_runtime_error(vm, "Expected %d arguments but got %d.", value_as_function_object(value)->arity, argument_count);
+        case ObjectKind_Closure: {
+            ObjectFunction* function = value_as_closure(value)->function;
+            if (argument_count != function->arity) {
+                VirtualMachine_runtime_error(vm, "Expected %d arguments but got %d.", function->arity, argument_count);
                 return false;
             }
 
@@ -489,14 +510,14 @@ static bool VirtualMachine_call_function(VirtualMachine* vm, Value value, int ar
 
             StackFunctionCall_push(
                 &vm->function_calls,
-                value_as_function_object(value),
-                value_as_function_object(value)->bytecode.instructions.items,
+                value_as_closure(value),
+                value_as_closure(value)->function->bytecode.instructions.items,
                 vm->stack_value.top,
                 argument_count
             );
 
 #ifdef DEBUG_TRACE_EXECUTION
-            ObjectString* function_name = value_as_function_object(value)->name;
+            ObjectString* function_name = function->name;
             char* title = function_name == NULL ? "Script" : function_name->characters;
             printf("\n");
             Bytecode_disassemble_header(title);

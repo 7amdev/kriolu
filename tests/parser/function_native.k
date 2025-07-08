@@ -3,6 +3,6 @@ funson fib(n) {
     divolvi fib(n - 2) + fib(n - 1);
 }
 
-mimoria kumesu = rilogio(10);
-// imprimi fib(10);
-// imprimi rilogio() - kumesu;
+mimoria kumesu = rilogio();
+imprimi fib(10);
+imprimi rilogio() - kumesu;

@@ -77,6 +77,33 @@ int Bytecode_insert_instruction_constant(Bytecode* bytecode, Value value, int li
     );
 }
 
+void Bytecode_insert_instruction_closure(Bytecode* bytecode, Value value, int line_number) {
+    int value_index = array_value_insert(&bytecode->values, value);
+    assert(value_index > -1);
+
+    if (value_index < 256) {
+        Bytecode_insert_instruction_2bytes(
+            bytecode,
+            OpCode_Closure,        // OpCode
+            (uint8_t)value_index,  // Operand
+            line_number
+        );
+
+        return;
+    }
+
+    uint8_t byte1 = (value_index >> 0 & 0xff);
+    uint8_t byte2 = (value_index >> 8 & 0xff);
+    uint8_t byte3 = (value_index >> 16 & 0xff);
+
+    Bytecode_insert_instruction_4bytes(
+        bytecode,
+        OpCode_Closure_Long,      // OpCode
+        byte1, byte2, byte3,      // Operand
+        line_number
+    );
+}
+
 // Jumps Forward
 //
 int Bytecode_insert_instruction_jump(Bytecode* bytecode, OpCode opcode, int line) {
@@ -122,11 +149,9 @@ static int Bytecode_debug_instruction_2bytes(Bytecode* bytecode, const char* opc
     uint8_t operand = bytecode->instructions.items[ret_offset_increment - 1];
     Value value = bytecode->values.items[operand];
 
-    if (strcmp(opcode_text, "OPCODE_INTERPOLATION") == 0)
-    {
+    if (strcmp(opcode_text, "OPCODE_INTERPOLATION") == 0) {
         printf("%-22s %5s '%d'\n", opcode_text, "**", operand);
-    } else
-    {
+    } else {
         printf("%-22s %5d '", opcode_text, operand);
         value_print(value);
         printf("'\n");
@@ -207,6 +232,10 @@ int Bytecode_disassemble_instruction(Bytecode* bytecode, int offset)
         return Bytecode_debug_instruction_2bytes(bytecode, "OPCODE_INTERPOLATION", (offset + 2));
     if (opcode == OpCode_Constant_Long)
         return Bytecode_debug_instruction_4bytes(bytecode, "OPCODE_CONSTANT_LONG", (offset + 4));
+    if (opcode == OpCode_Closure)
+        return Bytecode_debug_instruction_2bytes(bytecode, "OPCODE_CLOSURE", (offset + 2));
+    if (opcode == OpCode_Closure_Long)
+        return Bytecode_debug_instruction_4bytes(bytecode, "OPCODE_CLOSURE_LONG", (offset + 4));
     if (opcode == OpCode_True)
         return Bytecode_debug_instruction_byte("OPCODE_TRUE", (offset + 1));
     if (opcode == OpCode_False)

@@ -175,6 +175,8 @@ enum
 
     OpCode_Constant,
     OpCode_Constant_Long,
+    OpCode_Closure,
+    OpCode_Closure_Long,
     OpCode_Interpolation,
     OpCode_Nil,
     OpCode_True,
@@ -268,7 +270,7 @@ typedef struct
 #define value_as_string(value) ((ObjectString *)value_as_object(value))
 #define value_as_function_object(value) ((ObjectFunction *)value_as_object(value))
 #define value_as_function_native(value) ((ObjectFunctionNative*)value_as_object(value))
-// #define value_as_function_native(value) (((ObjectFunctionNative*)value_as_object(value))->function)
+#define value_as_closure(value) ((ObjectClosure*)value_as_object(value))
 
 #define value_is_runtime_error(value) ((value).kind == Value_Runtime_Error)
 #define value_is_boolean(value) ((value).kind == Value_Boolean)
@@ -278,6 +280,7 @@ typedef struct
 #define value_is_string(value) object_validate_kind_from_value(value, ObjectKind_String)
 #define value_is_function(value) object_validate_kind_from_value(value, ObjectKind_Function)
 #define value_is_function_native(value) object_validate_kind_from_value(value, ObjectKind_Function_Native)
+#define value_is_closure(value) object_validate_kind_from_value(value, ObjectKind_Closure)
 
 #define value_get_object_type(value) value_as_object(value)->kind
 #define value_get_string_chars(value) (value_as_string(value)->characters)
@@ -305,27 +308,20 @@ typedef struct
     ArrayLineNumber lines;
 } Bytecode;
 
-// #define bytecode_emit_instruction_1byte(opcode, line) Bytecode_insert_instruction_1byte(&g_bytecode, opcode, line)
-// #define bytecode_emit_instruction_2bytes(opcode, operand, line) bytecode_insert_instruction_2bytes(&g_bytecode, opcode, operand, line)
-// #define bytecode_emit_constant(value, line) bytecode_insert_instruction_constant(&g_bytecode, value, line)
-// #define bytecode_emit_instruction_jump(opcode, line) bytecode_insert_instruction_jump(&g_bytecode, opcode, line)
-// #define bytecode_emit_value(value) array_value_insert(&g_bytecode.values, value)
-// #define Bytecode_EmitLoop(start_index, line) bytecode_emit_instruction_loop(&g_bytecode, start_index, line);
-// #define Bytecode_PatchInstructionJump(operand_index) bytecode_patch_instruction_jump(&g_bytecode, operand_index)
-
 #define Compiler_CompileInstruction_1Byte(bytecode, opcode, line) Bytecode_insert_instruction_1byte(bytecode, opcode, line)
 #define Compiler_CompileInstruction_2Bytes(bytecode, opcode, operand, line) Bytecode_insert_instruction_2bytes(bytecode, opcode, operand, line)
 #define Compiler_CompileInstruction_Constant(bytecode, value, line) Bytecode_insert_instruction_constant(bytecode, value, line)
+#define Compiler_CompileInstruction_Closure(bytecode, value, line) Bytecode_insert_instruction_closure(bytecode, value, line)
 #define Compiler_CompileInstruction_Jump(bytecode, opcode, line) Bytecode_insert_instruction_jump(bytecode, opcode, line)
 #define Compiler_CompileInstruction_Loop(bytecode, start_index, line) Bytecode_emit_instruction_loop(bytecode, start_index, line);
 #define Compiler_CompileValue(bytecode, value) array_value_insert(&bytecode->values, value)
 #define Compiler_PatchInstructionJump(bytecode, operand_index) Bytecode_patch_instruction_jump(bytecode, operand_index)
 
-
 void Bytecode_init(Bytecode* bytecode);
 int Bytecode_insert_instruction_1byte(Bytecode* bytecode, OpCode opcode, int line_number);
 int Bytecode_insert_instruction_2bytes(Bytecode* bytecode, OpCode opcode, uint8_t operand, int line_number);
 int Bytecode_insert_instruction_constant(Bytecode* bytecode, Value value, int line_number);
+void Bytecode_insert_instruction_closure(Bytecode* bytecode, Value value, int line_number);
 int Bytecode_insert_instruction_jump(Bytecode* bytecode, OpCode opcode, int line);
 void Bytecode_emit_instruction_loop(Bytecode* bytecode, int loop_start_index, int line_number);
 bool Bytecode_patch_instruction_jump(Bytecode* bytecode, int operand_index);
@@ -349,7 +345,8 @@ typedef enum
 
     ObjectKind_String,
     ObjectKind_Function,
-    ObjectKind_Function_Native
+    ObjectKind_Function_Native,
+    ObjectKind_Closure
 } ObjectKind;
 
 
@@ -390,6 +387,12 @@ typedef struct {
     int arity;
 } ObjectFunctionNative;
 
+typedef struct {
+    Object object;
+
+    ObjectFunction* function;
+} ObjectClosure;
+
 Object* Object_allocate(ObjectKind kind, size_t size, Object** object_head);
 void Object_init(Object* object, ObjectKind kind, Object** object_head);
 void Object_clear(Object* object);
@@ -409,10 +412,13 @@ ObjectString ObjectString_from_string(String string);
 ObjectString* ObjectString_is_interned(HashTable* table, String string);
 void ObjectString_free(ObjectString* string);
 
-
 ObjectFunction* ObjectFunction_allocate(Object** object_head);
 void ObjectFunction_init(ObjectFunction* function, ObjectString* name, Bytecode* bytecode, int arity, Object** object_head);
 void ObjectFunction_free(ObjectFunction* function);
+
+ObjectClosure* ObjectClosure_allocate(ObjectFunction* function, Object** object_head);
+void ObjectClosure_init(ObjectClosure* closure, ObjectFunction* function, Object** object_head);
+void ObjectClosure_free(ObjectClosure* closure);
 
 ObjectFunctionNative* ObjectFunctionNative_allocate(FunctionNative* function, Object** object_head, int arity);
 void ObjectFunctionNative_init(ObjectFunctionNative* native, FunctionNative* function, Object** object_head, int arity);
@@ -813,7 +819,8 @@ typedef enum
 } InterpreterResult;
 
 typedef struct {
-    ObjectFunction* function;
+    // ObjectFunction* function;
+    ObjectClosure* closure;
     uint8_t* ip;
     Value* frame_start; // base_pointer
 } FunctionCall;
@@ -824,7 +831,7 @@ typedef struct {
 } StackFunctionCall;
 
 void StackFunctionCall_reset(StackFunctionCall* function_calls);
-FunctionCall* StackFunctionCall_push(StackFunctionCall* function_calls, ObjectFunction* function, uint8_t* ip, Value* stack_value_top, int argument_count);
+FunctionCall* StackFunctionCall_push(StackFunctionCall* function_calls, ObjectClosure* closure, uint8_t* ip, Value* stack_value_top, int argument_count);
 FunctionCall* StackFunctionCall_pop(StackFunctionCall* function_calls);
 FunctionCall* StackFunctionCall_peek(StackFunctionCall* function_calls, int offset);
 bool StackFunctionCall_is_empty(StackFunctionCall* function_calls);

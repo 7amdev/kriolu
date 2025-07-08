@@ -573,14 +573,24 @@ static Statement* parser_parse_declaration_function(Parser* parser) {
 
     int function_name_index = parser_parse_identifier(parser, "Expect function name identifier.");
     parser_initialize_local_identifier(parser);
+
     ObjectFunction* parsed_function = parser_parse_function_paramenters_and_body(parser, FunctionKind_Function);
 
     Value function = value_make_object(parsed_function);
-    Compiler_CompileInstruction_Constant(
+    Compiler_CompileInstruction_Closure(
         parser_get_current_bytecode(parser),
         function,
         parser->token_previous.line_number
     );
+
+    // TODO: remove code bellow
+    // 
+    // Value function = value_make_object(parsed_function);
+    // Compiler_CompileInstruction_Constant(
+    //     parser_get_current_bytecode(parser),
+    //     function,
+    //     parser->token_previous.line_number
+    // );
 
     // TODO:
     // UPVALUE Support
@@ -633,6 +643,9 @@ static Statement* parser_parse_method_declaration(Parser* parser) {
 static ObjectFunction* parser_parse_function_paramenters_and_body(Parser* parser, FunctionKind function_kind) {
     Compiler compiler;
     ObjectString* function_name = ObjectString_allocate_if_not_interned(parser->string_database, parser->token_previous.start, parser->token_previous.length, parser->object_head);
+
+    // REVIEW: parser->object_head -> &parser->object_head
+    //
     Compiler_init(&compiler, function_kind, &parser->compiler, function_name, parser->object_head);
     parser_begin_scope(parser);
 

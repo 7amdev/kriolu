@@ -6,13 +6,13 @@ void StackFunctionCall_reset(StackFunctionCall* function_calls) {
 
 // TODO: add parameter argument_cont
 //       rename frame_start -> stack_value_top
-FunctionCall* StackFunctionCall_push(StackFunctionCall* function_calls, ObjectFunction* function, uint8_t* ip, Value* stack_value_top, int argument_count) {
+FunctionCall* StackFunctionCall_push(StackFunctionCall* function_calls, ObjectClosure* closure, uint8_t* ip, Value* stack_value_top, int argument_count) {
     assert(function_calls->top < FRAME_STACK_MAX);
     if (function_calls->top == FRAME_STACK_MAX) return NULL;
 
     FunctionCall* new_function_call = &function_calls->items[function_calls->top];
 
-    new_function_call->function = function;
+    new_function_call->closure = closure;
     new_function_call->frame_start = stack_value_top - argument_count - 1;
     new_function_call->ip = ip;
 
