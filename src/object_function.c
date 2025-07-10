@@ -3,16 +3,17 @@
 ObjectFunction* ObjectFunction_allocate(Object** object_head) {
     ObjectFunction* function = calloc(1, sizeof(ObjectFunction));
     assert(function);
-    ObjectFunction_init(function, NULL, &function->bytecode, 0, object_head);
+    ObjectFunction_init(function, NULL, &function->bytecode, 0, object_head, 0);
 
     return function;
 }
 
-void ObjectFunction_init(ObjectFunction* function, ObjectString* name, Bytecode* bytecode, int arity, Object** object_head) {
+void ObjectFunction_init(ObjectFunction* function, ObjectString* name, Bytecode* bytecode, int arity, Object** object_head, int upvalue_count) {
     Object_init((Object*)function, ObjectKind_Function, object_head);
     assert(function->object.kind == ObjectKind_Function);
     function->arity = arity;
     function->name = name;
+    function->upvalue_count = upvalue_count;
     Bytecode_init(bytecode);
 }
 

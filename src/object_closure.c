@@ -11,10 +11,13 @@ ObjectClosure* ObjectClosure_allocate(ObjectFunction* function, Object** object_
 void ObjectClosure_init(ObjectClosure* closure, ObjectFunction* function, Object** object_head) {
     Object_init((Object*)closure, ObjectKind_Closure, object_head);
     assert(closure->object.kind == ObjectKind_Closure);
+
     closure->function = function;
+    ArrayObjectUpvalue_init(&closure->upvalues, function->upvalue_count);
 }
 
 void ObjectClosure_free(ObjectClosure* closure) {
+    ArrayObjectUpvalue_free(&closure->upvalues);
     free(closure);
     closure->function = NULL;
 }

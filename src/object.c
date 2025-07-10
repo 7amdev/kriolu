@@ -49,11 +49,6 @@ void Object_print(Object* object)
     case ObjectKind_Function: {
         ObjectFunction* function = (ObjectFunction*)object;
         Object_print_function(function);
-        // if (function->name == NULL) {
-        //     printf("<script>");
-        //     return;
-        // }
-        // printf("<fn %s>", function->name->characters);
     } break;
     case ObjectKind_Function_Native: {
         printf("<fn native>");
@@ -61,6 +56,9 @@ void Object_print(Object* object)
     case ObjectKind_Closure: {
         ObjectFunction* function = ((ObjectClosure*)object)->function;
         Object_print_function(function);
+    } break;
+    case ObjectKind_Upvalue: {
+        printf("upvalue");
     } break;
     }
 }

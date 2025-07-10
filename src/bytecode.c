@@ -144,8 +144,7 @@ static int Bytecode_debug_instruction_byte(const char* opcode_text, int ret_offs
     return ret_offset_increment;
 }
 
-static int Bytecode_debug_instruction_2bytes(Bytecode* bytecode, const char* opcode_text, int ret_offset_increment)
-{
+static int Bytecode_debug_instruction_2bytes(Bytecode* bytecode, const char* opcode_text, int ret_offset_increment) {
     uint8_t operand = bytecode->instructions.items[ret_offset_increment - 1];
     Value value = bytecode->values.items[operand];
 
@@ -155,6 +154,31 @@ static int Bytecode_debug_instruction_2bytes(Bytecode* bytecode, const char* opc
         printf("%-22s %5d '", opcode_text, operand);
         value_print(value);
         printf("'\n");
+    }
+
+    return ret_offset_increment;
+}
+
+static int Bytecode_debug_instruction_call(Bytecode* bytecode, const char* opcode_text, int ret_offset_increment) {
+    uint8_t operand = bytecode->instructions.items[ret_offset_increment - 1];
+    printf("%-22s argc: %d", opcode_text, operand);
+    printf("\n");
+    return ret_offset_increment;
+}
+
+static int Bytecode_debug_instruction_closure(Bytecode* bytecode, const char* opcode_text, int ret_offset_increment) {
+    uint8_t operand = bytecode->instructions.items[ret_offset_increment - 1];
+    Value value = bytecode->values.items[operand];
+
+    printf("%-22s %5d '", opcode_text, operand);
+    value_print(value);
+    printf("'\n");
+
+    ObjectFunction* function = value_as_function_object(value);
+    for (int i = 0; i < function->upvalue_count; i++) {
+        int is_local = bytecode->instructions.items[ret_offset_increment++];
+        int index = bytecode->instructions.items[ret_offset_increment++];
+        printf("%04d      | %2s %-7s %d\n", ret_offset_increment - 2, "", is_local ? "local" : "upvalue", index);
     }
 
     return ret_offset_increment;
@@ -233,9 +257,9 @@ int Bytecode_disassemble_instruction(Bytecode* bytecode, int offset)
     if (opcode == OpCode_Constant_Long)
         return Bytecode_debug_instruction_4bytes(bytecode, "OPCODE_CONSTANT_LONG", (offset + 4));
     if (opcode == OpCode_Closure)
-        return Bytecode_debug_instruction_2bytes(bytecode, "OPCODE_CLOSURE", (offset + 2));
+        return Bytecode_debug_instruction_closure(bytecode, "OPCODE_CLOSURE", (offset + 2));
     if (opcode == OpCode_Closure_Long)
-        return Bytecode_debug_instruction_4bytes(bytecode, "OPCODE_CLOSURE_LONG", (offset + 4));
+        return Bytecode_debug_instruction_closure(bytecode, "OPCODE_CLOSURE_LONG", (offset + 4));
     if (opcode == OpCode_True)
         return Bytecode_debug_instruction_byte("OPCODE_TRUE", (offset + 1));
     if (opcode == OpCode_False)
@@ -252,8 +276,12 @@ int Bytecode_disassemble_instruction(Bytecode* bytecode, int offset)
         return Bytecode_debug_instruction_local(bytecode, "OPCODE_READ_LOCAL", (offset + 2));
     if (opcode == OpCode_Assign_Local)
         return Bytecode_debug_instruction_local(bytecode, "OPCODE_ASSIGN_LOCAL", (offset + 2));
+    if (opcode == OpCode_Set_Upvalue)
+        return Bytecode_debug_instruction_local(bytecode, "OPCODE_SET_UPVALUE", (offset + 2));
+    if (opcode == OpCode_Get_Upvalue)
+        return Bytecode_debug_instruction_local(bytecode, "OPCODE_GET_UPVALUE", (offset + 2));
     if (opcode == OpCode_Function_Call)
-        return Bytecode_debug_instruction_2bytes(bytecode, "OPCODE_FUNCTION_CALL", (offset + 2));
+        return Bytecode_debug_instruction_call(bytecode, "OPCODE_FUNCTION_CALL", (offset + 2));
     if (opcode == OpCode_Nil)
         return Bytecode_debug_instruction_byte("OPCODE_NIL", (offset + 1));
     if (opcode == OpCode_Negation)

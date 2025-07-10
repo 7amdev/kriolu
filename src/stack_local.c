@@ -47,7 +47,7 @@ int StackLocal_get_local_index_by_token(StackLocal* locals, Token* token, Local*
     for (int i = locals->top - 1; i >= 0; i--) {
         Local* local = &locals->items[i];
         if (token_is_identifier_equal(&local->token, token)) {
-            *local_out = local;
+            if (local_out != NULL) *local_out = local;
             return i;
         }
     }

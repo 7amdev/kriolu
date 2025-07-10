@@ -90,6 +90,11 @@ void value_print(Value value)
         Object_print(value_as_object(value));
         break;
     }
+    case Value_Runtime_Error:
+    {
+        printf("Error: runtime");
+        break;
+    }
     }
 }
 

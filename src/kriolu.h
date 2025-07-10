@@ -19,7 +19,7 @@
 // #define block(condition) for (int i = 0;i < 1 && (condition); ++i)
 #define block for (int i = 0;i < 1; ++i)
 #define DEBUG_LOG_PARSER
-// #define DEBUG_COMPILER_BYTECODE
+#define DEBUG_COMPILER_BYTECODE
 
 //
 // Token
@@ -202,6 +202,8 @@ enum
     OpCode_Assign_Global, // x = 7;
     OpCode_Read_Local,   // print x;
     OpCode_Assign_Local,  // x = 7;
+    OpCode_Get_Upvalue,
+    OpCode_Set_Upvalue,
     OpCode_Loop,
     OpCode_Function_Call,
 
@@ -346,7 +348,8 @@ typedef enum
     ObjectKind_String,
     ObjectKind_Function,
     ObjectKind_Function_Native,
-    ObjectKind_Closure
+    ObjectKind_Closure,
+    ObjectKind_Upvalue
 } ObjectKind;
 
 
@@ -377,6 +380,7 @@ typedef struct
     Bytecode bytecode;
     ObjectString* name;
     int arity; // Number of parameters
+    int upvalue_count;
 } ObjectFunction;
 
 typedef Value FunctionNative(VirtualMachine* vm, int argument_count, Value* arguments);
@@ -390,7 +394,23 @@ typedef struct {
 typedef struct {
     Object object;
 
+    Value* value_address; // value_location
+} ObjectUpvalue; // TODO: rename to ValueAddress??
+
+typedef struct {
+    ObjectUpvalue** items;
+    int count;
+} ArrayObjectUpvalue; // TODO: rename to ArrayValueAddress
+
+
+typedef struct {
+    Object object;
+
     ObjectFunction* function;
+
+    // TODO: change line to 'ArrayValueAddress parent_locals;'
+    // 
+    ArrayObjectUpvalue upvalues;
 } ObjectClosure;
 
 Object* Object_allocate(ObjectKind kind, size_t size, Object** object_head);
@@ -413,8 +433,16 @@ ObjectString* ObjectString_is_interned(HashTable* table, String string);
 void ObjectString_free(ObjectString* string);
 
 ObjectFunction* ObjectFunction_allocate(Object** object_head);
-void ObjectFunction_init(ObjectFunction* function, ObjectString* name, Bytecode* bytecode, int arity, Object** object_head);
+void ObjectFunction_init(ObjectFunction* function, ObjectString* name, Bytecode* bytecode, int arity, Object** object_head, int upvalue_count);
 void ObjectFunction_free(ObjectFunction* function);
+
+ObjectUpvalue* ObjectUpvalue_allocate(Object** object_head, Value* value_addresss);
+void ObjectUpvalue_init(ObjectUpvalue* upvalue, Object** object_head, Value* value_address);
+void ObjectUpvalue_free(ObjectUpvalue* upvalue);
+
+ArrayObjectUpvalue* ArrayObjectUpvalue_allocate();
+void ArrayObjectUpvalue_init(ArrayObjectUpvalue* upvalues, int item_count);
+void ArrayObjectUpvalue_free(ArrayObjectUpvalue* upvalues);
 
 ObjectClosure* ObjectClosure_allocate(ObjectFunction* function, Object** object_head);
 void ObjectClosure_init(ObjectClosure* closure, ObjectFunction* function, Object** object_head);
@@ -621,18 +649,33 @@ typedef enum {
     FunctionKind_Function
 } FunctionKind;
 
-// TODO: rename to ParserFunction
+typedef struct {
+    uint8_t index;
+    bool is_local; // TODO: rename to is_on_stack
+} Upvalue; // TODO: rename to ValueMetadata or ??
+
+typedef struct {
+    Upvalue items[UINT8_COUNT];
+    int count;
+} ArrayUpvalue;
+
+void ArrayUpvalue_init(ArrayUpvalue* upvalues, int count);
+int ArrayUpvalue_add(ArrayUpvalue* upvalues, uint8_t index, bool is_local, int* function_upvalue_count);
+
+// TODO: rename to ParserFunction 
 typedef struct Compiler {
     struct Compiler* previous; // LinkedList acting as a Stack
 
     ObjectFunction* function;
     FunctionKind function_kind;
     StackLocal locals;
+    ArrayUpvalue upvalues;
     int depth; // Scope depth
 } Compiler;
 
 void Compiler_init(Compiler* compiler, FunctionKind function_kind, Compiler** compiler_current, ObjectString* function_name, Object** object_head);
 ObjectFunction* Compiler_end(Compiler* compiler, Compiler** compiler_current, bool parser_has_error, int line_number);
+int Compiler_resolve_upvalues(Compiler* compiler, Token* name, Local** out);
 
 //
 // Parser
@@ -819,7 +862,6 @@ typedef enum
 } InterpreterResult;
 
 typedef struct {
-    // ObjectFunction* function;
     ObjectClosure* closure;
     uint8_t* ip;
     Value* frame_start; // base_pointer

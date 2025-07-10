@@ -29,6 +29,8 @@ static Expression* parser_parse_operator_function_call(Parser* parser, Expressio
 static Expression* parser_parse_operators_logical(Parser* parser, Expression* left_operand);
 static Expression* parser_parse_operators_arithmetic(Parser* parser, Expression* left_operand);
 static Expression* parser_parse_operators_relational(Parser* parser, Expression* left_operand);
+// TODO: rename to Compiler_find_local_by_token(Compiler* compiler, Token* name, Local** out);
+// static void parser_resolve_upvalue(Compiler* compiler, Token* name, Local** out);
 static void parser_compile_return(Parser* parser);
 static bool parser_is_operator_arithmetic(Parser* parser);
 static bool parser_is_operator_logical(Parser* parser);
@@ -576,27 +578,6 @@ static Statement* parser_parse_declaration_function(Parser* parser) {
 
     ObjectFunction* parsed_function = parser_parse_function_paramenters_and_body(parser, FunctionKind_Function);
 
-    Value function = value_make_object(parsed_function);
-    Compiler_CompileInstruction_Closure(
-        parser_get_current_bytecode(parser),
-        function,
-        parser->token_previous.line_number
-    );
-
-    // TODO: remove code bellow
-    // 
-    // Value function = value_make_object(parsed_function);
-    // Compiler_CompileInstruction_Constant(
-    //     parser_get_current_bytecode(parser),
-    //     function,
-    //     parser->token_previous.line_number
-    // );
-
-    // TODO:
-    // UPVALUE Support
-    // Loop for every upvalue_count
-    //     Compiler_CompileInstruction_2Bytes(is_local, index);
-
     // Define Function Identifier
     //
     if (parser->compiler->depth == 0) {
@@ -679,12 +660,24 @@ static ObjectFunction* parser_parse_function_paramenters_and_body(Parser* parser
 
     ObjectFunction* function = Compiler_end(&compiler, &parser->compiler, parser->had_error, parser->token_previous.line_number);
 
-    // Value value = value_make_object(function);
-    // Compiler_CompileInstruction_Constant(
-    //     parser_get_current_bytecode(parser),
-    //     value,
-    //     parser->token_previous.line_number
-    // );
+    Compiler_CompileInstruction_Closure(
+        parser_get_current_bytecode(parser),
+        value_make_object(function),
+        parser->token_previous.line_number
+    );
+
+    for (int i = 0; i < function->upvalue_count; i++) {
+        Compiler_CompileInstruction_1Byte(
+            parser_get_current_bytecode(parser),
+            compiler.upvalues.items[i].is_local ? 1 : 0,
+            parser->token_previous.line_number
+        );
+        Compiler_CompileInstruction_1Byte(
+            parser_get_current_bytecode(parser),
+            (uint8_t)compiler.upvalues.items[i].index,
+            parser->token_previous.line_number
+        );
+    }
 
     return function;
 
@@ -1059,20 +1052,27 @@ static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bo
         uint8_t opcode_assign = OpCode_Invalid;
         uint8_t opcode_read = OpCode_Invalid;
         Local* local_found = NULL;
+        int operand = -1;
 
-        int operand = StackLocal_get_local_index_by_token(&parser->compiler->locals, &parser->token_previous, &local_found);
         ObjectString* variable_name = ObjectString_allocate_if_not_interned(parser->string_database, parser->token_previous.start, parser->token_previous.length, parser->object_head);
 
+        operand = StackLocal_get_local_index_by_token(&parser->compiler->locals, &parser->token_previous, &local_found);
         if (operand != -1) {
             opcode_assign = OpCode_Assign_Local;
             opcode_read = OpCode_Read_Local;
+        } else if ((operand = Compiler_resolve_upvalues(parser->compiler, &parser->token_previous, &local_found)) != -1) {
+            // ?????
+            // Compiler_resolve_upvalaues return: 
+            //     -1: item not found
+            //     -2: error too many closure variables in function
+            // operand;
+            opcode_assign = OpCode_Set_Upvalue;
+            opcode_read = OpCode_Get_Upvalue;
         } else {
-            // Default
             opcode_assign = OpCode_Assign_Global;
             opcode_read = OpCode_Read_Global;
 
             Value value_string = value_make_object_string(variable_name);
-
             int value_index = Compiler_CompileValue(parser_get_current_bytecode(parser), value_string);
             // TODO: Support for more than 256 value in a Scope
             if (value_index <= UINT8_MAX) {
@@ -1081,7 +1081,6 @@ static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bo
                 parser_error(parser, &parser->token_current, "Too many constants.");
                 operand = 0;
             }
-
         }
 
         if (local_found && local_found->scope_depth == -1)

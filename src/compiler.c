@@ -13,6 +13,7 @@ void Compiler_init(Compiler* compiler, FunctionKind function_kind, Compiler** co
 
     StackLocal_init(&compiler->locals, UINT8_COUNT);
     StackLocal_push(&compiler->locals, (Token) { 0 }, 0);
+    ArrayUpvalue_init(&compiler->upvalues, 0);
 
     // Mark this compiler as global and current
     // 
@@ -38,7 +39,7 @@ ObjectFunction* Compiler_end(Compiler* compiler, Compiler** compiler_current, bo
 
     // Restore parser->compiler to the previous state
     //
-    *compiler_current = compiler->previous;
+    *compiler_current = (*compiler_current)->previous;
 
 #ifdef DEBUG_COMPILER_BYTECODE
     if (!parser_has_error) {
@@ -52,4 +53,32 @@ ObjectFunction* Compiler_end(Compiler* compiler, Compiler** compiler_current, bo
 #endif
 
     return function;
+}
+
+int Compiler_resolve_upvalues(Compiler* compiler, Token* name, Local** out) {
+    if (compiler->previous == NULL) return -1;
+
+    // Search for the variable one level up, or on the enclosing function locals 
+    //
+    int local_index = StackLocal_get_local_index_by_token(&compiler->previous->locals, name, out);
+    if (local_index != -1) {
+        return ArrayUpvalue_add(
+            &compiler->upvalues,
+            (uint8_t)local_index,
+            true,
+            &compiler->function->upvalue_count
+        );
+    }
+
+    int upvalue = Compiler_resolve_upvalues(compiler->previous, name, out);
+    if (upvalue != -1) {
+        return ArrayUpvalue_add(
+            &compiler->upvalues,
+            (uint8_t)upvalue,
+            false,
+            &compiler->function->upvalue_count
+        );
+    }
+
+    return -1;
 }

@@ -12,6 +12,7 @@
 void VirtualMachine_runtime_error(VirtualMachine* vm, const char* format, ...);
 static void VirtualMachine_define_function_native(VirtualMachine* vm, const char* function_name, FunctionNative* function, int arity);
 static bool VirtualMachine_call_function(VirtualMachine* vm, Value function, int argument_count);
+static ObjectUpvalue* VirtualMachine_capture_upvalue(Value* value_address, Object** object_head);
 static inline bool object_validate_kind_from_value(Value value, ObjectKind object_kind);
 static Value FunctionNative_clock(VirtualMachine* vm, int argument_count, Value* arguments);
 
@@ -41,10 +42,9 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
     Value v_closure = value_make_object(closure);
     stack_value_push(&vm->stack_value, v_closure);
 
+    // TODO: remove 'closure->function->bytecode.instructions.items'
     FunctionCall* current_function_call = StackFunctionCall_push(
         &vm->function_calls,
-        // script,
-        // script->bytecode.instructions.items,
         closure,
         closure->function->bytecode.instructions.items,
         vm->stack_value.top,
@@ -57,6 +57,7 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
 #define READ_CONSTANT() (current_function_call->closure->function->bytecode.values.items[READ_BYTE_THEN_INCREMENT()])
 #define READ_CONSTANT_3BYTE() (current_function_call->closure->function->bytecode.values.items[READ_3BYTE_THEN_INCREMENT()])
 #define READ_STRING() value_as_string(READ_CONSTANT())
+    // TODO: #define READ_STRING_3BYTE() (...)
 
 #ifdef DEBUG_TRACE_EXECUTION
     ObjectString* function_name = current_function_call->closure->function->name;
@@ -99,6 +100,15 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
             ObjectFunction* function = value_as_function_object(READ_CONSTANT());
             ObjectClosure* closure = ObjectClosure_allocate(function, &vm->objects);
             stack_value_push(&vm->stack_value, value_make_object(closure));
+            for (int i = 0; i < closure->function->upvalue_count; i++) {
+                uint8_t is_local = READ_BYTE_THEN_INCREMENT();
+                uint8_t index = READ_BYTE_THEN_INCREMENT();
+                if (is_local) {
+                    closure->upvalues.items[i] = VirtualMachine_capture_upvalue(current_function_call->frame_start + index, &vm->objects);
+                } else {
+                    closure->upvalues.items[i] = current_function_call->closure->upvalues.items[index];
+                }
+            }
             break;
         }
         case OpCode_Closure_Long:
@@ -106,6 +116,15 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
             ObjectFunction* function = value_as_function_object(READ_CONSTANT_3BYTE());
             ObjectClosure* closure = ObjectClosure_allocate(function, &vm->objects);
             stack_value_push(&vm->stack_value, value_make_object(closure));
+            for (int i = 0; i < closure->function->upvalue_count; i++) {
+                uint8_t is_local = READ_BYTE_THEN_INCREMENT();
+                uint8_t index = READ_BYTE_THEN_INCREMENT();
+                if (is_local) {
+                    closure->upvalues.items[i] = VirtualMachine_capture_upvalue(current_function_call->frame_start + index, &vm->objects);
+                } else {
+                    closure->upvalues.items[i] = current_function_call->closure->upvalues.items[index];
+                }
+            }
             break;
         }
         case OpCode_True:
@@ -186,6 +205,19 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
             }
 
             current_function_call = StackFunctionCall_peek(&vm->function_calls, 0);
+            break;
+        }
+        case OpCode_Get_Upvalue: {
+            uint8_t index = READ_BYTE_THEN_INCREMENT();
+            stack_value_push(
+                &vm->stack_value,
+                *current_function_call->closure->upvalues.items[index]->value_address
+            );
+            break;
+        }
+        case OpCode_Set_Upvalue: {
+            uint8_t index = READ_BYTE_THEN_INCREMENT();
+            *current_function_call->closure->upvalues.items[index]->value_address = stack_value_peek(&vm->stack_value, 0);
             break;
         }
         case OpCode_Nil:
@@ -547,6 +579,11 @@ static bool VirtualMachine_call_function(VirtualMachine* vm, Value value, int ar
 
     VirtualMachine_runtime_error(vm, "Can only call functions and classes.");
     return false;
+}
+
+static ObjectUpvalue* VirtualMachine_capture_upvalue(Value* value_address, Object** object_head) {
+    ObjectUpvalue* object_upvalue = ObjectUpvalue_allocate(object_head, value_address);
+    return object_upvalue;
 }
 
 static inline bool object_validate_kind_from_value(Value value, ObjectKind object_kind) {
