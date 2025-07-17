@@ -12,7 +12,7 @@ void Compiler_init(Compiler* compiler, FunctionKind function_kind, Compiler** co
     compiler->function->name = function_name;
 
     StackLocal_init(&compiler->locals, UINT8_COUNT);
-    StackLocal_push(&compiler->locals, (Token) { 0 }, 0);
+    StackLocal_push(&compiler->locals, (Token) { 0 }, 0, false);
     ArrayUpvalue_init(&compiler->upvalues, 0);
 
     // Mark this compiler as global and current
@@ -62,6 +62,11 @@ int Compiler_resolve_upvalues(Compiler* compiler, Token* name, Local** out) {
     //
     int local_index = StackLocal_get_local_index_by_token(&compiler->previous->locals, name, out);
     if (local_index != -1) {
+        // NOTE: Mark Local to be moved to the Heap
+        // TODO: rename 'is_capture' to 'local_source'
+        //
+        compiler->previous->locals.items[local_index].is_captured = true;
+
         return ArrayUpvalue_add(
             &compiler->upvalues,
             (uint8_t)local_index,

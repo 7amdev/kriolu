@@ -4,23 +4,39 @@
 // ObjectUpvalue
 // 
 
-ObjectUpvalue* ObjectUpvalue_allocate(Object** object_head, Value* value_addresss) {
+ObjectUpvalue* ObjectUpvalue_allocate(Object** object_head, Value* value_addresss, ObjectUpvalue* next) {
     ObjectUpvalue* upvalue = calloc(1, sizeof(ObjectUpvalue));
     assert(upvalue);
-    ObjectUpvalue_init(upvalue, object_head, value_addresss);
+    ObjectUpvalue_init(upvalue, object_head, value_addresss, next);
 
     return upvalue;
 }
 
-void ObjectUpvalue_init(ObjectUpvalue* upvalue, Object** object_head, Value* value_address) {
+void ObjectUpvalue_init(ObjectUpvalue* upvalue, Object** object_head, Value* value_address, ObjectUpvalue* next) {
     Object_init((Object*)upvalue, ObjectKind_Upvalue, object_head);
     assert(upvalue->object.kind == ObjectKind_Upvalue);
     upvalue->value_address = value_address;
+    upvalue->value = value_make_nil(); // (Value) { 0 };
+    upvalue->next = next;
+}
+
+// Upvalue->value_address is stored in descendent order, because its
+// capturing memory-address from a stack data structure.
+// 
+UpvalueFindResult ObjectUpvalue_find(ObjectUpvalue* item_current, Value* value_address) {
+    ObjectUpvalue* item_previous = NULL;
+    while (item_current != NULL && item_current->value_address > value_address) {
+        item_previous = item_current;
+        item_current = item_current->next;
+    }
+
+    return (UpvalueFindResult) { item_previous, item_current };
 }
 
 void ObjectUpvalue_free(ObjectUpvalue* upvalue) {
     free(upvalue);
     upvalue->value_address = NULL;
+    upvalue->next = NULL;
 }
 
 //

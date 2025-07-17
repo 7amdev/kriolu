@@ -280,6 +280,8 @@ int Bytecode_disassemble_instruction(Bytecode* bytecode, int offset)
         return Bytecode_debug_instruction_local(bytecode, "OPCODE_SET_UPVALUE", (offset + 2));
     if (opcode == OpCode_Get_Upvalue)
         return Bytecode_debug_instruction_local(bytecode, "OPCODE_GET_UPVALUE", (offset + 2));
+    if (opcode == OpCode_Close_Upvalue)
+        return Bytecode_debug_instruction_byte("OPCODE_CLOSE_UPVALUE", (offset + 1));
     if (opcode == OpCode_Function_Call)
         return Bytecode_debug_instruction_call(bytecode, "OPCODE_FUNCTION_CALL", (offset + 2));
     if (opcode == OpCode_Nil)

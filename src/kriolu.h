@@ -177,6 +177,7 @@ enum
     OpCode_Constant_Long,
     OpCode_Closure,
     OpCode_Closure_Long,
+    OpCode_Close_Upvalue, // NOTE: OpCode_Pop_And_Move_To_Heap Move Local to the Heap
     OpCode_Interpolation,
     OpCode_Nil,
     OpCode_True,
@@ -391,17 +392,26 @@ typedef struct {
     int arity;
 } ObjectFunctionNative;
 
-typedef struct {
+// TODO: rename Type name to  ObjectValueSnapshot or ObjectValueContainer or ObjectValueAddress??
+//
+typedef struct ObjectUpvalue ObjectUpvalue;
+struct ObjectUpvalue {
     Object object;
 
     Value* value_address; // value_location
-} ObjectUpvalue; // TODO: rename to ValueAddress??
+    Value value;
+    ObjectUpvalue* next; // 'LinkedList* next';
+};
+
+typedef struct {
+    ObjectUpvalue* item_previous;
+    ObjectUpvalue* item;
+} UpvalueFindResult;
 
 typedef struct {
     ObjectUpvalue** items;
     int count;
-} ArrayObjectUpvalue; // TODO: rename to ArrayValueAddress
-
+} ArrayObjectUpvalue; // TODO: rename to ArrayObjectValueAddress
 
 typedef struct {
     Object object;
@@ -436,8 +446,9 @@ ObjectFunction* ObjectFunction_allocate(Object** object_head);
 void ObjectFunction_init(ObjectFunction* function, ObjectString* name, Bytecode* bytecode, int arity, Object** object_head, int upvalue_count);
 void ObjectFunction_free(ObjectFunction* function);
 
-ObjectUpvalue* ObjectUpvalue_allocate(Object** object_head, Value* value_addresss);
-void ObjectUpvalue_init(ObjectUpvalue* upvalue, Object** object_head, Value* value_address);
+ObjectUpvalue* ObjectUpvalue_allocate(Object** object_head, Value* value_addresss, ObjectUpvalue* next);
+void ObjectUpvalue_init(ObjectUpvalue* upvalue, Object** object_head, Value* value_address, ObjectUpvalue* next);
+UpvalueFindResult ObjectUpvalue_find(ObjectUpvalue* item_current, Value* value_address);
 void ObjectUpvalue_free(ObjectUpvalue* upvalue);
 
 ArrayObjectUpvalue* ArrayObjectUpvalue_allocate();
@@ -614,10 +625,23 @@ void array_statement_free(ArrayStatement* statements);
 #define UINT8_COUNT (UINT8_MAX + 1)
 #define INITIALIZED -1
 
+// typedef enum {
+//     LocalState_In_Stack,
+//     LocalState_In_Heap
+// } LocalState;
+
+typedef enum {
+    LocalSource_In_Heap,
+    LocalSource_In_Stack
+} LocalSource;
 
 typedef struct {
     Token token;       // has to be a identifier
     int scope_depth;
+
+    // open (false)-> In the Stack | closed (true) -> In the Heap
+    // TODO: change line -> LocalSource source;
+    bool is_captured;
 } Local;
 
 typedef struct {
@@ -627,11 +651,12 @@ typedef struct {
 } StackLocal;
 
 void  StackLocal_init(StackLocal* locals, int capacity);
-Local StackLocal_push(StackLocal* locals, Token token, int scope_depth);
-Local StackLocal_pop(StackLocal* local);
-Local* StackLocal_peek(StackLocal* local, int offset);
+Local StackLocal_push(StackLocal* locals, Token token, int scope_depth, bool is_captured);
+Local StackLocal_pop(StackLocal* locals);
+Local* StackLocal_peek(StackLocal* locals, int offset);
 int   StackLocal_get_local_index_by_token(StackLocal* locals, Token* token, Local** local_out);
 bool  StackLocal_is_full(StackLocal* locals);
+bool  StackLocal_is_empty(StackLocal* locals);
 
 typedef struct {
     StackLocal locals;
@@ -889,6 +914,8 @@ struct VirtualMachine {
     // A linked list of all objects created at runtime
     //
     Object* objects; // TODO: rename to 'first' or 'head'
+
+    ObjectUpvalue* openValues; // TODO: rename to ObjectValueSnapshot* head;
 
     // Stores global variables 
     //

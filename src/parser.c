@@ -555,7 +555,8 @@ static int parser_parse_identifier(Parser* parser, const char* error_message) {
         StackLocal_push(
             &parser->compiler->locals,
             parser->token_previous,
-            -1 // Mark as Uninitialized
+            -1, // Mark as Uninitialized
+            false
         );
     }
 
@@ -706,7 +707,8 @@ static Statement* parser_parse_declaration_variable(Parser* parser) {
         StackLocal_push(
             &parser->compiler->locals,
             parser->token_previous,
-            -1 // Mark Local as Uninitialized 
+            -1, // Mark Local as Uninitialized 
+            false
         );
 
         statement.variable_declaration.identifier = ObjectString_allocate_if_not_interned(parser->string_database, parser->token_previous.start, parser->token_previous.length, parser->object_head);
@@ -1098,7 +1100,12 @@ static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bo
 
         // Get variable value
         //
-        Compiler_CompileInstruction_2Bytes(parser_get_current_bytecode(parser), opcode_read, operand, parser->token_previous.line_number);
+        Compiler_CompileInstruction_2Bytes(
+            parser_get_current_bytecode(parser),
+            opcode_read,
+            operand,
+            parser->token_previous.line_number
+        );
 
         Expression expression = expression_make_variable(variable_name);
         return expression_allocate(expression);
@@ -1457,26 +1464,31 @@ static void parser_begin_scope(Parser* parser) {
 }
 
 static void parser_end_scope(Parser* parser) {
-    // TODO: refactor StackLocal by adding function like peek and get_top_item_index
-    // parser->scope.depth -= 1;
-    // for (;;) {
-    //     StackLocal locals = parser->scope.locals;
-
-    //     if (locals.top <= 0) break;
-    //     if (locals.items[locals.top - 1].scope_depth <= parser->scope.depth) break;
-
-    //     Compiler_CompileInstruction_1Byte(parser_get_current_bytecode(parser), OpCode_Pop, parser->token_previous.line_number);
-    //     StackLocal_pop(&parser->scope.locals);
-    // }
-
     parser->compiler->depth -= 1;
+
     StackLocal* locals = &parser->compiler->locals;
     for (;;) {
-        if (locals->top <= 0) break;
-        if (locals->items[locals->top - 1].scope_depth <= parser->compiler->depth) break;
+        // if (locals->top <= 0) break;
+        // if (locals->items[locals->top - 1].scope_depth <= parser->compiler->depth) break;
 
-        Compiler_CompileInstruction_1Byte(parser_get_current_bytecode(parser), OpCode_Pop, parser->token_previous.line_number);
-        StackLocal_pop(&parser->compiler->locals);
+        if (StackLocal_is_empty(locals)) break;
+        if (StackLocal_peek(locals, 0)->scope_depth <= parser->compiler->depth) break;
+
+        if (StackLocal_peek(locals, 0)->is_captured) {
+            Compiler_CompileInstruction_1Byte(
+                parser_get_current_bytecode(parser),
+                OpCode_Close_Upvalue,
+                parser->token_previous.line_number
+            );
+        } else {
+            Compiler_CompileInstruction_1Byte(
+                parser_get_current_bytecode(parser),
+                OpCode_Pop,
+                parser->token_previous.line_number
+            );
+        }
+
+        StackLocal_pop(locals);
     }
 }
 

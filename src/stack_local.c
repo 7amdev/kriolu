@@ -10,14 +10,14 @@ void StackLocal_init(StackLocal* locals, int capacity) {
     locals->capacity = capacity;
 }
 
-Local StackLocal_push(StackLocal* locals, Token token, int scope_depth) {
+Local StackLocal_push(StackLocal* locals, Token token, int scope_depth, bool is_captured) {
     assert(locals->top < locals->capacity && "Error: StackLocal Overflow.");
     // Local* local = &locals->items[locals->count];
     // local->token = token;
     // local->scope_depth = scope_depth;
     // locals->count += 1;
 
-    Local local = (Local){ token, scope_depth };
+    Local local = (Local){ token, scope_depth, is_captured };
     locals->items[locals->top] = local;
     locals->top += 1;
 
@@ -35,12 +35,12 @@ Local StackLocal_pop(StackLocal* locals) {
     return local;
 }
 
-Local* StackLocal_peek(StackLocal* local, int offset) {
-    int index = local->top - 1 - offset;
-    assert(index > -1);
-    assert(index < local->capacity);
+Local* StackLocal_peek(StackLocal* locals, int offset) {
+    int index = locals->top - 1 - offset;
+    assert(index > -1 && "Error: Index out of bond!");
+    assert(index < locals->capacity);
 
-    return &local->items[index];
+    return &locals->items[index];
 }
 
 int StackLocal_get_local_index_by_token(StackLocal* locals, Token* token, Local** local_out) {
@@ -56,5 +56,9 @@ int StackLocal_get_local_index_by_token(StackLocal* locals, Token* token, Local*
 }
 
 bool StackLocal_is_full(StackLocal* locals) {
-    return locals->top == locals->capacity;
+    return (locals->top == locals->capacity);
+}
+
+bool  StackLocal_is_empty(StackLocal* locals) {
+    return (locals->top == 0);
 }
