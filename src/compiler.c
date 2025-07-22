@@ -12,8 +12,8 @@ void Compiler_init(Compiler* compiler, FunctionKind function_kind, Compiler** co
     compiler->function->name = function_name;
 
     StackLocal_init(&compiler->locals, UINT8_COUNT);
-    StackLocal_push(&compiler->locals, (Token) { 0 }, 0, false);
-    ArrayUpvalue_init(&compiler->upvalues, 0);
+    StackLocal_push(&compiler->locals, (Token) { 0 }, 0, LocalAction_Default);
+    ArrayLocalMetadata_init(&compiler->variable_dependencies, 0);
 
     // Mark this compiler as global and current
     // 
@@ -55,33 +55,36 @@ ObjectFunction* Compiler_end(Compiler* compiler, Compiler** compiler_current, bo
     return function;
 }
 
-int Compiler_resolve_upvalues(Compiler* compiler, Token* name, Local** out) {
+// NOTE: If a closure (child function) access a variable from a parent, then it will
+//       traverse all the parent hierarchy to find the local. Once its found,
+//       the variable will be copyed in all the function the traversal had to
+//       to go trough to find the variabe. 
+//
+int Compiler_resolve_variable_dependencies(Compiler* compiler, Token* name, Local** out) {
     if (compiler->previous == NULL) return -1;
 
     // Search for the variable one level up, or on the enclosing function locals 
-    //
-    int local_index = StackLocal_get_local_index_by_token(&compiler->previous->locals, name, out);
-    if (local_index != -1) {
-        // NOTE: Mark Local to be moved to the Heap
-        // TODO: rename 'is_capture' to 'local_source'
-        //
-        compiler->previous->locals.items[local_index].is_captured = true;
-
-        return ArrayUpvalue_add(
-            &compiler->upvalues,
-            (uint8_t)local_index,
-            true,
-            &compiler->function->upvalue_count
+    // In Runtime, the enclosing function's locals are in the stack, thats why
+    // i called it 'stack_index'.
+    // 
+    int stack_index = StackLocal_get_local_index_by_token(&compiler->previous->locals, name, out);
+    if (stack_index != -1) {
+        compiler->previous->locals.items[stack_index].action = LocalAction_Move_Heap;
+        return ArrayLocalMetadata_add(
+            &compiler->variable_dependencies,
+            (uint8_t)stack_index,
+            LocalLocation_In_Parent_Stack,
+            &compiler->function->variable_dependencies_count
         );
     }
 
-    int upvalue = Compiler_resolve_upvalues(compiler->previous, name, out);
-    if (upvalue != -1) {
-        return ArrayUpvalue_add(
-            &compiler->upvalues,
-            (uint8_t)upvalue,
-            false,
-            &compiler->function->upvalue_count
+    int heap_value_index = Compiler_resolve_variable_dependencies(compiler->previous, name, out);
+    if (heap_value_index != -1) {
+        return ArrayLocalMetadata_add(
+            &compiler->variable_dependencies,
+            (uint8_t)heap_value_index,
+            LocalLocation_In_Parent_Heap_Values,
+            &compiler->function->variable_dependencies_count
         );
     }
 

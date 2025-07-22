@@ -12,8 +12,8 @@
 void VirtualMachine_runtime_error(VirtualMachine* vm, const char* format, ...);
 static void VirtualMachine_define_function_native(VirtualMachine* vm, const char* function_name, FunctionNative* function, int arity);
 static bool VirtualMachine_call_function(VirtualMachine* vm, Value function, int argument_count);
-static ObjectUpvalue* VirtualMachine_capture_upvalue(VirtualMachine* vm, Value* value_address, Object** object_head);
-static void VirtualMachine_close_upvalues(VirtualMachine* vm, Value* value_address);
+static ObjectValue* VirtualMachine_capture_object_value(VirtualMachine* vm, Value* value_address, Object** object_head);
+static void VirtualMachine_move_value_from_stack_to_heap(VirtualMachine* vm, Value* value_address);
 static inline bool object_validate_kind_from_value(Value value, ObjectKind object_kind);
 static Value FunctionNative_clock(VirtualMachine* vm, int argument_count, Value* arguments);
 
@@ -23,7 +23,7 @@ static Value FunctionNative_clock(VirtualMachine* vm, int argument_count, Value*
 
 void VirtualMachine_init(VirtualMachine* vm) {
     vm->objects = NULL;
-    vm->openValues = NULL;
+    vm->heap_values = NULL;
 
     stack_value_reset(&vm->stack_value);
     StackFunctionCall_reset(&vm->function_calls);
@@ -102,14 +102,14 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
             ObjectFunction* function = value_as_function_object(READ_CONSTANT());
             ObjectClosure* closure = ObjectClosure_allocate(function, &vm->objects);
             stack_value_push(&vm->stack_value, value_make_object(closure));
-            for (int i = 0; i < closure->function->upvalue_count; i++) {
-                uint8_t is_local = READ_BYTE_THEN_INCREMENT();
+            for (int i = 0; i < closure->function->variable_dependencies_count; i++) {
+                uint8_t local_location = READ_BYTE_THEN_INCREMENT();
                 uint8_t index = READ_BYTE_THEN_INCREMENT();
-                if (is_local) {
-                    closure->upvalues.items[i] = VirtualMachine_capture_upvalue(vm, current_function_call->frame_start + index, &vm->objects);
-                } else {
-                    closure->upvalues.items[i] = current_function_call->closure->upvalues.items[index];
-                }
+                if (local_location == LocalLocation_In_Parent_Stack) {
+                    closure->heap_values.items[i] = VirtualMachine_capture_object_value(vm, current_function_call->frame_start + index, &vm->objects);
+                } else { // TODO: change line to 'else if (local_source == LocalSource_In_Parent_Locals) {'
+                    closure->heap_values.items[i] = current_function_call->closure->heap_values.items[index];
+                } // TODO: add else { VirtualMachine_error("Wrong Local's source/origin/localtion."); }
             }
             break;
         }
@@ -118,13 +118,13 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
             ObjectFunction* function = value_as_function_object(READ_CONSTANT_3BYTE());
             ObjectClosure* closure = ObjectClosure_allocate(function, &vm->objects);
             stack_value_push(&vm->stack_value, value_make_object(closure));
-            for (int i = 0; i < closure->function->upvalue_count; i++) {
+            for (int i = 0; i < closure->function->variable_dependencies_count; i++) {
                 uint8_t is_local = READ_BYTE_THEN_INCREMENT();
                 uint8_t index = READ_BYTE_THEN_INCREMENT();
                 if (is_local) {
-                    closure->upvalues.items[i] = VirtualMachine_capture_upvalue(vm, current_function_call->frame_start + index, &vm->objects);
+                    closure->heap_values.items[i] = VirtualMachine_capture_object_value(vm, current_function_call->frame_start + index, &vm->objects);
                 } else {
-                    closure->upvalues.items[i] = current_function_call->closure->upvalues.items[index];
+                    closure->heap_values.items[i] = current_function_call->closure->heap_values.items[index];
                 }
             }
             break;
@@ -144,8 +144,8 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
             stack_value_pop(&vm->stack_value);
             break;
         }
-        case OpCode_Close_Upvalue: {
-            VirtualMachine_close_upvalues(vm, vm->stack_value.top - 1);
+        case OpCode_Move_To_Heap: {
+            VirtualMachine_move_value_from_stack_to_heap(vm, vm->stack_value.top - 1);
             stack_value_pop(&vm->stack_value);
             break;
         }
@@ -214,17 +214,17 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
             current_function_call = StackFunctionCall_peek(&vm->function_calls, 0);
             break;
         }
-        case OpCode_Get_Upvalue: {
+        case OpCode_Read_Heap_Value: { // TODO: rename to 'OpCode_Read_Heap_Value'
             uint8_t index = READ_BYTE_THEN_INCREMENT();
             stack_value_push(
                 &vm->stack_value,
-                *current_function_call->closure->upvalues.items[index]->value_address
+                *current_function_call->closure->heap_values.items[index]->value_address
             );
             break;
         }
-        case OpCode_Set_Upvalue: {
+        case OpCode_Assign_Heap_Value: { // TODO: rename to 'OpCode_Assign_Heap_Value'
             uint8_t index = READ_BYTE_THEN_INCREMENT();
-            *current_function_call->closure->upvalues.items[index]->value_address = stack_value_peek(&vm->stack_value, 0);
+            *current_function_call->closure->heap_values.items[index]->value_address = stack_value_peek(&vm->stack_value, 0);
             break;
         }
         case OpCode_Nil:
@@ -449,7 +449,7 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
         {
             Value returned_value = stack_value_pop(&vm->stack_value);
 
-            VirtualMachine_close_upvalues(vm, current_function_call->frame_start);
+            VirtualMachine_move_value_from_stack_to_heap(vm, current_function_call->frame_start);
             FunctionCall* returned_function_call = StackFunctionCall_pop(&vm->function_calls);
             if (StackFunctionCall_is_empty(&vm->function_calls)) {
                 stack_value_pop(&vm->stack_value);
@@ -590,29 +590,31 @@ static bool VirtualMachine_call_function(VirtualMachine* vm, Value value, int ar
     return false;
 }
 
-static ObjectUpvalue* VirtualMachine_capture_upvalue(VirtualMachine* vm, Value* value_address, Object** object_head) {
-    UpvalueFindResult result = ObjectUpvalue_find(vm->openValues, value_address);
+static ObjectValue* VirtualMachine_capture_object_value(VirtualMachine* vm, Value* value_address, Object** object_head) {
+    ObjectValueFindResult result = ObjectValue_find(vm->heap_values, value_address);
     if (result.item != NULL && result.item->value_address == value_address) {
         return result.item;
     }
 
-    ObjectUpvalue* new_upvalue = ObjectUpvalue_allocate(object_head, value_address, result.item);
+    ObjectValue* new_object_value = ObjectValue_allocate(object_head, value_address, result.item);
     if (result.item_previous == NULL) {
-        vm->openValues = new_upvalue;
+        vm->heap_values = new_object_value;
     } else {
-        result.item_previous->next = new_upvalue;
+        result.item_previous->next = new_object_value;
     }
 
-    return new_upvalue;
+    return new_object_value;
 }
 
-// TODO: rename function to 'VirtualMachine_move_value_from_stack_to_heap'
-static void VirtualMachine_close_upvalues(VirtualMachine* vm, Value* value_address) {
-    while (vm->openValues != NULL && vm->openValues->value_address >= value_address) {
-        ObjectUpvalue* upvalue = vm->openValues;
-        upvalue->value = *upvalue->value_address;
-        upvalue->value_address = &upvalue->value;
-        vm->openValues = upvalue->next;
+// TODO: Debug this code. vm->heap_values = object_value->next will change the 
+//       who's the root node. Why and how is it behaving??
+//
+static void VirtualMachine_move_value_from_stack_to_heap(VirtualMachine* vm, Value* value_address) {
+    while (vm->heap_values != NULL && vm->heap_values->value_address >= value_address) {
+        ObjectValue* object_value = vm->heap_values;
+        object_value->value = *object_value->value_address;
+        object_value->value_address = &object_value->value;
+        vm->heap_values = object_value->next;
     }
 }
 

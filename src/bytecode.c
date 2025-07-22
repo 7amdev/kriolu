@@ -175,10 +175,10 @@ static int Bytecode_debug_instruction_closure(Bytecode* bytecode, const char* op
     printf("'\n");
 
     ObjectFunction* function = value_as_function_object(value);
-    for (int i = 0; i < function->upvalue_count; i++) {
-        int is_local = bytecode->instructions.items[ret_offset_increment++];
+    for (int i = 0; i < function->variable_dependencies_count; i++) {
+        int local_location = bytecode->instructions.items[ret_offset_increment++];
         int index = bytecode->instructions.items[ret_offset_increment++];
-        printf("%04d      | %2s %-7s %d\n", ret_offset_increment - 2, "", is_local ? "local" : "upvalue", index);
+        printf("%04d      | %2s %-7s %d\n", ret_offset_increment - 2, "", local_location ? "stack" : "parent", index);
     }
 
     return ret_offset_increment;
@@ -276,12 +276,12 @@ int Bytecode_disassemble_instruction(Bytecode* bytecode, int offset)
         return Bytecode_debug_instruction_local(bytecode, "OPCODE_READ_LOCAL", (offset + 2));
     if (opcode == OpCode_Assign_Local)
         return Bytecode_debug_instruction_local(bytecode, "OPCODE_ASSIGN_LOCAL", (offset + 2));
-    if (opcode == OpCode_Set_Upvalue)
-        return Bytecode_debug_instruction_local(bytecode, "OPCODE_SET_UPVALUE", (offset + 2));
-    if (opcode == OpCode_Get_Upvalue)
-        return Bytecode_debug_instruction_local(bytecode, "OPCODE_GET_UPVALUE", (offset + 2));
-    if (opcode == OpCode_Close_Upvalue)
-        return Bytecode_debug_instruction_byte("OPCODE_CLOSE_UPVALUE", (offset + 1));
+    if (opcode == OpCode_Assign_Heap_Value)
+        return Bytecode_debug_instruction_local(bytecode, "OPCODE_ASSIGN_HRAP_VALUE", (offset + 2));
+    if (opcode == OpCode_Read_Heap_Value)
+        return Bytecode_debug_instruction_local(bytecode, "OPCODE_READ_HEAP_VALUE", (offset + 2));
+    if (opcode == OpCode_Move_To_Heap)
+        return Bytecode_debug_instruction_byte("OPCODE_MOVE_TO_HEAP", (offset + 1));
     if (opcode == OpCode_Function_Call)
         return Bytecode_debug_instruction_call(bytecode, "OPCODE_FUNCTION_CALL", (offset + 2));
     if (opcode == OpCode_Nil)

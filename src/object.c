@@ -57,8 +57,8 @@ void Object_print(Object* object)
         ObjectFunction* function = ((ObjectClosure*)object)->function;
         Object_print_function(function);
     } break;
-    case ObjectKind_Upvalue: {
-        printf("upvalue");
+    case ObjectKind_Heap_Value: {
+        printf("Heap Value");
     } break;
     }
 }

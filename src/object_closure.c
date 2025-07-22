@@ -13,11 +13,11 @@ void ObjectClosure_init(ObjectClosure* closure, ObjectFunction* function, Object
     assert(closure->object.kind == ObjectKind_Closure);
 
     closure->function = function;
-    ArrayObjectUpvalue_init(&closure->upvalues, function->upvalue_count);
+    ArrayHeapValue_init(&closure->heap_values, function->variable_dependencies_count);
 }
 
 void ObjectClosure_free(ObjectClosure* closure) {
-    ArrayObjectUpvalue_free(&closure->upvalues);
+    ArrayHeapValue_free(&closure->heap_values);
     free(closure);
     closure->function = NULL;
 }

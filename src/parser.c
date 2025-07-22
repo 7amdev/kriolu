@@ -30,7 +30,6 @@ static Expression* parser_parse_operators_logical(Parser* parser, Expression* le
 static Expression* parser_parse_operators_arithmetic(Parser* parser, Expression* left_operand);
 static Expression* parser_parse_operators_relational(Parser* parser, Expression* left_operand);
 // TODO: rename to Compiler_find_local_by_token(Compiler* compiler, Token* name, Local** out);
-// static void parser_resolve_upvalue(Compiler* compiler, Token* name, Local** out);
 static void parser_compile_return(Parser* parser);
 static bool parser_is_operator_arithmetic(Parser* parser);
 static bool parser_is_operator_logical(Parser* parser);
@@ -667,15 +666,15 @@ static ObjectFunction* parser_parse_function_paramenters_and_body(Parser* parser
         parser->token_previous.line_number
     );
 
-    for (int i = 0; i < function->upvalue_count; i++) {
+    for (int i = 0; i < function->variable_dependencies_count; i++) {
         Compiler_CompileInstruction_1Byte(
             parser_get_current_bytecode(parser),
-            compiler.upvalues.items[i].is_local ? 1 : 0,
+            compiler.variable_dependencies.items[i].location,
             parser->token_previous.line_number
         );
         Compiler_CompileInstruction_1Byte(
             parser_get_current_bytecode(parser),
-            (uint8_t)compiler.upvalues.items[i].index,
+            (uint8_t)compiler.variable_dependencies.items[i].index,
             parser->token_previous.line_number
         );
     }
@@ -1062,14 +1061,14 @@ static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bo
         if (operand != -1) {
             opcode_assign = OpCode_Assign_Local;
             opcode_read = OpCode_Read_Local;
-        } else if ((operand = Compiler_resolve_upvalues(parser->compiler, &parser->token_previous, &local_found)) != -1) {
+        } else if ((operand = Compiler_resolve_variable_dependencies(parser->compiler, &parser->token_previous, &local_found)) != -1) {
             // ?????
             // Compiler_resolve_upvalaues return: 
             //     -1: item not found
             //     -2: error too many closure variables in function
             // operand;
-            opcode_assign = OpCode_Set_Upvalue;
-            opcode_read = OpCode_Get_Upvalue;
+            opcode_assign = OpCode_Assign_Heap_Value;
+            opcode_read = OpCode_Read_Heap_Value;
         } else {
             opcode_assign = OpCode_Assign_Global;
             opcode_read = OpCode_Read_Global;
@@ -1474,10 +1473,10 @@ static void parser_end_scope(Parser* parser) {
         if (StackLocal_is_empty(locals)) break;
         if (StackLocal_peek(locals, 0)->scope_depth <= parser->compiler->depth) break;
 
-        if (StackLocal_peek(locals, 0)->is_captured) {
+        if (StackLocal_peek(locals, 0)->action == LocalAction_Move_Heap) {
             Compiler_CompileInstruction_1Byte(
                 parser_get_current_bytecode(parser),
-                OpCode_Close_Upvalue,
+                OpCode_Move_To_Heap,
                 parser->token_previous.line_number
             );
         } else {

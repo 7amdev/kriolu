@@ -10,14 +10,14 @@ void StackLocal_init(StackLocal* locals, int capacity) {
     locals->capacity = capacity;
 }
 
-Local StackLocal_push(StackLocal* locals, Token token, int scope_depth, bool is_captured) {
+Local StackLocal_push(StackLocal* locals, Token token, int scope_depth, LocalAction action) {
     assert(locals->top < locals->capacity && "Error: StackLocal Overflow.");
     // Local* local = &locals->items[locals->count];
     // local->token = token;
     // local->scope_depth = scope_depth;
     // locals->count += 1;
 
-    Local local = (Local){ token, scope_depth, is_captured };
+    Local local = (Local){ token, scope_depth, action };
     locals->items[locals->top] = local;
     locals->top += 1;
 

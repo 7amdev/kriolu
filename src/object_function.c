@@ -8,12 +8,12 @@ ObjectFunction* ObjectFunction_allocate(Object** object_head) {
     return function;
 }
 
-void ObjectFunction_init(ObjectFunction* function, ObjectString* name, Bytecode* bytecode, int arity, Object** object_head, int upvalue_count) {
+void ObjectFunction_init(ObjectFunction* function, ObjectString* name, Bytecode* bytecode, int arity, Object** object_head, int variable_dependencies_count) {
     Object_init((Object*)function, ObjectKind_Function, object_head);
     assert(function->object.kind == ObjectKind_Function);
     function->arity = arity;
     function->name = name;
-    function->upvalue_count = upvalue_count;
+    function->variable_dependencies_count = variable_dependencies_count;
     Bytecode_init(bytecode);
 }
 
