@@ -12,17 +12,19 @@ void Bytecode_init(Bytecode* bytecode) {
     array_line_init(&bytecode->lines);
 }
 
-int Bytecode_insert_instruction_1byte(Bytecode* bytecode, OpCode opcode, int line_number) {
+int Bytecode_insert_instruction_1byte(Bytecode* bytecode, OpCode opcode, int line_number, bool debug_trace_on) {
     int opcode_index = array_instruction_insert(&bytecode->instructions, opcode);
     int line_opcode_index = array_line_insert(&bytecode->lines, line_number);
 
     assert(opcode_index == line_opcode_index);
     assert(opcode_index == (bytecode->instructions.count - 1));
 
+    if (debug_trace_on) Bytecode_disassemble_instruction(bytecode, opcode_index);
+
     return bytecode->instructions.count - 1;
 }
 
-int Bytecode_insert_instruction_2bytes(Bytecode* bytecode, OpCode opcode, uint8_t operand, int line_number) {
+int Bytecode_insert_instruction_2bytes(Bytecode* bytecode, OpCode opcode, uint8_t operand, int line_number, bool debug_trace_on) {
     int opcode_index = array_instruction_insert(&bytecode->instructions, opcode);
     int line_opcode_index = array_line_insert(&bytecode->lines, line_number);
 
@@ -34,10 +36,12 @@ int Bytecode_insert_instruction_2bytes(Bytecode* bytecode, OpCode opcode, uint8_
     assert(operand_index == line_operand_index);
     assert(operand_index == (bytecode->instructions.count - 1));
 
+    if (debug_trace_on) Bytecode_disassemble_instruction(bytecode, opcode_index);
+
     return bytecode->instructions.count - 1;
 }
 
-static int Bytecode_insert_instruction_4bytes(Bytecode* bytecode, OpCode opcode, uint8_t byte1, uint8_t byte2, uint8_t byte3, int line_number) {
+static int Bytecode_insert_instruction_4bytes(Bytecode* bytecode, OpCode opcode, uint8_t byte1, uint8_t byte2, uint8_t byte3, int line_number, bool debug_trace_on) {
     int opcode_index = array_instruction_insert(&bytecode->instructions, opcode);
     int line_opcode_index = array_line_insert(&bytecode->lines, line_number);
 
@@ -49,35 +53,43 @@ static int Bytecode_insert_instruction_4bytes(Bytecode* bytecode, OpCode opcode,
     assert(operand_index == line_index);
     assert(operand_index == (bytecode->instructions.count - 1));
 
+    if (debug_trace_on) Bytecode_disassemble_instruction(bytecode, opcode_index);
+
     return bytecode->instructions.count - 1;
 }
 
-int Bytecode_insert_instruction_constant(Bytecode* bytecode, Value value, int line_number) {
+int Bytecode_insert_instruction_constant(Bytecode* bytecode, Value value, int line_number, bool debug_trace_on) {
     int value_index = array_value_insert(&bytecode->values, value);
     assert(value_index > -1);
 
     if (value_index < 256) {
+        // int opcode_index = bytecode->instructions.count;
         return Bytecode_insert_instruction_2bytes(
             bytecode,
             OpCode_Constant,       // OpCode
             (uint8_t)value_index,  // Operand
-            line_number
+            line_number,
+            DEBUG_TRACE_INSTRUCTION
         );
+        // if (debug_trace_on) Bytecode_disassemble_instruction(bytecode, opcode_index);
+        // return result;
     }
 
     uint8_t byte1 = (value_index >> 0 & 0xff);
     uint8_t byte2 = (value_index >> 8 & 0xff);
     uint8_t byte3 = (value_index >> 16 & 0xff);
 
+
     return Bytecode_insert_instruction_4bytes(
         bytecode,
         OpCode_Constant_Long,     // OpCode
         byte1, byte2, byte3,      // Operand
-        line_number
+        line_number,
+        DEBUG_TRACE_INSTRUCTION
     );
 }
 
-void Bytecode_insert_instruction_closure(Bytecode* bytecode, Value value, int line_number) {
+void Bytecode_insert_instruction_closure(Bytecode* bytecode, Value value, int line_number, bool debug_trace_on) {
     int value_index = array_value_insert(&bytecode->values, value);
     assert(value_index > -1);
 
@@ -86,7 +98,8 @@ void Bytecode_insert_instruction_closure(Bytecode* bytecode, Value value, int li
             bytecode,
             OpCode_Closure,        // OpCode
             (uint8_t)value_index,  // Operand
-            line_number
+            line_number,
+            DEBUG_TRACE_INSTRUCTION
         );
 
         return;
@@ -100,40 +113,53 @@ void Bytecode_insert_instruction_closure(Bytecode* bytecode, Value value, int li
         bytecode,
         OpCode_Closure_Long,      // OpCode
         byte1, byte2, byte3,      // Operand
-        line_number
+        line_number,
+        DEBUG_TRACE_INSTRUCTION
     );
 }
 
 // Jumps Forward
-//
-int Bytecode_insert_instruction_jump(Bytecode* bytecode, OpCode opcode, int line) {
-    Bytecode_insert_instruction_1byte(bytecode, opcode, line);
-    Bytecode_insert_instruction_1byte(bytecode, 0xff, line);
-    Bytecode_insert_instruction_1byte(bytecode, 0xff, line);
+// TODO: implement custom Debug_Trace
+int Bytecode_insert_instruction_jump(Bytecode* bytecode, OpCode opcode, int line, bool debug_trace_on) {
+    int instruction_start = Bytecode_insert_instruction_1byte(bytecode, opcode, line, false);
+    Bytecode_insert_instruction_1byte(bytecode, 0xff, line, false);
+    Bytecode_insert_instruction_1byte(bytecode, 0xff, line, false);
+
+    if (debug_trace_on) Bytecode_disassemble_instruction(bytecode, instruction_start);
 
     return bytecode->instructions.count - 2;
 }
 
 // Jumps Backwards
 //
-void Bytecode_emit_instruction_loop(Bytecode* bytecode, int loop_start_index, int line_number) {
+void Bytecode_emit_instruction_loop(Bytecode* bytecode, int jump_to_index, int line_number, bool debug_trace_on) {
     // instruction_array_current_position + loop_instruction_size(3 bytes) - increment_index_in_instruction_array
     //
-    int offset = bytecode->instructions.count + 3 - loop_start_index;
+    int instruction_start = bytecode->instructions.count;
+    int instruction_length = 3;
+    int offset = instruction_start + instruction_length - jump_to_index;
     uint8_t operand_byte1 = ((offset >> 8) & 0xff);
     uint8_t operand_byte2 = (offset & 0xff);
 
-    Bytecode_insert_instruction_1byte(bytecode, OpCode_Loop, line_number);
-    Bytecode_insert_instruction_1byte(bytecode, operand_byte1, line_number);
-    Bytecode_insert_instruction_1byte(bytecode, operand_byte2, line_number);
+    Bytecode_insert_instruction_1byte(bytecode, OpCode_Loop, line_number, false);
+    Bytecode_insert_instruction_1byte(bytecode, operand_byte1, line_number, false);
+    Bytecode_insert_instruction_1byte(bytecode, operand_byte2, line_number, false);
+
+    if (debug_trace_on) Bytecode_disassemble_instruction(bytecode, instruction_start);
 }
 
-bool Bytecode_patch_instruction_jump(Bytecode* bytecode, int operand_index) {
+bool Bytecode_patch_instruction_jump(Bytecode* bytecode, int operand_index, bool debug_trace_on) {
     int jump_to_index = bytecode->instructions.count - operand_index - 2;
     if (jump_to_index > UINT16_MAX) return true;
 
     bytecode->instructions.items[operand_index] = (jump_to_index >> 8) & 0xff;
     bytecode->instructions.items[operand_index + 1] = jump_to_index & 0xff;
+
+    if (debug_trace_on) {
+        printf(">> PATCH JUMP:\n");
+        Bytecode_disassemble_instruction(bytecode, operand_index - 1);
+        printf(">>>>\n");
+    }
 
     return false;
 }
@@ -178,7 +204,7 @@ static int Bytecode_debug_instruction_closure(Bytecode* bytecode, const char* op
     for (int i = 0; i < function->variable_dependencies_count; i++) {
         int local_location = bytecode->instructions.items[ret_offset_increment++];
         int index = bytecode->instructions.items[ret_offset_increment++];
-        printf("%04d      | %2s %-7s %d\n", ret_offset_increment - 2, "", local_location ? "stack" : "parent", index);
+        printf("%04d      | %2s %-7s %d\n", ret_offset_increment - 2, "", local_location ? "stack" : "heap", index);
     }
 
     return ret_offset_increment;

@@ -19,14 +19,15 @@
 // #define block(condition) for (int i = 0;i < 1 && (condition); ++i)
 #define block for (int i = 0;i < 1; ++i)
 #define DEBUG_LOG_PARSER
-#define DEBUG_COMPILER_BYTECODE
+// #define DEBUG_COMPILER_BYTECODE
+#define LinkedList(type) type##*
+#define StackHeader struct { int count; int capacity; }
 
 //
 // Token
 //
 
-typedef enum
-{
+typedef enum {
     Token_Error, // TODO: change to token_invalid
     Token_Eof,
 
@@ -97,15 +98,13 @@ bool token_is_identifier_equal(Token* a, Token* b);
 
 #define STRING_INTERPOLATION_MAX 8
 
-typedef struct
-{
+typedef struct {
     const char* start;
     const char* current;
     int line_number;
 
     int string_nested_interpolation[STRING_INTERPOLATION_MAX];
     int string_interpolation_count;
-
 } Lexer;
 
 #define l_debug_print_token(token) lexer_debug_print_token(token, "%s ")
@@ -169,19 +168,18 @@ void array_line_free(ArrayLineNumber* lines);
 //
 
 typedef uint8_t OpCode;
-enum
-{
+enum {
     OpCode_Invalid,
 
-    OpCode_Constant,
+    OpCode_Constant,        // TODO: rename 'OpCode_Value_Literal' or 'OpCode_Push_Stack_Value' 
     OpCode_Constant_Long,
-    OpCode_Closure,
+    OpCode_Closure,         // TODO: rename 'OpCode_Value_Closure'  or 'OpCode_Push_Stack_Value'
     OpCode_Closure_Long,
     OpCode_Move_To_Heap,
     OpCode_Interpolation,
-    OpCode_Nil,
-    OpCode_True,
-    OpCode_False,
+    OpCode_Nil,             // TODO: rename 'OpCode_Value_Nil' 
+    OpCode_True,            // TODO: rename 'OpCode_Value_True' 
+    OpCode_False,           // TODO: rename 'OpCode_Value_False' 
     OpCode_Negation,
     OpCode_Not,
     OpCode_Addition,
@@ -201,8 +199,12 @@ enum
     OpCode_Define_Global, // var x;
     OpCode_Read_Global,   // print x;
     OpCode_Assign_Global, // x = 7;
-    OpCode_Read_Local,   // print x;
-    OpCode_Assign_Local,  // x = 7;
+
+    // e.g.: print x; TODO: rename to 'OpCode_Read_Stack_Value'
+    OpCode_Read_Local,
+    // e.g.: x = 7;  TODO: rename to 'OpCode_Assign_Stack_Value'
+    OpCode_Assign_Local,
+
     OpCode_Read_Heap_Value,
     OpCode_Assign_Heap_Value,
     OpCode_Loop,
@@ -219,8 +221,8 @@ typedef struct
 } ArrayInstruction;
 
 void array_instruction_init(ArrayInstruction* instructions);
-int array_instruction_insert(ArrayInstruction* instructions, uint8_t item);
-int array_instruction_insert_u24(ArrayInstruction* instructions, uint8_t byte1, uint8_t byte2, uint8_t byte3);
+int  array_instruction_insert(ArrayInstruction* instructions, uint8_t item);
+int  array_instruction_insert_u24(ArrayInstruction* instructions, uint8_t byte1, uint8_t byte2, uint8_t byte3);
 void array_instruction_free(ArrayInstruction* instructions);
 
 //
@@ -311,29 +313,29 @@ typedef struct
     ArrayLineNumber lines;
 } Bytecode;
 
-#define Compiler_CompileInstruction_1Byte(bytecode, opcode, line) Bytecode_insert_instruction_1byte(bytecode, opcode, line)
-#define Compiler_CompileInstruction_2Bytes(bytecode, opcode, operand, line) Bytecode_insert_instruction_2bytes(bytecode, opcode, operand, line)
-#define Compiler_CompileInstruction_Constant(bytecode, value, line) Bytecode_insert_instruction_constant(bytecode, value, line)
-#define Compiler_CompileInstruction_Closure(bytecode, value, line) Bytecode_insert_instruction_closure(bytecode, value, line)
-#define Compiler_CompileInstruction_Jump(bytecode, opcode, line) Bytecode_insert_instruction_jump(bytecode, opcode, line)
-#define Compiler_CompileInstruction_Loop(bytecode, start_index, line) Bytecode_emit_instruction_loop(bytecode, start_index, line);
+#define DEBUG_TRACE_INSTRUCTION true
+
+#define Compiler_CompileInstruction_1Byte(bytecode, opcode, line) Bytecode_insert_instruction_1byte(bytecode, opcode, line, DEBUG_TRACE_INSTRUCTION)
+#define Compiler_CompileInstruction_2Bytes(bytecode, opcode, operand, line) Bytecode_insert_instruction_2bytes(bytecode, opcode, operand, line, DEBUG_TRACE_INSTRUCTION)
+#define Compiler_CompileInstruction_Constant(bytecode, value, line) Bytecode_insert_instruction_constant(bytecode, value, line, DEBUG_TRACE_INSTRUCTION)
+#define Compiler_CompileInstruction_Closure(bytecode, value, line) Bytecode_insert_instruction_closure(bytecode, value, line, DEBUG_TRACE_INSTRUCTION)
+#define Compiler_CompileInstruction_Jump(bytecode, opcode, line) Bytecode_insert_instruction_jump(bytecode, opcode, line, DEBUG_TRACE_INSTRUCTION)
+#define Compiler_CompileInstruction_Loop(bytecode, start_index, line) Bytecode_emit_instruction_loop(bytecode, start_index, line, DEBUG_TRACE_INSTRUCTION)
 #define Compiler_CompileValue(bytecode, value) array_value_insert(&bytecode->values, value)
-#define Compiler_PatchInstructionJump(bytecode, operand_index) Bytecode_patch_instruction_jump(bytecode, operand_index)
+#define Compiler_PatchInstructionJump(bytecode, operand_index) Bytecode_patch_instruction_jump(bytecode, operand_index, DEBUG_TRACE_INSTRUCTION)
 
 void Bytecode_init(Bytecode* bytecode);
-int Bytecode_insert_instruction_1byte(Bytecode* bytecode, OpCode opcode, int line_number);
-int Bytecode_insert_instruction_2bytes(Bytecode* bytecode, OpCode opcode, uint8_t operand, int line_number);
-int Bytecode_insert_instruction_constant(Bytecode* bytecode, Value value, int line_number);
-void Bytecode_insert_instruction_closure(Bytecode* bytecode, Value value, int line_number);
-int Bytecode_insert_instruction_jump(Bytecode* bytecode, OpCode opcode, int line);
-void Bytecode_emit_instruction_loop(Bytecode* bytecode, int loop_start_index, int line_number);
-bool Bytecode_patch_instruction_jump(Bytecode* bytecode, int operand_index);
+int  Bytecode_insert_instruction_1byte(Bytecode* bytecode, OpCode opcode, int line_number, bool debug_trace_on);
+int  Bytecode_insert_instruction_2bytes(Bytecode* bytecode, OpCode opcode, uint8_t operand, int line_number, bool debug_trace_on);
+int  Bytecode_insert_instruction_constant(Bytecode* bytecode, Value value, int line_number, bool debug_trace_on);
+void Bytecode_insert_instruction_closure(Bytecode* bytecode, Value value, int line_number, bool debug_trace_on);
+int  Bytecode_insert_instruction_jump(Bytecode* bytecode, OpCode opcode, int line, bool debug_trace_on);
+void Bytecode_emit_instruction_loop(Bytecode* bytecode, int jump_to_index, int line_number, bool debug_trace_on);
+bool Bytecode_patch_instruction_jump(Bytecode* bytecode, int operand_index, bool debug_trace_on);
 void Bytecode_disassemble_header(char* title_name);
 void Bytecode_disassemble(Bytecode* bytecode, const char* name);
-int Bytecode_disassemble_instruction(Bytecode* bytecode, int offset);
+int  Bytecode_disassemble_instruction(Bytecode* bytecode, int offset);
 void Bytecode_free(Bytecode* bytecode);
-// void Bytecode_emitter_begin();
-// Bytecode Bytecode_emitter_end();
 
 //
 // Object / Runtime Values
@@ -679,19 +681,35 @@ int  ArrayLocalMetadata_add(ArrayLocalMetadata* local_metadata, uint8_t index, L
 
 // TODO: rename to:
 // ParserFunction or FunctionContainer or FunctionCompiler or FunctionWrapper
-typedef struct Compiler {
-    struct Compiler* previous; // LinkedList acting as a Stack
+typedef struct Compiler Compiler;
+struct Compiler {
+    // Compiler* previous; // LinkedList acting as a Stack
+    LinkedList(Compiler) previous;
 
     ObjectFunction* function;
     FunctionKind function_kind;
     StackLocal locals;     // Emulates Runtime StackValue 
     ArrayLocalMetadata variable_dependencies;
     int depth; // Scope depth
-} Compiler;
+};
 
 void Compiler_init(Compiler* compiler, FunctionKind function_kind, Compiler** compiler_current, ObjectString* function_name, Object** object_head);
 ObjectFunction* Compiler_end(Compiler* compiler, Compiler** compiler_current, bool parser_has_error, int line_number);
-int Compiler_resolve_variable_dependencies(Compiler* compiler, Token* name, Local** out);
+int Compiler_resolve_variable_dependencies(Compiler* compiler, Token* name, Local** ret_local);
+
+typedef struct StackCompiler StackCompiler;
+struct StackCompiler {
+    int top;
+    Compiler* items[UINT8_COUNT];
+};
+
+void      StackCompiler_init(StackCompiler* stack_compiler);
+Compiler* StackCompiler_push(StackCompiler* stack_compiler, Compiler* compiler);
+Compiler* StackCompiler_pop(StackCompiler* stack_compiler);
+Compiler* StackCompiler_peek(StackCompiler* stack_compiler, int offset);
+bool      StackCompiler_is_empty(StackCompiler* stack_compiler);
+bool      StackCompiler_is_full(StackCompiler* stack_compiler);
+void      StackCompiler_free(StackCompiler* stack_compiler);
 
 //
 // Parser
@@ -754,12 +772,12 @@ typedef struct {
     int top;
 } StackBreakpoint;
 
-void StackBreak_init(StackBreakpoint* breakpoints);
+void       StackBreak_init(StackBreakpoint* breakpoints);
 Breakpoint StackBreak_push(StackBreakpoint* breakpoints, Breakpoint value);
 Breakpoint StackBreak_pop(StackBreakpoint* breakpoints);
 Breakpoint StackBreak_peek(StackBreakpoint* breakpoints, int offset);
-bool StackBreak_is_empty(StackBreakpoint* breakpoints);
-bool StackBreak_is_full(StackBreakpoint* breakpoints);
+bool       StackBreak_is_empty(StackBreakpoint* breakpoints);
+bool       StackBreak_is_full(StackBreakpoint* breakpoints);
 
 #define BLOCKS_MAX 200
 
@@ -781,7 +799,7 @@ typedef struct
     Token token_current;
     Token token_previous;
     Lexer* lexer;
-    Compiler* compiler; // TODO: change line to ParserFunction* function
+    Compiler* compiler; // TODO: change line to LinkedList(ParserFunction) function
     bool had_error;
     bool panic_mode;
 
@@ -899,16 +917,12 @@ bool StackFunctionCall_is_full(StackFunctionCall* function_calls);
 //
 struct VirtualMachine {
     StackFunctionCall function_calls;
-
     StackValue stack_value; // TODO: rename to stack_values
+    LinkedList(Object) objects;
 
-    // A linked list of all objects created at runtime
+    // Heap Values tracker
     //
-    Object* objects; // TODO: rename to 'first' or 'head'
-
-    // TODO: change line to: LinkedList(ObjectValue) heap_values;
-    //
-    ObjectValue* heap_values; // TODO: rename to 'first' or 'head' or 'heap_values'
+    LinkedList(ObjectValue) heap_values;
 
     // Stores global variables 
     //

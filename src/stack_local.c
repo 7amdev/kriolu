@@ -44,6 +44,8 @@ Local* StackLocal_peek(StackLocal* locals, int offset) {
 }
 
 int StackLocal_get_local_index_by_token(StackLocal* locals, Token* token, Local** local_out) {
+    if (locals == NULL) return -1;
+
     for (int i = locals->top - 1; i >= 0; i--) {
         Local* local = &locals->items[i];
         if (token_is_identifier_equal(&local->token, token)) {

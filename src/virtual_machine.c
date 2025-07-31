@@ -119,9 +119,9 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
             ObjectClosure* closure = ObjectClosure_allocate(function, &vm->objects);
             stack_value_push(&vm->stack_value, value_make_object(closure));
             for (int i = 0; i < closure->function->variable_dependencies_count; i++) {
-                uint8_t is_local = READ_BYTE_THEN_INCREMENT();
+                uint8_t is_local = READ_BYTE_THEN_INCREMENT(); // TODO: rename to 'local_location'
                 uint8_t index = READ_BYTE_THEN_INCREMENT();
-                if (is_local) {
+                if (is_local) { // TODO: change line to 'if(local_location == LocalLocation_In_Parent_Stack) {...}'
                     closure->heap_values.items[i] = VirtualMachine_capture_object_value(vm, current_function_call->frame_start + index, &vm->objects);
                 } else {
                     closure->heap_values.items[i] = current_function_call->closure->heap_values.items[index];
@@ -596,8 +596,11 @@ static ObjectValue* VirtualMachine_capture_object_value(VirtualMachine* vm, Valu
         return result.item;
     }
 
-    ObjectValue* new_object_value = ObjectValue_allocate(object_head, value_address, result.item);
+    ObjectValue* new_object_value = ObjectValue_allocate(object_head, value_address, NULL);
     if (result.item_previous == NULL) {
+        // NOTE: If the List is empty or is a new Item, append on the head.
+        // 
+        new_object_value->next = result.item;
         vm->heap_values = new_object_value;
     } else {
         result.item_previous->next = new_object_value;
@@ -606,14 +609,14 @@ static ObjectValue* VirtualMachine_capture_object_value(VirtualMachine* vm, Valu
     return new_object_value;
 }
 
-// TODO: Debug this code. vm->heap_values = object_value->next will change the 
-//       who's the root node. Why and how is it behaving??
-//
 static void VirtualMachine_move_value_from_stack_to_heap(VirtualMachine* vm, Value* value_address) {
     while (vm->heap_values != NULL && vm->heap_values->value_address >= value_address) {
         ObjectValue* object_value = vm->heap_values;
         object_value->value = *object_value->value_address;
         object_value->value_address = &object_value->value;
+
+        // Removes the current Object_Value from the Tracker from the top
+        //
         vm->heap_values = object_value->next;
     }
 }

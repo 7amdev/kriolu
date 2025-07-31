@@ -17,7 +17,7 @@ void ObjectValue_init(ObjectValue* object_value, Object** object_head, Value* va
     assert(object_value->object.kind == ObjectKind_Heap_Value);
     object_value->value_address = value_address;
     object_value->value = value_make_nil(); // (Value) { 0 };
-    object_value->next = next;
+    if (next != NULL) object_value->next = next;
 }
 
 // LocalMetadata->value_address is stored in descendent order, because its

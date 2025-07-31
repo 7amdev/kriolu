@@ -386,11 +386,19 @@ static Statement* parser_instruction_while(Parser* parser) {
 }
 
 static Statement* parser_instruction_for(Parser* parser) {
+
     parser_begin_scope(parser);
     parser_begin_block(parser, BlockType_Loop);
 
     parser_consume(parser, Token_Left_Parenthesis, "Expected '(' after 'pa'.");
 
+#ifdef DEBUG_TRACE_INSTRUCTION
+    printf("------ FOR-LOOP Instruction ------\n");
+#endif
+
+#ifdef DEBUG_TRACE_INSTRUCTION
+    printf("------ Initialization ------\n");
+#endif
     Statement* initializer = NULL;
     if (parser_match_then_advance(parser, Token_Semicolon)) {
         // Do nothing. There is no initializer.
@@ -399,39 +407,102 @@ static Statement* parser_instruction_for(Parser* parser) {
     } else {
         initializer = parser_parse_statement_expression(parser);
     }
+#ifdef DEBUG_TRACE_INSTRUCTION
+    printf("--------------------------\n");
+#endif
 
     int condition_start_index = parser_get_current_bytecode(parser)->instructions.count;
     int exit_jump_operand_index = -1;
     Expression* condition = NULL;
+#ifdef DEBUG_TRACE_INSTRUCTION
+    printf("------ Conditional ------\n");
+#endif
     if (!parser_match_then_advance(parser, Token_Semicolon)) {
         condition = parser_parse_expression(parser, OperatorPrecedence_Assignment);
         parser_consume(parser, Token_Semicolon, "Epected ';'.");
 
-        exit_jump_operand_index = Compiler_CompileInstruction_Jump(parser_get_current_bytecode(parser), OpCode_Jump_If_False, parser->token_previous.line_number);
-        Compiler_CompileInstruction_1Byte(parser_get_current_bytecode(parser), OpCode_Pop, parser->token_previous.line_number);
+        exit_jump_operand_index = Compiler_CompileInstruction_Jump(
+            parser_get_current_bytecode(parser),
+            OpCode_Jump_If_False,
+            parser->token_previous.line_number
+        );
+        Compiler_CompileInstruction_1Byte(
+            parser_get_current_bytecode(parser),
+            OpCode_Pop,
+            parser->token_previous.line_number
+        );
     }
+#ifdef DEBUG_TRACE_INSTRUCTION
+    printf("--------------------------\n");
+#endif
 
     Expression* increment = NULL;
     int increment_start_index = -1;
     int continue_jump_to_old = parser->continue_jump_to;
+
+#ifdef DEBUG_TRACE_INSTRUCTION
+    printf("------ Update ------\n");
+#endif
     if (!parser_match_then_advance(parser, Token_Right_Parenthesis)) {
-        int jump_to_body = Compiler_CompileInstruction_Jump(parser_get_current_bytecode(parser), OpCode_Jump, parser->token_previous.line_number);
+        int jump_to_body = Compiler_CompileInstruction_Jump(
+            parser_get_current_bytecode(parser),
+            OpCode_Jump,
+            parser->token_previous.line_number
+        );
+
         increment_start_index = parser_get_current_bytecode(parser)->instructions.count;
         parser->continue_jump_to = increment_start_index;
         increment = parser_parse_expression(parser, OperatorPrecedence_Assignment);
-        Compiler_CompileInstruction_1Byte(parser_get_current_bytecode(parser), OpCode_Pop, parser->token_previous.line_number);
+
+        Compiler_CompileInstruction_1Byte(
+            parser_get_current_bytecode(parser),
+            OpCode_Pop,
+            parser->token_previous.line_number
+        );
+
+        // parser_get_current_bytecode(parser)->instructions.count
         parser_consume(parser, Token_Right_Parenthesis, "Epected ')' after increment expression clause.");
 
-        Compiler_CompileInstruction_Loop(parser_get_current_bytecode(parser), condition_start_index, parser->token_previous.line_number);
-        Compiler_PatchInstructionJump(parser_get_current_bytecode(parser), jump_to_body);
+        Compiler_CompileInstruction_Loop(
+            parser_get_current_bytecode(parser),
+            condition_start_index,
+            parser->token_previous.line_number
+        );
+        Compiler_PatchInstructionJump(
+            parser_get_current_bytecode(parser),
+            jump_to_body
+        );
     }
+#ifdef DEBUG_TRACE_INSTRUCTION
+    printf("--------------------------\n");
+#endif
+
+#ifdef DEBUG_TRACE_INSTRUCTION
+    printf("------ Body ------\n");
+#endif
 
     Statement* body = parser_parse_statement(parser, BlockType_Loop);
 
-    Compiler_CompileInstruction_Loop(parser_get_current_bytecode(parser), increment_start_index, parser->token_previous.line_number);
+#ifdef DEBUG_TRACE_INSTRUCTION
+    printf("--------------------------\n");
+#endif
+
+    Compiler_CompileInstruction_Loop(
+        parser_get_current_bytecode(parser),
+        increment_start_index,
+        parser->token_previous.line_number
+    );
+
     if (exit_jump_operand_index != -1) {
-        Compiler_PatchInstructionJump(parser_get_current_bytecode(parser), exit_jump_operand_index);
-        Compiler_CompileInstruction_1Byte(parser_get_current_bytecode(parser), OpCode_Pop, parser->token_previous.line_number);
+        Compiler_PatchInstructionJump(
+            parser_get_current_bytecode(parser),
+            exit_jump_operand_index
+        );
+        Compiler_CompileInstruction_1Byte(
+            parser_get_current_bytecode(parser),
+            OpCode_Pop,
+            parser->token_previous.line_number
+        );
     }
 
     parser->continue_jump_to = continue_jump_to_old;
@@ -1009,10 +1080,11 @@ static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bo
         parser_parse_unary_literals_and_identifier(parser, can_assign);
 
         if (parser->interpolation_count_nesting == 0) {
-            Compiler_CompileInstruction_2Bytes(parser_get_current_bytecode(parser),
-                                               OpCode_Interpolation,
-                                               (uint8_t)parser->interpolation_count_value_pushed,
-                                               parser->token_previous.line_number
+            Compiler_CompileInstruction_2Bytes(
+                parser_get_current_bytecode(parser),
+                OpCode_Interpolation,
+                (uint8_t)parser->interpolation_count_value_pushed,
+                parser->token_previous.line_number
             );
         }
 
