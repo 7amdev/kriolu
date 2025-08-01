@@ -200,13 +200,13 @@ enum {
     OpCode_Read_Global,   // print x;
     OpCode_Assign_Global, // x = 7;
 
-    // e.g.: print x; TODO: rename to 'OpCode_Read_Stack_Value'
+    // e.g.: print x; TODO: rename to 'OpCode_Append_Stack_Value'
     OpCode_Read_Local,
-    // e.g.: x = 7;  TODO: rename to 'OpCode_Assign_Stack_Value'
+    // e.g.: x = 7;  TODO: rename to 'OpCode_Update_Stack_Value_At_Idx'
     OpCode_Assign_Local,
 
-    OpCode_Read_Heap_Value,
-    OpCode_Assign_Heap_Value,
+    OpCode_Read_Heap_Value, // TODO: rename to 'OpCode_Move_Heap_Value_To_Stack'
+    OpCode_Assign_Heap_Value, // TODO: rename to 'OpCode_Set_Heap_Value_From_Stack'
     OpCode_Loop,
     OpCode_Function_Call,
 
@@ -643,6 +643,7 @@ Local* StackLocal_peek(StackLocal* locals, int offset);
 int    StackLocal_get_local_index_by_token(StackLocal* locals, Token* token, Local** local_out);
 bool   StackLocal_is_full(StackLocal* locals);
 bool   StackLocal_is_empty(StackLocal* locals);
+bool   StackLocal_initialize_local(StackLocal* locals, int depth, int offset);
 
 typedef struct {
     StackLocal locals;
@@ -786,13 +787,13 @@ typedef struct {
     int top;
 } StackBlock;
 
-void StackBlock_init(StackBlock* blocks);
+void      StackBlock_init(StackBlock* blocks);
 BlockType StackBlock_push(StackBlock* blocks, BlockType value);
 BlockType StackBlock_pop(StackBlock* blocks);
 BlockType StackBlock_peek(StackBlock* blocks, int offset);
-bool StackBlock_is_empty(StackBlock* blocks);
-bool StackBlock_is_full(StackBlock* blocks);
-int StackBlock_get_top_item_index(StackBlock* blocks);
+bool      StackBlock_is_empty(StackBlock* blocks);
+bool      StackBlock_is_full(StackBlock* blocks);
+int       StackBlock_get_top_item_index(StackBlock* blocks);
 
 typedef struct
 {

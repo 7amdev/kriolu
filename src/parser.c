@@ -400,10 +400,22 @@ static Statement* parser_instruction_for(Parser* parser) {
     printf("------ Initialization ------\n");
 #endif
     Statement* initializer = NULL;
+    // 1: Feature::Function Closure support {
+    Token variable_name = { 0 };
+    int variable_stack_idx = -1;
+    // 1: }
     if (parser_match_then_advance(parser, Token_Semicolon)) {
         // Do nothing. There is no initializer.
     } else if (parser_match_then_advance(parser, Token_Mimoria)) {
+        // 1: {
+        variable_name = parser->token_current;
+        // 1: }
+
         initializer = parser_parse_declaration_variable(parser);
+
+        // 1: {
+        variable_stack_idx = parser->compiler->locals.top - 1;
+        // 1: }
     } else {
         initializer = parser_parse_statement_expression(parser);
     }
@@ -477,15 +489,62 @@ static Statement* parser_instruction_for(Parser* parser) {
     printf("--------------------------\n");
 #endif
 
+
+    // 1: {
+    int new_variable_idx = -1;
+    if (variable_stack_idx != -1) {
+        parser_begin_scope(parser);
+        Compiler_CompileInstruction_2Bytes(
+            parser_get_current_bytecode(parser),
+            OpCode_Read_Local,
+            (uint8_t)variable_stack_idx,
+            parser->token_previous.line_number
+        );
+
+        // Create a new local variable
+        // '-1' Mark as Uninitialized
+        //
+        StackLocal_push(&parser->compiler->locals, variable_name, -1, LocalAction_Default);
+        StackLocal_initialize_local(&parser->compiler->locals, parser->compiler->depth, 0);
+        new_variable_idx = parser->compiler->locals.top - 1;
+    }
+    // 1: }
+
 #ifdef DEBUG_TRACE_INSTRUCTION
     printf("------ Body ------\n");
 #endif
-
     Statement* body = parser_parse_statement(parser, BlockType_Loop);
-
 #ifdef DEBUG_TRACE_INSTRUCTION
     printf("--------------------------\n");
 #endif
+
+    // 1: {
+    if (variable_stack_idx != -1) {
+        Compiler_CompileInstruction_2Bytes(
+            parser_get_current_bytecode(parser),
+            OpCode_Read_Local,
+            new_variable_idx,
+            parser->token_previous.line_number
+        );
+        Compiler_CompileInstruction_2Bytes(
+            parser_get_current_bytecode(parser),
+            OpCode_Assign_Local,
+            variable_stack_idx,
+            parser->token_previous.line_number
+        );
+        Compiler_CompileInstruction_1Byte(
+            parser_get_current_bytecode(parser),
+            OpCode_Pop,
+            parser->token_previous.line_number
+        );
+
+        // Generates the instruction to move the variable, acessed by the closure,
+        // from the Stack to the Heap.
+        //
+        parser_end_scope(parser);
+    }
+    // 1: }
+
 
     Compiler_CompileInstruction_Loop(
         parser_get_current_bytecode(parser),
@@ -626,7 +685,7 @@ static int parser_parse_identifier(Parser* parser, const char* error_message) {
             &parser->compiler->locals,
             parser->token_previous,
             -1, // Mark as Uninitialized
-            false
+            LocalAction_Default
         );
     }
 
@@ -738,16 +797,30 @@ static ObjectFunction* parser_parse_function_paramenters_and_body(Parser* parser
     );
 
     for (int i = 0; i < function->variable_dependencies_count; i++) {
-        Compiler_CompileInstruction_1Byte(
+        Bytecode_insert_instruction_1byte(
             parser_get_current_bytecode(parser),
             compiler.variable_dependencies.items[i].location,
-            parser->token_previous.line_number
+            parser->token_previous.line_number,
+            false
         );
-        Compiler_CompileInstruction_1Byte(
+        Bytecode_insert_instruction_1byte(
             parser_get_current_bytecode(parser),
             (uint8_t)compiler.variable_dependencies.items[i].index,
-            parser->token_previous.line_number
+            parser->token_previous.line_number,
+            false
         );
+
+        // Compiler_CompileInstruction_1Byte(
+        //     parser_get_current_bytecode(parser),
+        //     compiler.variable_dependencies.items[i].location,
+        //     parser->token_previous.line_number
+        // );
+        //
+        // Compiler_CompileInstruction_1Byte(
+        //     parser_get_current_bytecode(parser),
+        //     (uint8_t)compiler.variable_dependencies.items[i].index,
+        //     parser->token_previous.line_number
+        // );
     }
 
     return function;
@@ -778,7 +851,7 @@ static Statement* parser_parse_declaration_variable(Parser* parser) {
             &parser->compiler->locals,
             parser->token_previous,
             -1, // Mark Local as Uninitialized 
-            false
+            LocalAction_Default
         );
 
         statement.variable_declaration.identifier = ObjectString_allocate_if_not_interned(parser->string_database, parser->token_previous.start, parser->token_previous.length, parser->object_head);
@@ -1523,11 +1596,6 @@ static bool parser_check_locals_duplicates(Parser* parser, Token* identifier) {
 
     return false;
 }
-
-// TODO: remove
-// static void parser_end_parsing(Parser* parser) {
-//     Compiler_CompileInstruction_1Byte(parser_get_current_bytecode(parser), OpCode_Return, parser->token_current.line_number);
-// }
 
 static void parser_begin_scope(Parser* parser) {
     // parser->scope.depth += 1;

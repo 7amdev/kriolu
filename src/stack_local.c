@@ -61,6 +61,14 @@ bool StackLocal_is_full(StackLocal* locals) {
     return (locals->top == locals->capacity);
 }
 
-bool  StackLocal_is_empty(StackLocal* locals) {
+bool StackLocal_is_empty(StackLocal* locals) {
     return (locals->top == 0);
+}
+
+bool StackLocal_initialize_local(StackLocal* locals, int depth, int offset) {
+    Local* local = StackLocal_peek(locals, offset);
+    if (local == NULL) return false;
+
+    local->scope_depth = depth;
+    return true;;
 }

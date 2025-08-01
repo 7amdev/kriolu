@@ -214,7 +214,7 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
             current_function_call = StackFunctionCall_peek(&vm->function_calls, 0);
             break;
         }
-        case OpCode_Read_Heap_Value: { // TODO: rename to 'OpCode_Read_Heap_Value'
+        case OpCode_Read_Heap_Value: {
             uint8_t index = READ_BYTE_THEN_INCREMENT();
             stack_value_push(
                 &vm->stack_value,
@@ -222,7 +222,7 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
             );
             break;
         }
-        case OpCode_Assign_Heap_Value: { // TODO: rename to 'OpCode_Assign_Heap_Value'
+        case OpCode_Assign_Heap_Value: {
             uint8_t index = READ_BYTE_THEN_INCREMENT();
             *current_function_call->closure->heap_values.items[index]->value_address = stack_value_peek(&vm->stack_value, 0);
             break;
