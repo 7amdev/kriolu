@@ -27,7 +27,7 @@ ObjectFunction* Compiler_end(Compiler* compiler, Compiler** compiler_current, bo
     // REVIEW
     Compiler_CompileInstruction_1Byte(
         &function->bytecode,
-        OpCode_Nil,
+        OpCode_Stack_Push_Literal_Nil,
         line_number
     );
 

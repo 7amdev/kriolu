@@ -20,19 +20,6 @@ void ObjectValue_init(ObjectValue* object_value, Object** object_head, Value* va
     if (next != NULL) object_value->next = next;
 }
 
-// LocalMetadata->value_address is stored in descendent order, because its
-// capturing memory-address from a stack data structure.
-// 
-ObjectValueFindResult ObjectValue_find(ObjectValue* item_current, Value* value_address) {
-    ObjectValue* item_previous = NULL;
-    while (item_current != NULL && item_current->value_address > value_address) {
-        item_previous = item_current;
-        item_current = item_current->next;
-    }
-
-    return (ObjectValueFindResult) { item_previous, item_current };
-}
-
 void ObjectValue_free(ObjectValue* object_value) {
     free(object_value);
     object_value->value_address = NULL;
@@ -40,17 +27,17 @@ void ObjectValue_free(ObjectValue* object_value) {
 }
 
 //
-// ArrayHeapValue
+// ArrayObjectValue
 // 
 
-ArrayHeapValue* ArrayHeapValue_allocate() {
-    ArrayHeapValue* heap_values = calloc(1, sizeof(ArrayHeapValue));
+ArrayObjectValue* ArrayObjectValue_allocate() {
+    ArrayObjectValue* heap_values = calloc(1, sizeof(ArrayObjectValue));
     assert(heap_values);
 
     return heap_values;
 }
 
-void ArrayHeapValue_init(ArrayHeapValue* heap_values, int item_count) {
+void ArrayObjectValue_init(ArrayObjectValue* heap_values, int item_count) {
     ObjectValue** items = malloc(item_count * sizeof(ObjectValue*));
     assert(items);
     for (int i = 0; i < item_count; i++) items[i] = NULL;
@@ -59,7 +46,7 @@ void ArrayHeapValue_init(ArrayHeapValue* heap_values, int item_count) {
     heap_values->count = item_count;
 }
 
-void ArrayHeapValue_free(ArrayHeapValue* heap_values) {
+void ArrayObjectValue_free(ArrayObjectValue* heap_values) {
     // TODO:
     // loop heap_values->count -> heap_values->items[i] = NULL;
     free(heap_values->items);

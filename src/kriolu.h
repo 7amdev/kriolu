@@ -11,17 +11,15 @@
 #include <stdarg.h>
 
 #include "time.h"
+#include "linked_list.h"
 
 // 
 // Utils
 // 
 
-// #define block(condition) for (int i = 0;i < 1 && (condition); ++i)
 #define block for (int i = 0;i < 1; ++i)
 #define DEBUG_LOG_PARSER
 // #define DEBUG_COMPILER_BYTECODE
-#define LinkedList(type) type##*
-#define StackHeader struct { int count; int capacity; }
 
 //
 // Token
@@ -166,28 +164,42 @@ void array_line_free(ArrayLineNumber* lines);
 //
 // Instruction
 //
+// 'OpCode_Stack_Push_Literal' 
+// 'OpCode_Stack_Push_Literal_Nil'
+// 'OpCode_Stack_Push_Literal_True'
+// 'OpCode_Stack_Push_Literla_False'
+// 'OpCode_Stack_Push_Closure' 
+
+// 'OpCode_Stack_Copy_Top_To_Idx'                   <- 'OpCode_Assign_Local'
+// 'OpCode_Stack_Copy_From_idx_To_Top'              <- 'OpCode_Read_Local' 
+// 'OpCode_Copy_From_Heap_To_Stack'                 <- 'OpCode_Read_Heap_Value'
+// 'OpCode_Copy_From_Stack_To_Heap'                 <- 'OpCode_Assign_Heap_Value'
+// 'OpCode_Move_Value_To_Heap'                      <- 'OpCode_Move_To_Heap'
 
 typedef uint8_t OpCode;
 enum {
     OpCode_Invalid,
 
-    OpCode_Constant,        // TODO: rename 'OpCode_Value_Literal' or 'OpCode_Push_Stack_Value' 
-    OpCode_Constant_Long,
-    OpCode_Closure,         // TODO: rename 'OpCode_Value_Closure'  or 'OpCode_Push_Stack_Value'
-    OpCode_Closure_Long,
+    OpCode_Stack_Push_Literal,
+    OpCode_Stack_Push_Literal_Long,
+    OpCode_Stack_Push_Literal_Nil,
+    OpCode_Stack_Push_Literal_True,
+    OpCode_Stack_Push_Literal_False,
+    OpCode_Stack_Push_Closure,
+    OpCode_Stack_Push_Closure_Long,
+    OpCode_Stack_Pop,
+    OpCode_Stack_Copy_From_idx_To_Top,
+    OpCode_Stack_Copy_Top_To_Idx,
     OpCode_Move_To_Heap,
     OpCode_Interpolation,
-    OpCode_Nil,             // TODO: rename 'OpCode_Value_Nil' 
-    OpCode_True,            // TODO: rename 'OpCode_Value_True' 
-    OpCode_False,           // TODO: rename 'OpCode_Value_False' 
     OpCode_Negation,
     OpCode_Not,
-    OpCode_Addition,
-    OpCode_Subtraction,
-    OpCode_Multiplication,
-    OpCode_Division,
+    OpCode_Add,
+    OpCode_Subtract,
+    OpCode_Multiply,
+    OpCode_Divide,
+    OpCode_Exponentiation,  // TODO: rename to 'OpCode_Exponentiate'
     // TODO: add OpCode_Modulus
-    OpCode_Exponentiation,
     OpCode_Equal_To,
     OpCode_Greater_Than,
     OpCode_Less_Than,
@@ -195,20 +207,14 @@ enum {
     OpCode_Print,
     OpCode_Jump_If_False,
     OpCode_Jump,
-    OpCode_Pop,
-    OpCode_Define_Global, // var x;
-    OpCode_Read_Global,   // print x;
-    OpCode_Assign_Global, // x = 7;
+    OpCode_Define_Global,
+    OpCode_Read_Global,
+    OpCode_Assign_Global,
 
-    // e.g.: print x; TODO: rename to 'OpCode_Append_Stack_Value'
-    OpCode_Read_Local,
-    // e.g.: x = 7;  TODO: rename to 'OpCode_Update_Stack_Value_At_Idx'
-    OpCode_Assign_Local,
-
-    OpCode_Read_Heap_Value, // TODO: rename to 'OpCode_Move_Heap_Value_To_Stack'
-    OpCode_Assign_Heap_Value, // TODO: rename to 'OpCode_Set_Heap_Value_From_Stack'
+    OpCode_Copy_From_Heap_To_Stack,
+    OpCode_Copy_From_Stack_To_Heap,
     OpCode_Loop,
-    OpCode_Function_Call,
+    OpCode_Call_Function,
 
     OpCode_Return
 };
@@ -344,8 +350,7 @@ void Bytecode_free(Bytecode* bytecode);
 typedef struct VirtualMachine VirtualMachine;
 typedef struct HashTable HashTable;
 
-typedef enum
-{
+typedef enum {
     ObjectKind_Invalid,
 
     ObjectKind_String,
@@ -354,7 +359,6 @@ typedef enum
     ObjectKind_Closure,
     ObjectKind_Heap_Value
 } ObjectKind;
-
 
 struct Object {
     ObjectKind kind;
@@ -388,16 +392,13 @@ typedef struct {
     int arity;
 } ObjectFunctionNative;
 
-// TODO: rename to 'HeapValue' or 'ObjectHeapValue', or 'ObjectValue'?
-// TODO: #define LinkedList(type) Object##type##*
-//
 typedef struct ObjectValue ObjectValue;
 struct ObjectValue {
     Object object;
 
-    Value* value_address;
+    Value* value_address; // TODO: rename to 'memory_address' or 'address'
     Value value;
-    ObjectValue* next; // 'LinkedList* next';
+    ObjectValue* next; // 'LinkedList(ObjectValue) next'; or 'Link(ObjectValue) next;'
 };
 
 typedef struct {
@@ -408,13 +409,13 @@ typedef struct {
 typedef struct {
     ObjectValue** items;
     int count;
-} ArrayHeapValue;
+} ArrayObjectValue;
 
 typedef struct {
     Object object;
 
     ObjectFunction* function;
-    ArrayHeapValue heap_values;
+    ArrayObjectValue heap_values;
 } ObjectClosure;
 
 Object* Object_allocate(ObjectKind kind, size_t size, Object** object_head);
@@ -442,12 +443,11 @@ void ObjectFunction_free(ObjectFunction* function);
 
 ObjectValue* ObjectValue_allocate(Object** object_head, Value* value_addresss, ObjectValue* next);
 void ObjectValue_init(ObjectValue* object_value, Object** object_head, Value* value_address, ObjectValue* next);
-ObjectValueFindResult ObjectValue_find(ObjectValue* item_current, Value* value_address);
 void ObjectValue_free(ObjectValue* object_value);
 
-ArrayHeapValue* ArrayHeapValue_allocate();
-void ArrayHeapValue_init(ArrayHeapValue* heap_values, int item_count);
-void ArrayHeapValue_free(ArrayHeapValue* heap_values);
+ArrayObjectValue* ArrayObjectValue_allocate();
+void ArrayObjectValue_init(ArrayObjectValue* heap_values, int item_count);
+void ArrayObjectValue_free(ArrayObjectValue* heap_values);
 
 ObjectClosure* ObjectClosure_allocate(ObjectFunction* function, Object** object_head);
 void ObjectClosure_init(ObjectClosure* closure, ObjectFunction* function, Object** object_head);
@@ -684,11 +684,10 @@ int  ArrayLocalMetadata_add(ArrayLocalMetadata* local_metadata, uint8_t index, L
 // ParserFunction or FunctionContainer or FunctionCompiler or FunctionWrapper
 typedef struct Compiler Compiler;
 struct Compiler {
-    // Compiler* previous; // LinkedList acting as a Stack
-    LinkedList(Compiler) previous;
+    LinkedList(Compiler) previous; // TODO: change line to 'Link(Compiler) previous;'
 
-    ObjectFunction* function;
     FunctionKind function_kind;
+    ObjectFunction* function;
     StackLocal locals;     // Emulates Runtime StackValue 
     ArrayLocalMetadata variable_dependencies;
     int depth; // Scope depth

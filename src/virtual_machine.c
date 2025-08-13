@@ -12,7 +12,7 @@
 void VirtualMachine_runtime_error(VirtualMachine* vm, const char* format, ...);
 static void VirtualMachine_define_function_native(VirtualMachine* vm, const char* function_name, FunctionNative* function, int arity);
 static bool VirtualMachine_call_function(VirtualMachine* vm, Value function, int argument_count);
-static ObjectValue* VirtualMachine_capture_object_value(VirtualMachine* vm, Value* value_address, Object** object_head);
+static ObjectValue* VirtualMachine_create_heap_value(VirtualMachine* vm, Value* value_address, Object** object_head);
 static void VirtualMachine_move_value_from_stack_to_heap(VirtualMachine* vm, Value* value_address);
 static inline bool object_validate_kind_from_value(Value value, ObjectKind object_kind);
 static Value FunctionNative_clock(VirtualMachine* vm, int argument_count, Value* arguments);
@@ -85,19 +85,19 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
         {
             assert(false && "Unsupported OpCode. Handle the OpCode by adding a if statement.");
         }
-        case OpCode_Constant:
+        case OpCode_Stack_Push_Literal:
         {
             Value constant = READ_CONSTANT();
             stack_value_push(&vm->stack_value, constant);
             break;
         }
-        case OpCode_Constant_Long:
+        case OpCode_Stack_Push_Literal_Long:
         {
             Value constant = READ_CONSTANT_3BYTE();
             stack_value_push(&vm->stack_value, constant);
             break;
         }
-        case OpCode_Closure:
+        case OpCode_Stack_Push_Closure:
         {
             ObjectFunction* function = value_as_function_object(READ_CONSTANT());
             ObjectClosure* closure = ObjectClosure_allocate(function, &vm->objects);
@@ -106,14 +106,18 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
                 uint8_t local_location = READ_BYTE_THEN_INCREMENT();
                 uint8_t index = READ_BYTE_THEN_INCREMENT();
                 if (local_location == LocalLocation_In_Parent_Stack) {
-                    closure->heap_values.items[i] = VirtualMachine_capture_object_value(vm, current_function_call->frame_start + index, &vm->objects);
+                    closure->heap_values.items[i] = VirtualMachine_create_heap_value(
+                        vm,
+                        current_function_call->frame_start + index,
+                        &vm->objects
+                    );
                 } else { // TODO: change line to 'else if (local_source == LocalSource_In_Parent_Locals) {'
                     closure->heap_values.items[i] = current_function_call->closure->heap_values.items[index];
                 } // TODO: add else { VirtualMachine_error("Wrong Local's source/origin/localtion."); }
             }
             break;
         }
-        case OpCode_Closure_Long:
+        case OpCode_Stack_Push_Closure_Long:
         {
             ObjectFunction* function = value_as_function_object(READ_CONSTANT_3BYTE());
             ObjectClosure* closure = ObjectClosure_allocate(function, &vm->objects);
@@ -122,24 +126,24 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
                 uint8_t is_local = READ_BYTE_THEN_INCREMENT(); // TODO: rename to 'local_location'
                 uint8_t index = READ_BYTE_THEN_INCREMENT();
                 if (is_local) { // TODO: change line to 'if(local_location == LocalLocation_In_Parent_Stack) {...}'
-                    closure->heap_values.items[i] = VirtualMachine_capture_object_value(vm, current_function_call->frame_start + index, &vm->objects);
+                    closure->heap_values.items[i] = VirtualMachine_create_heap_value(vm, current_function_call->frame_start + index, &vm->objects);
                 } else {
                     closure->heap_values.items[i] = current_function_call->closure->heap_values.items[index];
                 }
             }
             break;
         }
-        case OpCode_True:
+        case OpCode_Stack_Push_Literal_True:
         {
             stack_value_push(&vm->stack_value, value_make_boolean(true));
             break;
         }
-        case OpCode_False:
+        case OpCode_Stack_Push_Literal_False:
         {
             stack_value_push(&vm->stack_value, value_make_boolean(false));
             break;
         }
-        case OpCode_Pop:
+        case OpCode_Stack_Pop:
         {
             stack_value_pop(&vm->stack_value);
             break;
@@ -182,28 +186,23 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
             }
             break;
         }
-        case OpCode_Read_Local:
+        case OpCode_Stack_Copy_From_idx_To_Top:
         {
             uint8_t local_slot_index = READ_BYTE_THEN_INCREMENT();
 
-            // Value local = *(frame_call->framestart + local_slot_index);
-            //
             Value local = current_function_call->frame_start[local_slot_index];
             stack_value_push(&vm->stack_value, local);
 
             break;
         }
-        case OpCode_Assign_Local:
+        case OpCode_Stack_Copy_Top_To_Idx:
         {
             uint8_t local_slot_index = READ_BYTE_THEN_INCREMENT();
 
-            // *(current_function_call->frame_start + local_slot_index) = ...
-            //
             current_function_call->frame_start[local_slot_index] = stack_value_peek(&vm->stack_value, 0);
-
             break;
         }
-        case OpCode_Function_Call:
+        case OpCode_Call_Function:
         {
             int argument_count = READ_BYTE_THEN_INCREMENT();
             Value function = stack_value_peek(&vm->stack_value, argument_count);
@@ -214,7 +213,7 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
             current_function_call = StackFunctionCall_peek(&vm->function_calls, 0);
             break;
         }
-        case OpCode_Read_Heap_Value: {
+        case OpCode_Copy_From_Heap_To_Stack: {
             uint8_t index = READ_BYTE_THEN_INCREMENT();
             stack_value_push(
                 &vm->stack_value,
@@ -222,12 +221,12 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
             );
             break;
         }
-        case OpCode_Assign_Heap_Value: {
+        case OpCode_Copy_From_Stack_To_Heap: {
             uint8_t index = READ_BYTE_THEN_INCREMENT();
             *current_function_call->closure->heap_values.items[index]->value_address = stack_value_peek(&vm->stack_value, 0);
             break;
         }
-        case OpCode_Nil:
+        case OpCode_Stack_Push_Literal_Nil:
         {
             stack_value_push(&vm->stack_value, value_make_nil());
             break;
@@ -272,7 +271,7 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
             assert(false && "TODO: missing implementation");
             break;
         }
-        case OpCode_Addition:
+        case OpCode_Add:
         {
             if (value_is_number(stack_value_peek(&vm->stack_value, 0)) &&
                 value_is_number(stack_value_peek(&vm->stack_value, 1)))
@@ -310,7 +309,7 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
 
             break;
         }
-        case OpCode_Subtraction:
+        case OpCode_Subtract:
         {
             if (!value_is_number(stack_value_peek(&vm->stack_value, 0)) ||
                 !value_is_number(stack_value_peek(&vm->stack_value, 1)))
@@ -327,7 +326,7 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
             stack_value_push(&vm->stack_value, value_difference);
             break;
         }
-        case OpCode_Multiplication:
+        case OpCode_Multiply:
         {
             if (!value_is_number(stack_value_peek(&vm->stack_value, 0)) ||
                 !value_is_number(stack_value_peek(&vm->stack_value, 1)))
@@ -344,7 +343,7 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
             stack_value_push(&vm->stack_value, value_product);
             break;
         }
-        case OpCode_Division:
+        case OpCode_Divide:
         {
             if (!value_is_number(stack_value_peek(&vm->stack_value, 0)) ||
                 !value_is_number(stack_value_peek(&vm->stack_value, 1)))
@@ -590,21 +589,24 @@ static bool VirtualMachine_call_function(VirtualMachine* vm, Value value, int ar
     return false;
 }
 
-static ObjectValue* VirtualMachine_capture_object_value(VirtualMachine* vm, Value* value_address, Object** object_head) {
-    ObjectValueFindResult result = ObjectValue_find(vm->heap_values, value_address);
-    if (result.item != NULL && result.item->value_address == value_address) {
-        return result.item;
+static ObjectValue* VirtualMachine_create_heap_value(VirtualMachine* vm, Value* value_address, Object** object_head) {
+    ObjectValue* current = NULL;
+    ObjectValue* previous = NULL;
+    LinkedList_foreach(ObjectValue, vm->heap_values, object_value) {
+        if (object_value.curr->value_address == value_address) {
+            return object_value.curr;
+        }
+        if (object_value.curr->value_address < value_address) {
+            current = object_value.curr;
+            previous = object_value.prev;
+            break;
+        }
     }
 
     ObjectValue* new_object_value = ObjectValue_allocate(object_head, value_address, NULL);
-    if (result.item_previous == NULL) {
-        // NOTE: If the List is empty or is a new Item, append on the head.
-        // 
-        new_object_value->next = result.item;
-        vm->heap_values = new_object_value;
-    } else {
-        result.item_previous->next = new_object_value;
-    }
+    if (LinkedList_is_empty(vm->heap_values)) LinkedList_push(vm->heap_values, new_object_value);
+    else if (previous == NULL)                LinkedList_push(vm->heap_values, new_object_value);
+    else                                      LinkedList_insert_after(previous, new_object_value);
 
     return new_object_value;
 }
