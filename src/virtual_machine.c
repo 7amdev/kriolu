@@ -35,7 +35,7 @@ void VirtualMachine_init(VirtualMachine* vm) {
 
 
 InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* script) {
-    if (script == NULL) return Interpreter_Compiler_error;
+    if (script == NULL) return Interpreter_Function_error;
 
     Value value = value_make_object(script);
     stack_value_push(&vm->stack_value, value);
@@ -148,7 +148,7 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
             stack_value_pop(&vm->stack_value);
             break;
         }
-        case OpCode_Move_To_Heap: {
+        case OpCode_Move_Value_To_Heap: {
             VirtualMachine_move_value_from_stack_to_heap(vm, vm->stack_value.top - 1);
             stack_value_pop(&vm->stack_value);
             break;

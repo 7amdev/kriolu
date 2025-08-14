@@ -307,8 +307,8 @@ int Bytecode_disassemble_instruction(Bytecode* bytecode, int offset)
         return Bytecode_debug_instruction_local(bytecode, "OPCODE_COPY_FROM_STACK_TO_HEAP", (offset + 2));
     if (opcode == OpCode_Copy_From_Heap_To_Stack)
         return Bytecode_debug_instruction_local(bytecode, "OPCODE_COPY_FROM_HEAP_TO_STACK", (offset + 2));
-    if (opcode == OpCode_Move_To_Heap)
-        return Bytecode_debug_instruction_byte("OPCODE_MOVE_TO_HEAP", (offset + 1));
+    if (opcode == OpCode_Move_Value_To_Heap)
+        return Bytecode_debug_instruction_byte("OpCode_Move_Value_To_Heap", (offset + 1));
     if (opcode == OpCode_Call_Function)
         return Bytecode_debug_instruction_call(bytecode, "OPCODE_CALL_FUNCTION", (offset + 2));
     if (opcode == OpCode_Negation)

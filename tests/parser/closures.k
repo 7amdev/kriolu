@@ -29,9 +29,7 @@ funson Vetor2(x, y) {
     si (mensagem == "y")    divolvi y;
     si (mensagem == "soma") divolvi soma;
 
-    imprimi "Erro: ka ta existe opson '"; 
-    imprimi mensagem; 
-    imprimi "'."; 
+    imprimi "Eru: opson ka ta existe!"; 
   }
 
   divolvi objetu;

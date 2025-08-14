@@ -29,7 +29,7 @@ static Expression* parser_parse_operator_function_call(Parser* parser, Expressio
 static Expression* parser_parse_operators_logical(Parser* parser, Expression* left_operand);
 static Expression* parser_parse_operators_arithmetic(Parser* parser, Expression* left_operand);
 static Expression* parser_parse_operators_relational(Parser* parser, Expression* left_operand);
-// TODO: rename to Compiler_find_local_by_token(Compiler* compiler, Token* name, Local** out);
+// TODO: rename to Function_find_local_by_token(Function* function, Token* name, Local** out);
 static void parser_compile_return(Parser* parser);
 static bool parser_is_operator_arithmetic(Parser* parser);
 static bool parser_is_operator_logical(Parser* parser);
@@ -50,7 +50,7 @@ void parser_init(Parser* parser, const char* source_code, Lexer* lexer, HashTabl
         assert(parser->lexer);
         lexer_init(parser->lexer, source_code);
     }
-    parser->compiler = NULL;
+    parser->function = NULL;
     parser->interpolation_count_nesting = 0;
     parser->interpolation_count_value_pushed = 0;
     parser->continue_jump_to = -1;
@@ -62,11 +62,11 @@ void parser_init(Parser* parser, const char* source_code, Lexer* lexer, HashTabl
 
 ObjectFunction* parser_parse(Parser* parser, ArrayStatement** return_statements)
 {
-    Compiler compiler;
+    Function function;
     ArrayStatement* statements = array_statement_allocate();
 
     parser_advance(parser);
-    Compiler_init(&compiler, FunctionKind_Script, &parser->compiler, NULL, parser->object_head);
+    Function_init(&function, FunctionKind_Script, &parser->function, NULL, parser->object_head);
 
     for (;;) {
         if (parser->token_current.kind == Token_Eof) break;
@@ -78,7 +78,7 @@ ObjectFunction* parser_parse(Parser* parser, ArrayStatement** return_statements)
         // TODO: free statement here
     }
 
-    ObjectFunction* compiled_script = Compiler_end(&compiler, &parser->compiler, parser->had_error, parser->token_current.line_number);
+    ObjectFunction* compiled_script = Function_end(&function, &parser->function, parser->had_error, parser->token_current.line_number);
 
     if (return_statements != NULL) *return_statements = statements;
     return parser->had_error ? NULL : compiled_script;
@@ -169,11 +169,10 @@ static void parser_error(Parser* parser, Token* token, const char* message)
 }
 
 static Bytecode* parser_get_current_bytecode(Parser* parser) {
-    return &parser->compiler->function->bytecode;
+    return &parser->function->object->bytecode;
 }
 
-static Statement* parser_parse_statement(Parser* parser, BlockType block_type)
-{
+static Statement* parser_parse_statement(Parser* parser, BlockType block_type) {
     // DECLARATIONS: introduces new identifiers
     //   klassi, mimoria, funson
     // INSTRUCTIONS: tells the computer to perform an action
@@ -405,7 +404,7 @@ static Statement* parser_instruction_for(Parser* parser) {
         initializer = parser_parse_declaration_variable(parser);
 
         // 1: {
-        variable_stack_idx = parser->compiler->locals.top - 1;
+        variable_stack_idx = parser->function->locals.top - 1;
         // 1: }
     } else {
         initializer = parser_parse_statement_expression(parser);
@@ -495,9 +494,9 @@ static Statement* parser_instruction_for(Parser* parser) {
         // Create a new local variable
         // '-1' Mark as Uninitialized
         //
-        StackLocal_push(&parser->compiler->locals, variable_name, -1, LocalAction_Default);
-        StackLocal_initialize_local(&parser->compiler->locals, parser->compiler->depth, 0);
-        new_variable_idx = parser->compiler->locals.top - 1;
+        StackLocal_push(&parser->function->locals, variable_name, -1, LocalAction_Default);
+        StackLocal_initialize_local(&parser->function->locals, parser->function->depth, 0);
+        new_variable_idx = parser->function->locals.top - 1;
     }
     // 1: }
 
@@ -625,7 +624,7 @@ static void parser_compile_return(Parser* parser) {
 }
 
 static Statement* parser_instruction_return(Parser* parser) {
-    if (parser->compiler->function_kind == FunctionKind_Script)
+    if (parser->function->function_kind == FunctionKind_Script)
         parser_error(parser, &parser->token_previous, "Can't return from top-level code.");
 
     if (parser->token_current.kind == Token_Semicolon) {
@@ -650,7 +649,7 @@ static int parser_parse_identifier(Parser* parser, const char* error_message) {
 
     parser_consume(parser, Token_Identifier, error_message);
 
-    if (parser->compiler->depth == 0) { // Parse Global Function Name 
+    if (parser->function->depth == 0) { // Parse Global Function Name 
         // ObjectString* identifier_string = ObjectString_allocate_if_not_interned(parser->string_database,parser->token_previous.start, parser->token_previous.length);
         String token = { 0 };
         string_init(&token, parser->token_previous.start, parser->token_previous.length);
@@ -664,7 +663,7 @@ static int parser_parse_identifier(Parser* parser, const char* error_message) {
         if (value_index > UINT8_MAX)
             parser_error(parser, &parser->token_current, "Too many constants.");
     } else {  // Parse Local Function Name 
-        if (StackLocal_is_full(&parser->compiler->locals)) {
+        if (StackLocal_is_full(&parser->function->locals)) {
             parser_error(parser, &parser->token_previous, "Too many local variables in a scope.");
         }
 
@@ -673,7 +672,7 @@ static int parser_parse_identifier(Parser* parser, const char* error_message) {
         }
 
         StackLocal_push(
-            &parser->compiler->locals,
+            &parser->function->locals,
             parser->token_previous,
             -1, // Mark as Uninitialized
             LocalAction_Default
@@ -684,10 +683,10 @@ static int parser_parse_identifier(Parser* parser, const char* error_message) {
 }
 
 static void parser_initialize_local_identifier(Parser* parser) {
-    if (parser->compiler->depth == 0) return;
+    if (parser->function->depth == 0) return;
 
-    Local* local = StackLocal_peek(&parser->compiler->locals, 0);
-    local->scope_depth = parser->compiler->depth;
+    Local* local = StackLocal_peek(&parser->function->locals, 0);
+    local->scope_depth = parser->function->depth;
 }
 
 static Statement* parser_parse_declaration_function(Parser* parser) {
@@ -701,7 +700,7 @@ static Statement* parser_parse_declaration_function(Parser* parser) {
 
     // Define Function Identifier
     //
-    if (parser->compiler->depth == 0) {
+    if (parser->function->depth == 0) {
         Compiler_CompileInstruction_2Bytes(
             parser_get_current_bytecode(parser),
             OpCode_Define_Global,
@@ -743,26 +742,26 @@ static Statement* parser_parse_method_declaration(Parser* parser) {
 }
 
 static ObjectFunction* parser_parse_function_paramenters_and_body(Parser* parser, FunctionKind function_kind) {
-    Compiler compiler;
+    Function function;
     ObjectString* function_name = ObjectString_allocate_if_not_interned(parser->string_database, parser->token_previous.start, parser->token_previous.length, parser->object_head);
 
     // REVIEW: parser->object_head -> &parser->object_head
     //
-    Compiler_init(&compiler, function_kind, &parser->compiler, function_name, parser->object_head);
+    Function_init(&function, function_kind, &parser->function, function_name, parser->object_head);
     parser_begin_scope(parser);
 
     parser_consume(parser, Token_Left_Parenthesis, "Expect a '(' after the function name.");
     if (!(parser->token_current.kind == Token_Right_Parenthesis)) {
         do {
-            parser->compiler->function->arity += 1;
-            if (parser->compiler->function->arity > 255)
+            parser->function->object->arity += 1;
+            if (parser->function->object->arity > 255)
                 parser_error(parser, &parser->token_current, "Can't have more than 255 parameters.");
 
             uint8_t indentifier_index = parser_parse_identifier(parser, "Expect parameter name.");
 
             // Define Identifier
             //  
-            if (parser->compiler->depth == 0) {
+            if (parser->function->depth == 0) {
                 Compiler_CompileInstruction_2Bytes(
                     parser_get_current_bytecode(parser),
                     OpCode_Define_Global,
@@ -779,44 +778,44 @@ static ObjectFunction* parser_parse_function_paramenters_and_body(Parser* parser
 
     Statement* statement_block = parser_parse_instruction_block(parser, BlockType_Function);
 
-    ObjectFunction* function = Compiler_end(&compiler, &parser->compiler, parser->had_error, parser->token_previous.line_number);
+    ObjectFunction* object_fn = Function_end(&function, &parser->function, parser->had_error, parser->token_previous.line_number);
 
     Compiler_CompileInstruction_Closure(
         parser_get_current_bytecode(parser),
-        value_make_object(function),
+        value_make_object(object_fn),
         parser->token_previous.line_number
     );
 
-    for (int i = 0; i < function->variable_dependencies_count; i++) {
+    for (int i = 0; i < object_fn->variable_dependencies_count; i++) {
         // Compile Instruction
         //
         Bytecode_insert_instruction_1byte(
             parser_get_current_bytecode(parser),
-            compiler.variable_dependencies.items[i].location,
+            function.variable_dependencies.items[i].location,
             parser->token_previous.line_number,
             false
         );
         Bytecode_insert_instruction_1byte(
             parser_get_current_bytecode(parser),
-            (uint8_t)compiler.variable_dependencies.items[i].index,
+            (uint8_t)function.variable_dependencies.items[i].index,
             parser->token_previous.line_number,
             false
         );
 
         // Compiler_CompileInstruction_1Byte(
         //     parser_get_current_bytecode(parser),
-        //     compiler.variable_dependencies.items[i].location,
+        //     function.variable_dependencies.items[i].location,
         //     parser->token_previous.line_number
         // );
         //
         // Compiler_CompileInstruction_1Byte(
         //     parser_get_current_bytecode(parser),
-        //     (uint8_t)compiler.variable_dependencies.items[i].index,
+        //     (uint8_t)function.variable_dependencies.items[i].index,
         //     parser->token_previous.line_number
         // );
     }
 
-    return function;
+    return object_fn;
 
 }
 
@@ -827,10 +826,10 @@ static Statement* parser_parse_declaration_variable(Parser* parser) {
     parser_consume(parser, Token_Identifier, "Expect variable name.");
 
     block{
-        if (parser->compiler->depth == 0)
+        if (parser->function->depth == 0)
             break;
 
-        if (StackLocal_is_full(&parser->compiler->locals)) {
+        if (StackLocal_is_full(&parser->function->locals)) {
             parser_error(parser, &parser->token_previous, "Too many local variables in a scope.");
             break;
         }
@@ -841,7 +840,7 @@ static Statement* parser_parse_declaration_variable(Parser* parser) {
         }
 
         StackLocal_push(
-            &parser->compiler->locals,
+            &parser->function->locals,
             parser->token_previous,
             -1, // Mark Local as Uninitialized 
             LocalAction_Default
@@ -867,8 +866,8 @@ static Statement* parser_parse_declaration_variable(Parser* parser) {
 
         // Mark local as Initialized
         //
-        Local* local = &parser->compiler->locals.items[parser->compiler->locals.top - 1];
-        local->scope_depth = parser->compiler->depth;
+        Local* local = &parser->function->locals.items[parser->function->locals.top - 1];
+        local->scope_depth = parser->function->depth;
 
         return statement_allocate(statement);
     }
@@ -1186,13 +1185,13 @@ static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bo
 
         ObjectString* variable_name = ObjectString_allocate_if_not_interned(parser->string_database, parser->token_previous.start, parser->token_previous.length, parser->object_head);
 
-        operand = StackLocal_get_local_index_by_token(&parser->compiler->locals, &parser->token_previous, &local_found);
+        operand = StackLocal_get_local_index_by_token(&parser->function->locals, &parser->token_previous, &local_found);
         if (operand != -1) {
             // If is a Local, then:
             //
             opcode_assign = OpCode_Stack_Copy_Top_To_Idx; // 'OpCode_Stack_Copy_Top_To_Idx'
             opcode_read = OpCode_Stack_Copy_From_idx_To_Top;     // 'OpCode_Stack_Copy_From_Idx_To_Top'
-        } else if ((operand = Compiler_resolve_variable_dependencies(parser->compiler, &parser->token_previous, &local_found)) != -1) {
+        } else if ((operand = Function_resolve_variable_dependencies(parser->function, &parser->token_previous, &local_found)) != -1) {
             // If is a closure's variable, then: 
             //
             opcode_assign = OpCode_Copy_From_Stack_To_Heap; // 'OpCode_Copy_From_Stack_To_Heap'
@@ -1440,10 +1439,10 @@ static Expression* parser_parse_operator_function_call(Parser* parser, Expressio
 }
 
 static bool parser_check_locals_duplicates(Parser* parser, Token* identifier) {
-    StackLocal* locals = &parser->compiler->locals;
+    StackLocal* locals = &parser->function->locals;
     for (int i = locals->top - 1; i >= 0; i--) {
         Local* local = &locals->items[i];
-        if (local->scope_depth < parser->compiler->depth &&
+        if (local->scope_depth < parser->function->depth &&
             local->scope_depth != -1) {
             break;
         }
@@ -1457,24 +1456,24 @@ static bool parser_check_locals_duplicates(Parser* parser, Token* identifier) {
 
 static void parser_begin_scope(Parser* parser) {
     // parser->scope.depth += 1;
-    parser->compiler->depth += 1;
+    parser->function->depth += 1;
 }
 
 static void parser_end_scope(Parser* parser) {
-    parser->compiler->depth -= 1;
+    parser->function->depth -= 1;
 
-    StackLocal* locals = &parser->compiler->locals;
+    StackLocal* locals = &parser->function->locals;
     for (;;) {
         // if (locals->top <= 0) break;
-        // if (locals->items[locals->top - 1].scope_depth <= parser->compiler->depth) break;
+        // if (locals->items[locals->top - 1].scope_depth <= parser->function->depth) break;
 
         if (StackLocal_is_empty(locals)) break;
-        if (StackLocal_peek(locals, 0)->scope_depth <= parser->compiler->depth) break;
+        if (StackLocal_peek(locals, 0)->scope_depth <= parser->function->depth) break;
 
         if (StackLocal_peek(locals, 0)->action == LocalAction_Move_Heap) {
             Compiler_CompileInstruction_1Byte(
                 parser_get_current_bytecode(parser),
-                OpCode_Move_To_Heap,
+                OpCode_Move_Value_To_Heap,
                 parser->token_previous.line_number
             );
         } else {

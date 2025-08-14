@@ -164,17 +164,6 @@ void array_line_free(ArrayLineNumber* lines);
 //
 // Instruction
 //
-// 'OpCode_Stack_Push_Literal' 
-// 'OpCode_Stack_Push_Literal_Nil'
-// 'OpCode_Stack_Push_Literal_True'
-// 'OpCode_Stack_Push_Literla_False'
-// 'OpCode_Stack_Push_Closure' 
-
-// 'OpCode_Stack_Copy_Top_To_Idx'                   <- 'OpCode_Assign_Local'
-// 'OpCode_Stack_Copy_From_idx_To_Top'              <- 'OpCode_Read_Local' 
-// 'OpCode_Copy_From_Heap_To_Stack'                 <- 'OpCode_Read_Heap_Value'
-// 'OpCode_Copy_From_Stack_To_Heap'                 <- 'OpCode_Assign_Heap_Value'
-// 'OpCode_Move_Value_To_Heap'                      <- 'OpCode_Move_To_Heap'
 
 typedef uint8_t OpCode;
 enum {
@@ -190,7 +179,7 @@ enum {
     OpCode_Stack_Pop,
     OpCode_Stack_Copy_From_idx_To_Top,
     OpCode_Stack_Copy_Top_To_Idx,
-    OpCode_Move_To_Heap,
+    OpCode_Move_Value_To_Heap,
     OpCode_Interpolation,
     OpCode_Negation,
     OpCode_Not,
@@ -237,8 +226,7 @@ void array_instruction_free(ArrayInstruction* instructions);
 
 typedef struct Object Object;
 
-typedef enum
-{
+typedef enum {
     Value_Runtime_Error,
 
     Value_Boolean,
@@ -249,8 +237,7 @@ typedef enum
     Value_Count
 } ValueKind;
 
-typedef struct
-{
+typedef struct {
     ValueKind kind;
     union
     {
@@ -260,8 +247,7 @@ typedef struct
     } as;
 } Value;
 
-typedef struct
-{
+typedef struct {
     Value* items;
     int count;
     int capacity;
@@ -653,7 +639,7 @@ typedef struct {
 void scope_init(Scope* scope);
 
 // 
-// Compiler
+// Function
 // 
 
 typedef enum {
@@ -669,7 +655,6 @@ typedef enum {
 typedef struct {
     uint8_t index;
     LocalLocation location;
-    // bool is_local; 
 } LocalMetadata;
 
 typedef struct {
@@ -680,43 +665,40 @@ typedef struct {
 void ArrayLocalMetadata_init(ArrayLocalMetadata* local_metadata, int count);
 int  ArrayLocalMetadata_add(ArrayLocalMetadata* local_metadata, uint8_t index, LocalLocation location, int* variable_dependencies_count);
 
-// TODO: rename to:
-// ParserFunction or FunctionContainer or FunctionCompiler or FunctionWrapper
-typedef struct Compiler Compiler;
-struct Compiler {
-    LinkedList(Compiler) previous; // TODO: change line to 'Link(Compiler) previous;'
+typedef struct Function Function;
+struct Function {
+    LinkedList(Function) previous;
 
     FunctionKind function_kind;
-    ObjectFunction* function;
-    StackLocal locals;     // Emulates Runtime StackValue 
-    ArrayLocalMetadata variable_dependencies;
-    int depth; // Scope depth
+    ObjectFunction* object;                     // NOTE: Runtime function data structure
+    StackLocal locals;                          // NOTE: Variables declared inside a function; Emulates runtime StackValue 
+    ArrayLocalMetadata variable_dependencies;   // NOTE: Varibale accessed that belongs to a parent function
+    int depth;                                  // NOTE: Scope depth
 };
 
-void Compiler_init(Compiler* compiler, FunctionKind function_kind, Compiler** compiler_current, ObjectString* function_name, Object** object_head);
-ObjectFunction* Compiler_end(Compiler* compiler, Compiler** compiler_current, bool parser_has_error, int line_number);
-int Compiler_resolve_variable_dependencies(Compiler* compiler, Token* name, Local** ret_local);
+void            Function_init(Function* function, FunctionKind function_kind, Function** function_current, ObjectString* function_name, Object** object_head);
+ObjectFunction* Function_end(Function* function, Function** Function_current, bool parser_has_error, int line_number);
+int             Function_resolve_variable_dependencies(Function* function, Token* name, Local** ret_local);
 
-typedef struct StackCompiler StackCompiler;
-struct StackCompiler {
+typedef struct StackFunction StackFunction;
+struct StackFunction {
     int top;
-    Compiler* items[UINT8_COUNT];
+    Function* items[UINT8_COUNT];
 };
 
-void      StackCompiler_init(StackCompiler* stack_compiler);
-Compiler* StackCompiler_push(StackCompiler* stack_compiler, Compiler* compiler);
-Compiler* StackCompiler_pop(StackCompiler* stack_compiler);
-Compiler* StackCompiler_peek(StackCompiler* stack_compiler, int offset);
-bool      StackCompiler_is_empty(StackCompiler* stack_compiler);
-bool      StackCompiler_is_full(StackCompiler* stack_compiler);
-void      StackCompiler_free(StackCompiler* stack_compiler);
+void      StackFunction_init(StackFunction* stack_function);
+Function* StackFunction_push(StackFunction* stack_function, Function* function);
+Function* StackFunction_pop(StackFunction* stack_function);
+Function* StackFunction_peek(StackFunction* stack_function, int offset);
+bool      StackFunction_is_empty(StackFunction* stack_function);
+bool      StackFunction_is_full(StackFunction* stack_function);
+void      StackFunction_free(StackFunction* stack_function);
 
 //
 // Parser
 //
 
-typedef enum
-{
+typedef enum {
     OperatorPrecedence_Invalid,
 
     OperatorPrecedence_Assignment,                  // =
@@ -754,6 +736,8 @@ typedef struct {
     BlockType block_type;
 } ParseStatementParams;
 
+// TODO: Remove this
+//
 #define ParseStatementParamsDefault()    \
     (ParseStatementParams) {             \
         .block_type = BlockType_None,    \
@@ -794,27 +778,32 @@ bool      StackBlock_is_empty(StackBlock* blocks);
 bool      StackBlock_is_full(StackBlock* blocks);
 int       StackBlock_get_top_item_index(StackBlock* blocks);
 
-typedef struct
-{
+typedef struct {
     Token token_current;
     Token token_previous;
     Lexer* lexer;
-    Compiler* compiler; // TODO: change line to LinkedList(ParserFunction) function
-    bool had_error;
-    bool panic_mode;
-
-    // Bookkeeping
-    //
+    Function* function; // TODO: change line to LinkedList(ParserFunction) function
     HashTable* string_database;
-    Object** object_head;
+
+    // TODO: Missing implementation
+    //
+    // LinkedList(Object) objects;
+
+    // TODO: remove this
+    // 
+    Object** object_head;  // NOTE: it holds the address of the VM.oject_head
+
     int interpolation_count_nesting;
     int interpolation_count_value_pushed;
     int continue_jump_to;
     StackBreakpoint breakpoints;
     StackBlock blocks;
+
+    bool had_error;
+    bool panic_mode;
 } Parser;
 
-void parser_init(Parser* parser, const char* source_code, Lexer* lexer, HashTable* string_database, Object** object_head);
+void            parser_init(Parser* parser, const char* source_code, Lexer* lexer, HashTable* string_database, Object** object_head);
 ObjectFunction* parser_parse(Parser* parser, ArrayStatement** return_statements);
 
 
@@ -891,7 +880,7 @@ void hash_table_free(HashTable* table);
 typedef enum
 {
     Interpreter_Ok,
-    Interpreter_Compiler_error,
+    Interpreter_Function_error,
     Interpreter_Runtime_Error
 } InterpreterResult;
 

@@ -108,6 +108,9 @@ int main(int argc, const char* argv[]) {
 
     ObjectFunction* script = parser_parse(&parser, NULL);
 
+    // NOTE: Architecting this way will remove parser's dependency on VirtualMachine
+    // TODO: VirtalMachine_interpret(&vm, script, parser.object_head);
+    // TODO: vm.object_head = parser.object_head;
     VirtualMachine_interpret(&vm, script);
 
     // Bytecode_free(&bytecode);
