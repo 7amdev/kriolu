@@ -26,8 +26,8 @@ int main(int argc, const char* argv[]) {
     bool is_info = false;
     bool is_help = false;
     bool is_file = false;
-    if (strcmp(argv[1], "info") == 0)  is_info = true;
-    else if (strcmp(argv[1], "djudan") == 0) is_help = true;
+    if (strcmp(argv[1], "info") == 0)           is_info = true;
+    else if (strcmp(argv[1], "djudan") == 0)    is_help = true;
     else if (filename_ends_with(argv[1], ".k")) is_file = true;
 
 
@@ -58,12 +58,12 @@ int main(int argc, const char* argv[]) {
     int result = file_read(argv[1], &source_code);
     if (result <= 0) exit(EXIT_FAILURE);
 
-    bool is_flag_lexer = false;
-    bool is_flag_parser = false;
+    bool is_flag_lexer    = false;
+    bool is_flag_parser   = false;
     bool is_flag_bytecode = false;
     for (int i = 2; i < argc; i++) {
-        if (strcmp(argv[i], "-lexer") == 0) is_flag_lexer = true;
-        else if (strcmp(argv[i], "-parser") == 0) is_flag_parser = true;
+        if (strcmp(argv[i], "-lexer") == 0)         is_flag_lexer    = true;
+        else if (strcmp(argv[i], "-parser") == 0)   is_flag_parser   = true;
         else if (strcmp(argv[i], "-bytecode") == 0) is_flag_bytecode = true;
     }
 
@@ -76,13 +76,12 @@ int main(int argc, const char* argv[]) {
 
     Parser parser;
     VirtualMachine vm = { 0 };
+    Parser_Init(&parser, source_code);
+    VirtualMachine_init(&vm);
 
     if (is_flag_parser) {
-        VirtualMachine_init(&vm);
-        parser_init(&parser, source_code, NULL, &vm.string_database, &vm.objects);
-
         ArrayStatement* statements = NULL;
-        parser_parse(&parser, &statements);
+        parser_parse(&parser, &statements, &vm.string_database, &vm.objects);
         for (int i = 0; i < statements->count; i++) {
             statement_print(&statements->items[i], 0);
             printf("\n");
@@ -92,35 +91,24 @@ int main(int argc, const char* argv[]) {
     }
 
     if (is_flag_bytecode) {
-        VirtualMachine_init(&vm);
-        parser_init(&parser, source_code, NULL, &vm.string_database, &vm.objects);
-
-        ObjectFunction* script = parser_parse(&parser, NULL);
-
+        ObjectFunction* script = parser_parse(&parser, NULL, &vm.string_database, &vm.objects);
         Bytecode_disassemble(&script->bytecode, "Script");
         // Bytecode_free(&bytecode);
 
         return 0;
     }
 
-    VirtualMachine_init(&vm);
-    parser_init(&parser, source_code, NULL, &vm.string_database, &vm.objects);
-
-    ObjectFunction* script = parser_parse(&parser, NULL);
-
-    // NOTE: Architecting this way will remove parser's dependency on VirtualMachine
-    // TODO: VirtalMachine_interpret(&vm, script, parser.object_head);
-    // TODO: vm.object_head = parser.object_head;
+    // TODO: make ArrayStatements optional and last 
+    //
+    ObjectFunction* script = parser_parse(&parser, NULL, &vm.string_database, &vm.objects);
     VirtualMachine_interpret(&vm, script);
 
     // Bytecode_free(&bytecode);
     // vm_free();
-
     return 0;
 }
 
-int file_read(const char* file_path, char** buffer_out)
-{
+int file_read(const char* file_path, char** buffer_out) {
     int result = 0;
     FILE* file = fopen(file_path, "rb");
     if (file == NULL)

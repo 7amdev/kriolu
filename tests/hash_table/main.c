@@ -3,6 +3,23 @@
 #include <time.h>
 #include "kriolu.h"
 
+// NOTE: quick fix just to make this code pass the compilation error
+// TODO: refactor this code to reflect new change in the API
+//
+// object_string.h
+// 
+ObjectString* ObjectString_allocate(char* characters, int length, uint32_t hash, Object** object_head);
+ObjectString* ObjectString_allocate_if_not_interned(HashTable* table, const char* characters, int length, Object** object_head);
+ObjectString* ObjectString_allocate_and_intern(HashTable* table, char* characters, int length, uint32_t hash, Object** object_head);
+void ObjectString_init(ObjectString* object_string, char* characters, int length, uint32_t hash, Object** object_head);
+String ObjectString_to_string(ObjectString* object_string);
+ObjectString ObjectString_from_string(String string);
+ObjectString* ObjectString_is_interned(HashTable* table, String string);
+void ObjectString_free(ObjectString* string);
+
+inline bool object_validate_kind_from_value(Value value, ObjectKind object_kind) {
+    return (value_is_object(value) && value_as_object(value)->kind == object_kind);
+}
 
 //
 // Profiler
@@ -239,7 +256,11 @@ int main(void) {
         String string_key = ObjectString_to_string(dedup_key);
         Value dedup_value = { 0 };
         // ObjectString* key_in_database = hash_table_get_key(&keys_db, string_key, string_hash(string_key));
-        ObjectString* key_in_database = hash_table_get_key(&keys_db, ObjectString_from_string(string_key));
+        ObjectString* key_in_database = hash_table_get_key(
+            &keys_db, 
+            string_key, 
+            string_hash(string_key)
+        );
         if (key_in_database != NULL) dedup_key = key_in_database;
 
         bool found = hash_table_get_value(&key_value_table, dedup_key, &dedup_value);
@@ -256,7 +277,7 @@ int main(void) {
 void generate_keys(ObjectString** keys) {
     for (int i = 0; i < N; i++) {
         String string = string_make_from_format("key_%d", i);
-        ObjectString* key = ObjectString_allocate(string.characters, string.length, string_hash(string));
+        ObjectString* key = ObjectString_allocate(string.characters, string.length, string_hash(string), NULL);
         keys[i] = key;
     }
 }
@@ -266,7 +287,7 @@ void generate_and_intern_keys(HashTable* table, ObjectString** keys, int len)
     for (int i = 0; i < len; i++)
     {
         String string = string_make_from_format("key_%d", i);
-        ObjectString* key = ObjectString_allocate_and_intern(table, string.characters, string.length, string_hash(string));
+        ObjectString* key = ObjectString_allocate_and_intern(table, string.characters, string.length, string_hash(string), NULL);
         keys[i] = key;
     }
 }
@@ -285,7 +306,7 @@ void generate_random_values(Value* values, int len) {
             value = value_make_nil();
         } else if (value_type == Val_String) {
             String string = string_make_from_format("value_%d", i);
-            ObjectString* object_string = ObjectString_allocate(string.characters, string.length, string_hash(string));
+            ObjectString* object_string = ObjectString_allocate(string.characters, string.length, string_hash(string), NULL);
             value = value_make_object_string(object_string);
         }
 
@@ -296,7 +317,7 @@ void generate_random_values(Value* values, int len) {
 void generate_string_values(Value* values) {
     for (int i = 0; i < N; i++) {
         String string = string_make_from_format("value_%d", i);
-        ObjectString* object_string = ObjectString_allocate(string.characters, string.length, string_hash(string));
+        ObjectString* object_string = ObjectString_allocate(string.characters, string.length, string_hash(string), NULL);
         values[i] = value_make_object_string(object_string);
     }
 }

@@ -93,7 +93,8 @@ ObjectString* hash_table_get_key(HashTable* table, String string, uint32_t hash)
 
         if (entry->key->length == string.length &&
             entry->key->hash == hash &&
-            memcmp(entry->key->characters, string.characters, entry->key->length) == 0)
+            memcmp(entry->key->characters, string.characters, entry->key->length) == 0
+            )
         {
             return entry->key;
         }

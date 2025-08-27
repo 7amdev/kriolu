@@ -1,5 +1,38 @@
 #include "kriolu.h"
 
+// TODO: Implement error handling logic
+//       Signature: 
+//           bool ObjectString_Allocate(.error_msg = error_msg);
+//       Usage:
+//           const char *error_msg = "";
+//           if (!ObjectString_Allocate(.error_msg = error_msg)) {
+//               printf ("Error: %s\n", error_msg);
+//               return 1;
+//           }
+//
+// API usage:
+// 
+// ObjectString_Allocate(
+//     .task = (
+//        AllocateTask_Initialize        | 
+//        AllocateTask_Intern            | 
+//        AllocateTask_Copy_String       | 
+//        AllocateTask_Check_If_Interned 
+//      ),
+//     .string = string, 
+//     .hash   = hash,
+//     .first  = first,
+//     .table  = table
+// );
+
+void ObjectString_init(ObjectString* object_string, char* characters, int length, uint32_t hash, Object** object_head) {
+    Object_init((Object*)object_string, ObjectKind_String, object_head);
+    assert(object_string->object.kind == ObjectKind_String);
+    object_string->characters = characters;
+    object_string->length = length;
+    object_string->hash = hash;
+}
+
 ObjectString* ObjectString_allocate(char* characters, int length, uint32_t hash, Object** object_head) {
     ObjectString* object_string = calloc(1, sizeof(ObjectString));
     assert(object_string);
@@ -8,12 +41,21 @@ ObjectString* ObjectString_allocate(char* characters, int length, uint32_t hash,
     return object_string;
 }
 
-// TODO: Convert this function to a macro
 ObjectString* ObjectString_is_interned(HashTable* table, String string) {
     uint32_t hash = string_hash(string);
     ObjectString* object_string = hash_table_get_key(table, string, hash);
 
     return object_string;
+}
+
+ObjectString* ObjectString_allocate_and_intern(HashTable* table, char* characters, int length, uint32_t hash, Object** object_head) {
+    ObjectString* string = ObjectString_allocate(characters, length, hash, object_head);
+    assert(string);
+
+    // Interning
+    //
+    hash_table_set_value(table, string, value_make_nil());
+    return string;
 }
 
 ObjectString* ObjectString_allocate_if_not_interned(HashTable* table, const char* characters, int length, Object** object_head) {
@@ -25,25 +67,16 @@ ObjectString* ObjectString_allocate_if_not_interned(HashTable* table, const char
     if (string == NULL) {
         source_string = string_copy(characters, length);
         uint32_t hash = string_hash(source_string);
-        string = ObjectString_allocate_and_intern(table, source_string.characters, source_string.length, hash, object_head);
+        string = ObjectString_allocate_and_intern(
+            table,
+            source_string.characters,
+            source_string.length,
+            hash,
+            object_head
+        );
     }
 
     return string;
-}
-
-ObjectString* ObjectString_allocate_and_intern(HashTable* table, char* characters, int length, uint32_t hash, Object** object_head) {
-    ObjectString* string = ObjectString_allocate(characters, length, hash, object_head);
-    assert(string);
-    hash_table_set_value(table, string, value_make_nil());
-    return string;
-}
-
-void ObjectString_init(ObjectString* object_string, char* characters, int length, uint32_t hash, Object** object_head) {
-    Object_init((Object*)object_string, ObjectKind_String, object_head);
-    assert(object_string->object.kind == ObjectKind_String);
-    object_string->characters = characters;
-    object_string->length = length;
-    object_string->hash = hash;
 }
 
 String ObjectString_to_string(ObjectString* object_string) {

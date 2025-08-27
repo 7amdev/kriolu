@@ -11,7 +11,7 @@
 } while (0)
 
 #define LinkedList_pop(first, node_out) do {      \
-    (node_out) = (first);                         \
+    if (node_out != NULL) (node_out) = (first);   \
     (first) = (first)->next;                      \
 } while (0)
 
@@ -38,11 +38,25 @@
 // TODO: #define LinkedList_insert_at(...)
 // TODO: #define LinkedList_remove_at(...)
 
-#define LinkedList_foreach(Type, node, it)                                  \
-    for (                                                                   \
-        struct { Type* curr; Type* prev; int i; } it = { (node), NULL, 0};  \
-        (it).curr != NULL;                                                  \
-        (it).prev = (it).curr, (it).curr = (it).curr->next, (it).i += 1     \
+// Usage example: 
+//
+// Person p1 = { name = "John Doe", gender: MALE   };  
+// Person p2 = { name = "Jane Doe", gender: FEMALE };  
+// Person p3 = { name = "Joao Doe", gender: MALE   };  
+// Person *first = NULL;
+// LinkedList_push(first, p3);
+// LinkedList_push(first, p2);
+// LinkedList_push(first, p3);
+// 
+// LinkedList_foreach(Person, first, person) {
+//     .... 
+// }
+// 
+#define LinkedList_foreach(Type, node, it)                                    \
+    for (                                                                     \
+        struct t { Type* curr; Type* prev; int i; } it = { (node), NULL, 0};  \
+        (it).curr != NULL;                                                    \
+        (it).prev = (it).curr, (it).curr = (it).curr->next, (it).i += 1       \
     )
 
 #define LinkedList_is_empty(first) (first == NULL)

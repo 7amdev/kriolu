@@ -12,7 +12,7 @@
 void VirtualMachine_runtime_error(VirtualMachine* vm, const char* format, ...);
 static void VirtualMachine_define_function_native(VirtualMachine* vm, const char* function_name, FunctionNative* function, int arity);
 static bool VirtualMachine_call_function(VirtualMachine* vm, Value function, int argument_count);
-static ObjectValue* VirtualMachine_create_heap_value(VirtualMachine* vm, Value* value_address, Object** object_head);
+static ObjectValue* VirtualMachine_create_heap_value(VirtualMachine* vm, Value* value_address);
 static void VirtualMachine_move_value_from_stack_to_heap(VirtualMachine* vm, Value* value_address);
 static inline bool object_validate_kind_from_value(Value value, ObjectKind object_kind);
 static Value FunctionNative_clock(VirtualMachine* vm, int argument_count, Value* arguments);
@@ -45,6 +45,7 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
     stack_value_push(&vm->stack_value, v_closure);
 
     // TODO: remove 'closure->function->bytecode.instructions.items'
+    //
     FunctionCall* current_function_call = StackFunctionCall_push(
         &vm->function_calls,
         closure,
@@ -108,8 +109,7 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
                 if (local_location == LocalLocation_In_Parent_Stack) {
                     closure->heap_values.items[i] = VirtualMachine_create_heap_value(
                         vm,
-                        current_function_call->frame_start + index,
-                        &vm->objects
+                        current_function_call->frame_start + index
                     );
                 } else { // TODO: change line to 'else if (local_source == LocalSource_In_Parent_Locals) {'
                     closure->heap_values.items[i] = current_function_call->closure->heap_values.items[index];
@@ -126,7 +126,7 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
                 uint8_t is_local = READ_BYTE_THEN_INCREMENT(); // TODO: rename to 'local_location'
                 uint8_t index = READ_BYTE_THEN_INCREMENT();
                 if (is_local) { // TODO: change line to 'if(local_location == LocalLocation_In_Parent_Stack) {...}'
-                    closure->heap_values.items[i] = VirtualMachine_create_heap_value(vm, current_function_call->frame_start + index, &vm->objects);
+                    closure->heap_values.items[i] = VirtualMachine_create_heap_value(vm, current_function_call->frame_start + index);
                 } else {
                     closure->heap_values.items[i] = current_function_call->closure->heap_values.items[index];
                 }
@@ -273,18 +273,20 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
         }
         case OpCode_Add:
         {
-            if (value_is_number(stack_value_peek(&vm->stack_value, 0)) &&
-                value_is_number(stack_value_peek(&vm->stack_value, 1)))
-            {
+            if (
+                value_is_number(stack_value_peek(&vm->stack_value, 0)) &&
+                value_is_number(stack_value_peek(&vm->stack_value, 1))
+            ) {
                 Value b = stack_value_pop(&vm->stack_value);
                 Value a = stack_value_pop(&vm->stack_value);
                 double sum = value_as_number(a) + value_as_number(b);
                 Value value_sum = value_make_number(sum);
 
                 stack_value_push(&vm->stack_value, value_sum);
-            } else if (value_is_string(stack_value_peek(&vm->stack_value, 0)) &&
-                       value_is_string(stack_value_peek(&vm->stack_value, 1)))
-            {
+            } else if (
+                value_is_string(stack_value_peek(&vm->stack_value, 0)) &&
+                value_is_string(stack_value_peek(&vm->stack_value, 1))
+            ) {
                 Value b = stack_value_pop(&vm->stack_value);
                 Value a = stack_value_pop(&vm->stack_value);
                 ObjectString* os_a = value_as_string(a);
@@ -293,15 +295,22 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
                 String s_b = string_make(os_b->characters, os_b->length);
 
                 String final = string_concatenate(s_a, s_b);
-                uint32_t hash = string_hash(final);
-                ObjectString* string = hash_table_get_key(&vm->string_database, final, hash);
-                if (string == NULL) {
-                    string = ObjectString_allocate_and_intern(&vm->string_database, final.characters, final.length, hash, &vm->objects);
+                uint32_t final_hash = string_hash(final);
+
+                ObjectString* object_st = hash_table_get_key(&vm->string_database, final, final_hash);
+                if (object_st == NULL) {
+                    object_st = ObjectString_Allocate(
+                        .task = AllocateTask_Initialize | AllocateTask_Intern,
+                        .string = final,
+                        .hash = final_hash,
+                        .first = &vm->objects,
+                        .table = &vm->string_database
+                    );
                 } else {
                     string_free(&final);
                 }
 
-                stack_value_push(&vm->stack_value, value_make_object(string));
+                stack_value_push(&vm->stack_value, value_make_object(object_st));
             } else {
                 VirtualMachine_runtime_error(vm, "Operands must be 2(two) numbers or 2(two) strings.");
                 return Interpreter_Runtime_Error;
@@ -519,7 +528,20 @@ void VirtualMachine_free(VirtualMachine* vm)
 }
 
 static void VirtualMachine_define_function_native(VirtualMachine* vm, const char* function_name, FunctionNative* function, int arity) {
-    ObjectString* key = ObjectString_allocate_if_not_interned(&vm->string_database, function_name, strlen(function_name), &vm->objects);
+    String source_string = string_make(function_name, strlen(function_name));
+    uint32_t source_hash = string_hash(source_string);
+    ObjectString* key = ObjectString_Allocate(
+        .task = (
+            AllocateTask_Check_If_Interned |
+            AllocateTask_Copy_String       |
+            AllocateTask_Initialize        |
+            AllocateTask_Intern
+        ),
+        .string = source_string,
+        .hash = source_hash,
+        .first = &vm->objects,
+        .table = &vm->string_database
+    );
     ObjectFunctionNative* value = ObjectFunctionNative_allocate(function, &vm->objects, arity);
     stack_value_push(&vm->stack_value, value_make_object(key));
     stack_value_push(&vm->stack_value, value_make_object(value));
@@ -589,7 +611,7 @@ static bool VirtualMachine_call_function(VirtualMachine* vm, Value value, int ar
     return false;
 }
 
-static ObjectValue* VirtualMachine_create_heap_value(VirtualMachine* vm, Value* value_address, Object** object_head) {
+static ObjectValue* VirtualMachine_create_heap_value(VirtualMachine* vm, Value* value_address) {
     ObjectValue* current = NULL;
     ObjectValue* previous = NULL;
     LinkedList_foreach(ObjectValue, vm->heap_values, object_value) {
@@ -603,7 +625,7 @@ static ObjectValue* VirtualMachine_create_heap_value(VirtualMachine* vm, Value* 
         }
     }
 
-    ObjectValue* new_object_value = ObjectValue_allocate(object_head, value_address, NULL);
+    ObjectValue* new_object_value = ObjectValue_allocate(&vm->objects, value_address);
     if (LinkedList_is_empty(vm->heap_values)) LinkedList_push(vm->heap_values, new_object_value);
     else if (previous == NULL)                LinkedList_push(vm->heap_values, new_object_value);
     else                                      LinkedList_insert_after(previous, new_object_value);

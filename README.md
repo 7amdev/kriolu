@@ -47,6 +47,44 @@ imprimi nome; // nil
 
 mimoria cidade = "Praia";
 imprimi cidade; // Praia
+
+// Nota: [obrigatorio]
+mimoria Pessoa {
+    [nome] = "",  // Default value '""'
+    cidade = "",
+    idade  = 0
+};
+
+mimoria v2 = { 
+    x = 0,  
+    y = 0 
+};
+
+mimoria p1 =  Pessoa{ nome = "Joao" };
+p1.cidade  = "Sao Vicente'
+p1.idade   =  27;
+
+mimoria p2 = Pessoa{nome = "Joana", cidade = "Boavista"};
+mimoria p3 = Pessoa{nome = "Djon",  cidade = "Praia"};
+
+mimoria data = [1, "2"];
+data.push(10);
+data.push(p1);
+
+mimoria encontro = Pessoa[];
+{
+    encontro.poi(p1);
+    encontro.poi(p2);
+    encontro.poi(p3);
+    encontro.poi("Ana"); // erro: aceita so Pessoa
+    // or 
+    encontro[..., p1, p2, p3];
+    encontro[p1, p2, p3, ...];
+    encontro[p1, p2, ..., p3];
+}
+
+encontro.tra(p1);
+
 ```
 
 ### Expressions
@@ -189,6 +227,13 @@ di (5 ti 10) {
 ```
 
 ### Functions
+TODO: rename to 'operacao'
+```
+operacao produto(a, b) {
+    imprimi a + b;
+}
+produto(1, 2); // '()' -> significa Avaliar
+```
 
 ```
 // Declaration

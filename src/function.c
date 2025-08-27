@@ -1,23 +1,21 @@
 #include "kriolu.h"
 
-// TODO: rename file to parser_function.c
-// TODO: rename type prefix to ParserFunction_init 
+// TODO: delete this file. The logic has benn moved to the parser module
 
 void Function_init(Function* function, FunctionKind function_kind, Function** function_current, ObjectString* function_name, Object** object_head) {
-    function->previous = *function_current; // Saves the current Function stored in parser->function
     function->function_kind = function_kind;
     function->object = NULL;
     function->object = ObjectFunction_allocate(object_head);
     function->object->name = function_name;
     function->depth = 0;
-
     StackLocal_init(&function->locals, UINT8_COUNT);
     StackLocal_push(&function->locals, (Token) { 0 }, 0, LocalAction_Default);
     ArrayLocalMetadata_init(&function->variable_dependencies, 0);
 
-    // Mark this function as global and current
-    // 
-    *function_current = function;
+    // TODO: LinkedList_push(function_current, function);
+    //
+    function->next = *function_current;  // Saves the current Function stored in parser->function
+    *function_current = function;            // Mark this function as global and current
 }
 
 ObjectFunction* Function_end(Function* function, Function** function_current, bool parser_has_error, int line_number) {
@@ -37,9 +35,10 @@ ObjectFunction* Function_end(Function* function, Function** function_current, bo
         line_number
     );
 
-    // Restore parser->function to the previous state
+    // NOTE: This code pop a item from the list making a memory leak, because we lost 
+    //       the reference of the object to free it.
     //
-    *function_current = (*function_current)->previous;
+    *function_current = (*function_current)->next;
 
 #ifdef DEBUG_COMPILER_BYTECODE
     if (!parser_has_error) {
@@ -67,7 +66,7 @@ int Function_resolve_variable_dependencies(Function* function, Token* name, Loca
 
     StackFunction_push(&stack_function, function);
 
-    Function* current_function = function->previous;
+    Function* current_function = function->next;
     for (;;) {
         if (current_function == NULL) break;
 
@@ -76,7 +75,7 @@ int Function_resolve_variable_dependencies(Function* function, Token* name, Loca
 
         StackFunction_push(&stack_function, current_function);
 
-        current_function = current_function->previous;
+        current_function = current_function->next;
     }
 
     // if (local_found_idx == -1) {

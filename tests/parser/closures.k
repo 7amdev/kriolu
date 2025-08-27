@@ -41,9 +41,11 @@ mimoria c = a("soma")(b);
 
 imprimi a("x");
 imprimi a("y");
-
 imprimi c("x");
 imprimi c("y");
+
+imprimi "Hello " + "World";
+imprimi rilogio();
 
 // Test::2
 //

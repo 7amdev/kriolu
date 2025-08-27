@@ -17,7 +17,6 @@
 // Utils
 // 
 
-#define block for (int i = 0;i < 1; ++i)
 #define DEBUG_LOG_PARSER
 // #define DEBUG_COMPILER_BYTECODE
 
@@ -354,8 +353,6 @@ struct Object {
 typedef struct {
     Object object;
 
-    // String related fields
-    //
     char* characters;
     int length;
     uint32_t hash;
@@ -384,7 +381,7 @@ struct ObjectValue {
 
     Value* value_address; // TODO: rename to 'memory_address' or 'address'
     Value value;
-    ObjectValue* next; // 'LinkedList(ObjectValue) next'; or 'Link(ObjectValue) next;'
+    ObjectValue* next;
 };
 
 typedef struct {
@@ -404,44 +401,77 @@ typedef struct {
     ArrayObjectValue heap_values;
 } ObjectClosure;
 
+typedef enum {
+    AllocateTask_Initialize         = (1 << 0),     
+    AllocateTask_Intern             = (1 << 1),       
+    AllocateTask_Copy_String        = (1 << 2),    
+    AllocateTask_Check_If_Interned  = (1 << 3) 
+} AllocateTask;
+
+typedef struct {
+    AllocateTask task;
+    HashTable   *table;    // INTERNING
+    String       string;   // Initialization 
+    uint32_t     hash;     // Initialization
+    Object     **first;    // Initialization
+} AllocateParams;
+
+#define ObjectString_Allocate(...) \
+    ObjectString_allocate((AllocateParams){__VA_ARGS__})
+
 Object* Object_allocate(ObjectKind kind, size_t size, Object** object_head);
 void Object_init(Object* object, ObjectKind kind, Object** object_head);
-void Object_clear(Object* object);
 void Object_print(Object* object);
 void Object_free(Object* object);
+
+ObjectString* ObjectString_allocate(AllocateParams params);
+ObjectFunction* ObjectFunction_allocate(Object** object_head);
+ObjectValue* ObjectValue_allocate(Object** object_head, Value* value_address);
+ObjectClosure* ObjectClosure_allocate(ObjectFunction* function, Object** object_head);
+ObjectFunctionNative* ObjectFunctionNative_allocate(FunctionNative* function, Object** object_head, int arity);
+
 // inline bool object_validate_kind_from_value(Value value, ObjectKind object_kind);
 // inline bool object_validate_kind_from_value(Value value, ObjectKind object_kind) {
 //     return (value_is_object(value) && value_as_object(value)->kind == object_kind);
 // }
 
-ObjectString* ObjectString_allocate(char* characters, int length, uint32_t hash, Object** object_head);
-ObjectString* ObjectString_allocate_if_not_interned(HashTable* table, const char* characters, int length, Object** object_head);
-ObjectString* ObjectString_allocate_and_intern(HashTable* table, char* characters, int length, uint32_t hash, Object** object_head);
-void ObjectString_init(ObjectString* object_string, char* characters, int length, uint32_t hash, Object** object_head);
-String ObjectString_to_string(ObjectString* object_string);
-ObjectString ObjectString_from_string(String string);
-ObjectString* ObjectString_is_interned(HashTable* table, String string);
-void ObjectString_free(ObjectString* string);
+//
+// HashTable
+//
 
-ObjectFunction* ObjectFunction_allocate(Object** object_head);
-void ObjectFunction_init(ObjectFunction* function, ObjectString* name, Bytecode* bytecode, int arity, Object** object_head, int variable_dependencies_count);
-void ObjectFunction_free(ObjectFunction* function);
+// HashTable:
+//     Associates a set of Keys to a set of Values.
+//     Each Key/Value pair is an Entry in the Table.
+//     Constant time lookup.
+//
+//  HashTable
+// key  | Value
+// ---------------
+// 1248   "Hello"  -> Entry  <- *entries
+// 4323    9892    -> Entry
+//
+// Entries: [{1248, "Hello"}, {4323, 9892}, ...]
+//           ---------------  ------------
+//                Entry           Entry
 
-ObjectValue* ObjectValue_allocate(Object** object_head, Value* value_addresss, ObjectValue* next);
-void ObjectValue_init(ObjectValue* object_value, Object** object_head, Value* value_address, ObjectValue* next);
-void ObjectValue_free(ObjectValue* object_value);
+typedef struct {
+    ObjectString* key;
+    Value value;
+} Entry;
 
-ArrayObjectValue* ArrayObjectValue_allocate();
-void ArrayObjectValue_init(ArrayObjectValue* heap_values, int item_count);
-void ArrayObjectValue_free(ArrayObjectValue* heap_values);
+struct HashTable {
+    Entry* entries;
+    int count;
+    int capacity;
+};
 
-ObjectClosure* ObjectClosure_allocate(ObjectFunction* function, Object** object_head);
-void ObjectClosure_init(ObjectClosure* closure, ObjectFunction* function, Object** object_head);
-void ObjectClosure_free(ObjectClosure* closure);
-
-ObjectFunctionNative* ObjectFunctionNative_allocate(FunctionNative* function, Object** object_head, int arity);
-void ObjectFunctionNative_init(ObjectFunctionNative* native, FunctionNative* function, Object** object_head, int arity);
-void ObjectFunctionNative_free(ObjectFunctionNative* native);
+void hash_table_init(HashTable* table);
+void hash_table_copy(HashTable* from, HashTable* to); // tableAddAll
+bool hash_table_set_value(HashTable* table, ObjectString* key, Value value);
+bool hash_table_get_value(HashTable* table, ObjectString* key, Value* value_out);
+ObjectString* hash_table_get_key(HashTable* table, String string, uint32_t hash);
+bool hash_table_delete(HashTable* table, ObjectString* key);
+void hash_table_free(HashTable* table);
 
 //
 // Abstract Syntax Tree
@@ -667,7 +697,8 @@ int  ArrayLocalMetadata_add(ArrayLocalMetadata* local_metadata, uint8_t index, L
 
 typedef struct Function Function;
 struct Function {
-    LinkedList(Function) previous;
+    // LinkedList(Function) previous; // TOOD: rename to 'next'
+    LinkedList(Function) next;
 
     FunctionKind function_kind;
     ObjectFunction* object;                     // NOTE: Runtime function data structure
@@ -676,9 +707,9 @@ struct Function {
     int depth;                                  // NOTE: Scope depth
 };
 
-void            Function_init(Function* function, FunctionKind function_kind, Function** function_current, ObjectString* function_name, Object** object_head);
+void Function_init(Function* function, FunctionKind function_kind, Function** function_current, ObjectString* function_name, Object** object_head);
 ObjectFunction* Function_end(Function* function, Function** Function_current, bool parser_has_error, int line_number);
-int             Function_resolve_variable_dependencies(Function* function, Token* name, Local** ret_local);
+int Function_resolve_variable_dependencies(Function* function, Token* name, Local** ret_local);
 
 typedef struct StackFunction StackFunction;
 struct StackFunction {
@@ -731,18 +762,10 @@ typedef enum {
     BlockType_Function
 } BlockType;
 
-typedef struct {
-    bool is_block;
-    BlockType block_type;
-} ParseStatementParams;
-
-// TODO: Remove this
-//
-#define ParseStatementParamsDefault()    \
-    (ParseStatementParams) {             \
-        .block_type = BlockType_None,    \
-        .is_block = false                \
-    }
+// typedef struct {
+//     bool is_block;
+//     BlockType block_type;
+// } ParseStatementParams;
 
 #define BREAK_POINT_MAX 200
 
@@ -756,12 +779,12 @@ typedef struct {
     int top;
 } StackBreakpoint;
 
-void       StackBreak_init(StackBreakpoint* breakpoints);
+void StackBreak_init(StackBreakpoint* breakpoints);
 Breakpoint StackBreak_push(StackBreakpoint* breakpoints, Breakpoint value);
 Breakpoint StackBreak_pop(StackBreakpoint* breakpoints);
 Breakpoint StackBreak_peek(StackBreakpoint* breakpoints, int offset);
-bool       StackBreak_is_empty(StackBreakpoint* breakpoints);
-bool       StackBreak_is_full(StackBreakpoint* breakpoints);
+bool StackBreak_is_empty(StackBreakpoint* breakpoints);
+bool StackBreak_is_full(StackBreakpoint* breakpoints);
 
 #define BLOCKS_MAX 200
 
@@ -770,28 +793,24 @@ typedef struct {
     int top;
 } StackBlock;
 
-void      StackBlock_init(StackBlock* blocks);
+void StackBlock_init(StackBlock* blocks);
 BlockType StackBlock_push(StackBlock* blocks, BlockType value);
 BlockType StackBlock_pop(StackBlock* blocks);
 BlockType StackBlock_peek(StackBlock* blocks, int offset);
-bool      StackBlock_is_empty(StackBlock* blocks);
-bool      StackBlock_is_full(StackBlock* blocks);
-int       StackBlock_get_top_item_index(StackBlock* blocks);
+bool StackBlock_is_empty(StackBlock* blocks);
+bool StackBlock_is_full(StackBlock* blocks);
+int StackBlock_get_top_item_index(StackBlock* blocks);
 
 typedef struct {
     Token token_current;
     Token token_previous;
     Lexer* lexer;
-    Function* function; // TODO: change line to LinkedList(ParserFunction) function
+    LinkedList(Function) function;
     HashTable* string_database;
+    HashTable table_strings;
 
-    // TODO: Missing implementation
-    //
-    // LinkedList(Object) objects;
-
-    // TODO: remove this
-    // 
-    Object** object_head;  // NOTE: it holds the address of the VM.oject_head
+    Object** object_head;
+    LinkedList(Object) objects;
 
     int interpolation_count_nesting;
     int interpolation_count_value_pushed;
@@ -803,9 +822,17 @@ typedef struct {
     bool panic_mode;
 } Parser;
 
-void            parser_init(Parser* parser, const char* source_code, Lexer* lexer, HashTable* string_database, Object** object_head);
-ObjectFunction* parser_parse(Parser* parser, ArrayStatement** return_statements);
+typedef struct {
+    Lexer*     lexer;
+    HashTable* string_database;
+    Object**   object_head;
+} ParserInitParams;
 
+#define Parser_Init(parser, source_code, ...) \
+    parser_init((parser), (source_code), (ParserInitParams){__VA_ARGS__})
+
+void parser_init(Parser* parser, const char* source_code, ParserInitParams params);
+ObjectFunction* parser_parse(Parser* parser, ArrayStatement** return_statements, HashTable* string_database, Object** object_head);
 
 //
 // Value Stack
@@ -829,45 +856,6 @@ bool stack_value_is_empty(StackValue* stack);
 void stack_value_trace(StackValue* stack);
 void stack_free(StackValue* stack);
 
-//
-// HashTable
-//
-
-// HashTable:
-//     Associates a set of Keys to a set of Values.
-//     Each Key/Value pair is an Entry in the Table.
-//     Constant time lookup.
-//
-//  HashTable
-// key  | Value
-// ---------------
-// 1248   "Hello"  -> Entry  <- *entries
-// 4323    9892    -> Entry
-//
-// Entries: [{1248, "Hello"}, {4323, 9892}, ...]
-//           ---------------  ------------
-//                Entry           Entry
-
-typedef struct
-{
-    ObjectString* key;
-    Value value;
-} Entry;
-
-struct HashTable
-{
-    Entry* entries;
-    int count;
-    int capacity;
-};
-
-void hash_table_init(HashTable* table);
-void hash_table_copy(HashTable* from, HashTable* to); // tableAddAll
-bool hash_table_set_value(HashTable* table, ObjectString* key, Value value);
-bool hash_table_get_value(HashTable* table, ObjectString* key, Value* value_out);
-ObjectString* hash_table_get_key(HashTable* table, String string, uint32_t hash);
-bool hash_table_delete(HashTable* table, ObjectString* key);
-void hash_table_free(HashTable* table);
 
 //
 // Virtual Machine
