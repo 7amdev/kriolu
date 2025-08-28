@@ -14,11 +14,15 @@
 #include "linked_list.h"
 
 // 
-// Utils
+// Debug defines
 // 
 
 #define DEBUG_LOG_PARSER
+#define DEBUG_TRACE_INSTRUCTION true
+// #define DEBUG_TRACE_EXECUTION
 // #define DEBUG_COMPILER_BYTECODE
+// #define DEBUG_GC_STRESS
+// #define DEBUG_GC_TRACE
 
 //
 // Token
@@ -304,7 +308,6 @@ typedef struct
     ArrayLineNumber lines;
 } Bytecode;
 
-#define DEBUG_TRACE_INSTRUCTION true
 
 #define Compiler_CompileInstruction_1Byte(bytecode, opcode, line) Bytecode_insert_instruction_1byte(bytecode, opcode, line, DEBUG_TRACE_INSTRUCTION)
 #define Compiler_CompileInstruction_2Bytes(bytecode, opcode, operand, line) Bytecode_insert_instruction_2bytes(bytecode, opcode, operand, line, DEBUG_TRACE_INSTRUCTION)
@@ -856,12 +859,36 @@ bool stack_value_is_empty(StackValue* stack);
 void stack_value_trace(StackValue* stack);
 void stack_free(StackValue* stack);
 
+//
+// Memory / Garbage Collector
+// 
+
+#define Kilobytes(n) (n * 1024)
+#define Megabytes(n) (n * 1024 * 1024)
+#define Gigabytes(n) (n * 1024 * 1024 * 1024)
+
+#define Memory_Allocate(type, count)  \
+    Memory_allocate(NULL, 0, sizeof(type) * count)
+
+#define Memory_AllocateArray(type, pointer, old_count, new_count) \
+    Memory_allocate(pointer, sizeof(type) * old_count, sizeof(new_size) * new_count)
+
+#define Memory_Free(type, pointer) \
+    Memory_allocate(pointer, sizeof(type), 0)
+
+#define Memory_FreeArray(type, pointer, old_count) \
+    Memory_allocate(pointer, sizeof(type) * old_count, 0)
+
+void* Memory_allocate(void* pointer, size_t old_size, size_t new_size);
+void  Memory_register(size_t* bytes_total_source);
+void  Memory_mark_object(Object* object);
+void  Memory_mark_value(Value value);
+void  Memory_free_objects();
 
 //
 // Virtual Machine
 //
 
-// #define DEBUG_TRACE_EXECUTION
 #define FRAME_MAX 64
 #define FRAME_STACK_MAX (FRAME_MAX * UINT8_COUNT)
 
