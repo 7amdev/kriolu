@@ -1598,6 +1598,7 @@ static void parser_init_function(Parser* parser, Function* function, FunctionKin
     object_fn->arity = 0;
     object_fn->name = function_name;
     object_fn->variable_dependencies_count  = 0;
+    Bytecode_init(&object_fn->bytecode);
     LinkedList_push(parser->objects, (Object*)object_fn);
 
     // Initialize Function
