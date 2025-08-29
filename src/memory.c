@@ -1,11 +1,11 @@
 #include "kriolu.h"
 
 // TODO: 
-// [] Remove all the malloc, ralloc, and calloc by Mamory_allocate
 // [] Review Object_free if its covering all the object's type
 // [] Implement a generic Stack API
 // [] Implement Generic Dynamic Array
 // [] Implement garbage collector
+// [x] Remove all the malloc, ralloc, and calloc by Mamory_allocate
 // [x] Review Garbage collection operation order
 // [x] Organize the API interface
 

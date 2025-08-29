@@ -1,11 +1,16 @@
 #include "kriolu.h"
 
 Object* Object_allocate(ObjectKind kind, size_t size, Object** object_head) {
-    Object* object = (Object*)calloc(1, sizeof(Object));
+    Object* object = Memory_Allocate(Object, 1);
     assert(object);
 
     Object_init(object, kind, object_head);
     return object;
+}
+
+void Object_init(Object* object, ObjectKind kind, Object** object_head) {
+    object->kind = kind;
+    if (object_head != NULL) LinkedList_push(*object_head, object);
 }
 
 ObjectString* ObjectString_allocate(AllocateParams params) {
@@ -21,7 +26,7 @@ ObjectString* ObjectString_allocate(AllocateParams params) {
 
     if (object_st == NULL) {
         // .Allocate
-        object_st = calloc(1, sizeof(ObjectString));
+        object_st = Memory_Allocate(ObjectString, 1);
         assert(object_st);
 
         // .Copy String
@@ -50,14 +55,14 @@ ObjectString* ObjectString_allocate(AllocateParams params) {
 }
 
 ObjectFunction* ObjectFunction_allocate(Object** object_head) {
-    ObjectFunction* function = calloc(1, sizeof(ObjectFunction));
+    ObjectFunction* function = Memory_Allocate(ObjectFunction, 1);
     assert(function);
 
     return function;
 }
 
 ObjectValue* ObjectValue_allocate(Object** object_head, Value* value_address) {
-    ObjectValue* object_value = calloc(1, sizeof(ObjectValue));
+    ObjectValue* object_value = Memory_Allocate(ObjectValue, 1);
     assert(object_value);
 
     ((Object*)object_value)->kind = ObjectKind_Heap_Value;
@@ -69,7 +74,15 @@ ObjectValue* ObjectValue_allocate(Object** object_head, Value* value_address) {
 }
 
 ObjectClosure* ObjectClosure_allocate(ObjectFunction* function, Object** object_head) {
-    ObjectClosure* closure = calloc(1, sizeof(ObjectClosure));
+    int item_count = function->variable_dependencies_count;
+    ObjectValue** items = NULL;
+    if (item_count > 0) {
+       items = Memory_Allocate(ObjectValue*, item_count);
+       assert(items);
+       for (int i = 0; i < item_count; i++) items[i] = NULL;
+    }
+    
+    ObjectClosure* closure = Memory_Allocate(ObjectClosure, 1);
     assert(closure);
 
     // Initialization
@@ -77,19 +90,14 @@ ObjectClosure* ObjectClosure_allocate(ObjectFunction* function, Object** object_
     ((Object*)closure)->kind =  ObjectKind_Closure;
     LinkedList_push(*object_head, (Object*)closure);
     closure->function = function;
-
-    int item_count = function->variable_dependencies_count;
-    ObjectValue** items = malloc(item_count * sizeof(ObjectValue*));
-    assert(items);
-    for (int i = 0; i < item_count; i++) items[i] = NULL;
-
     closure->heap_values.items = items;
     closure->heap_values.count = item_count;
+
     return closure;
 }
 
 ObjectFunctionNative* ObjectFunctionNative_allocate(FunctionNative* function, Object** object_head, int arity) {
-    ObjectFunctionNative* native = calloc(1, sizeof(ObjectFunctionNative));
+    ObjectFunctionNative* native = Memory_Allocate(ObjectFunctionNative, 1);
     assert(native);
     
     ((Object*)native)->kind = ObjectKind_Function_Native;
@@ -98,18 +106,6 @@ ObjectFunctionNative* ObjectFunctionNative_allocate(FunctionNative* function, Ob
     native->arity = arity;
 
     return native;
-}
-
-void Object_init(Object* object, ObjectKind kind, Object** object_head) {
-    object->kind = kind;
-    if (object_head != NULL) LinkedList_push(*object_head, object);
-
-    // TODO: change if clause to 'LinkedList_push(object_head, object);'
-    //
-    // if (object_head != NULL) {
-    //     object->next = *object_head;
-    //     *object_head = object;
-    // }
 }
 
 void Object_print_function(ObjectFunction* function) {
@@ -148,27 +144,44 @@ void Object_print(Object* object) {
     }
 }
 
+void ObjectString_free(ObjectString* object_st) {
+    Memory_Free(char*, object_st->characters);
+    Memory_Free(ObjectString, object_st);
+    object_st = NULL;
+}
+
+void ObjectFunction_free(ObjectFunction* function) {
+    ObjectString_free(((ObjectFunction*)function)->name);
+    Memory_Free(ObjectFunction, function);
+    function = NULL;
+}
+
 void Object_free(Object* object) {
-    // TODO: update virtual machine's bytes allocated variable
     switch (object->kind)
     {
     case ObjectKind_String: {
-        // TODO: Missing Implementation
-        // ObjectString_free((ObjectString*)object);
-        //
-        assert(false && "[ERROR] object.c:157 Missing Implementation");
+        ObjectString_free((ObjectString*)object);
     } break;
     case ObjectKind_Function: {
-        // TODO: Missing Implementation
-        // ObjectFunction_free((ObjectFunction*)object);
-        // 
-        assert(false && "[ERROR] object.c:164 Missing Implementation");
+        ObjectFunction_free((ObjectFunction*)object);
+    } break;
+    case ObjectKind_Heap_Value : {
+        Memory_Free(ObjectValue, object);
+        object = NULL;
+    } break;
+    case ObjectKind_Closure : {
+        ObjectFunction_free(((ObjectClosure*)object)->function);
+        int count = ((ObjectClosure*)object)->heap_values.count;
+        for (int i = 0; i < count; i++) {
+            ObjectValue* object_value = ((ObjectClosure*)object)->heap_values.items[i];
+            Memory_Free(ObjectValue, object_value);
+        }
+        Memory_Free(ObjectClosure, object);
+        object = NULL;
     } break;
     case ObjectKind_Function_Native: {
-        // TODO: Missing Implementation
-        // ObjectFunctionNative_free((ObjectFunctionNative*)object);
-        // 
-        assert(false && "[ERROR] object.c:171 Missing Implementation");
+        Memory_Free(ObjectFunctionNative, object);
+        object = NULL;
     } break;
     }
 }

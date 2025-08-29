@@ -1,28 +1,23 @@
 #include "kriolu.h"
 
-
-// TODO: Change prefix from Stack to Array
-
-void StackLocal_init(StackLocal* locals, int capacity) {
-    locals->items = malloc(capacity * sizeof(Local));
+void StackLocal_init(StackLocal* locals) {
+    // locals->items = malloc(capacity * sizeof(Local));
     assert(locals->items);
     locals->top = 0;
-    locals->capacity = capacity;
+    locals->capacity = UINT8_COUNT;
 }
 
 Local StackLocal_push(StackLocal* locals, Token token, int scope_depth, LocalAction action) {
     assert(locals->top < locals->capacity && "Error: StackLocal Overflow.");
-    // Local* local = &locals->items[locals->count];
-    // local->token = token;
-    // local->scope_depth = scope_depth;
-    // locals->count += 1;
 
-    Local local = (Local){ token, scope_depth, action };
-    locals->items[locals->top] = local;
+    locals->items[locals->top] = (Local){ 
+        .token       = token, 
+        .scope_depth = scope_depth, 
+        .action      = action 
+    };
     locals->top += 1;
 
     return locals->items[locals->top - 1];
-
 }
 
 Local StackLocal_pop(StackLocal* locals) {

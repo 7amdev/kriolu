@@ -382,15 +382,10 @@ typedef struct ObjectValue ObjectValue;
 struct ObjectValue {
     Object object;
 
-    Value* value_address; // TODO: rename to 'memory_address' or 'address'
+    Value* value_address; 
     Value value;
     ObjectValue* next;
 };
-
-typedef struct {
-    ObjectValue* item_previous;
-    ObjectValue* item;
-} ObjectValueFindResult;
 
 typedef struct {
     ObjectValue** items;
@@ -630,9 +625,8 @@ ArrayStatement* array_statement_allocate();
 uint32_t array_statement_insert(ArrayStatement* statements, Statement statement);
 void array_statement_free(ArrayStatement* statements);
 
-
 //
-// Scope
+// Local
 //
 
 #define UINT8_COUNT (UINT8_MAX + 1)
@@ -650,12 +644,12 @@ typedef struct {
 } Local;
 
 typedef struct {
-    Local* items;
+    Local items[UINT8_COUNT];
     int top;
     int capacity;
 } StackLocal;
 
-void   StackLocal_init(StackLocal* locals, int capacity);
+void   StackLocal_init(StackLocal* locals);
 Local  StackLocal_push(StackLocal* locals, Token token, int scope_depth, LocalAction action);
 Local  StackLocal_pop(StackLocal* locals);
 Local* StackLocal_peek(StackLocal* locals, int offset);
@@ -663,13 +657,6 @@ int    StackLocal_get_local_index_by_token(StackLocal* locals, Token* token, Loc
 bool   StackLocal_is_full(StackLocal* locals);
 bool   StackLocal_is_empty(StackLocal* locals);
 bool   StackLocal_initialize_local(StackLocal* locals, int depth, int offset);
-
-typedef struct {
-    StackLocal locals;
-    int depth;
-} Scope;
-
-void scope_init(Scope* scope);
 
 // 
 // Function
@@ -700,7 +687,6 @@ int  ArrayLocalMetadata_add(ArrayLocalMetadata* local_metadata, uint8_t index, L
 
 typedef struct Function Function;
 struct Function {
-    // LinkedList(Function) previous; // TOOD: rename to 'next'
     LinkedList(Function) next;
 
     FunctionKind function_kind;
@@ -843,21 +829,20 @@ ObjectFunction* parser_parse(Parser* parser, ArrayStatement** return_statements,
 
 #define STACK_MAX 256
 
-typedef struct
-{
+typedef struct {
     Value items[STACK_MAX];
     Value* top;
 } StackValue;
 
-StackValue* stack_value_create(void);
-void stack_value_reset(StackValue* stack);
+// StackValue* stack_value_create(void);
+void  stack_value_reset(StackValue* stack);
 Value stack_value_push(StackValue* stack, Value value);
 Value stack_value_pop(StackValue* stack);
 Value stack_value_peek(StackValue* stack, int offset);
-bool stack_value_is_full(StackValue* stack);
-bool stack_value_is_empty(StackValue* stack);
-void stack_value_trace(StackValue* stack);
-void stack_free(StackValue* stack);
+bool  stack_value_is_full(StackValue* stack);
+bool  stack_value_is_empty(StackValue* stack);
+void  stack_value_trace(StackValue* stack);
+void  stack_free(StackValue* stack);
 
 //
 // Memory / Garbage Collector
@@ -868,10 +853,10 @@ void stack_free(StackValue* stack);
 #define Gigabytes(n) (n * 1024 * 1024 * 1024)
 
 #define Memory_Allocate(type, count)  \
-    Memory_allocate(NULL, 0, sizeof(type) * count)
+    (type*) Memory_allocate(NULL, 0, sizeof(type) * count)
 
 #define Memory_AllocateArray(type, pointer, old_count, new_count) \
-    Memory_allocate(pointer, sizeof(type) * old_count, sizeof(new_size) * new_count)
+    (type*) Memory_allocate(pointer, sizeof(type) * (old_count), sizeof(type) * (new_count))
 
 #define Memory_Free(type, pointer) \
     Memory_allocate(pointer, sizeof(type), 0)
@@ -879,6 +864,7 @@ void stack_free(StackValue* stack);
 #define Memory_FreeArray(type, pointer, old_count) \
     Memory_allocate(pointer, sizeof(type) * old_count, 0)
 
+// TODO: rename 'Memory_allocate' to 'Memory_update' ???
 void* Memory_allocate(void* pointer, size_t old_size, size_t new_size);
 void  Memory_register(size_t* bytes_total_source);
 void  Memory_mark_object(Object* object);

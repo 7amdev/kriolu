@@ -8,7 +8,7 @@ void Function_init(Function* function, FunctionKind function_kind, Function** fu
     function->object = ObjectFunction_allocate(object_head);
     function->object->name = function_name;
     function->depth = 0;
-    StackLocal_init(&function->locals, UINT8_COUNT);
+    StackLocal_init(&function->locals);
     StackLocal_push(&function->locals, (Token) { 0 }, 0, LocalAction_Default);
     ArrayLocalMetadata_init(&function->variable_dependencies, 0);
 

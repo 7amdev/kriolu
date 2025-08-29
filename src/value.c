@@ -6,7 +6,7 @@ bool value_negate_logically(Value value) {
     //     value_is_nil(value) ||
     //     (value_is_boolean(value) && !value_as_boolean(value)));
 
-    if (value_is_nil(value)) return true;
+    if (value_is_nil(value))     return true;
     if (value_is_boolean(value)) return !value_as_boolean(value);
 
     // Other Values
@@ -42,18 +42,17 @@ bool value_is_equal(Value a, Value b) {
     return false;
 }
 
-void array_value_init(ArrayValue* values)
-{
+void array_value_init(ArrayValue* values) {
     values->items = NULL;
     values->count = 0;
     values->capacity = 0;
 }
 
-uint32_t array_value_insert(ArrayValue* values, Value value)
-{
+uint32_t array_value_insert(ArrayValue* values, Value value) {
     if (values->capacity < values->count + 1) {
+        int old_capacity = values->capacity;
         values->capacity = values->capacity < 8 ? 8 : 2 * values->capacity;
-        values->items = (Value*)realloc(values->items, values->capacity * sizeof(Value));
+        values->items = Memory_AllocateArray(Value, values->items, old_capacity, values->capacity);
         assert(values->items);
     }
 
@@ -62,8 +61,7 @@ uint32_t array_value_insert(ArrayValue* values, Value value)
     return values->count - 1;
 }
 
-void value_print(Value value)
-{
+void value_print(Value value) {
     switch (value.kind)
     {
     default:
@@ -98,8 +96,7 @@ void value_print(Value value)
     }
 }
 
-void array_value_free(ArrayValue* values)
-{
+void array_value_free(ArrayValue* values) {
     free(values->items);
     array_value_init(values);
 }

@@ -20,40 +20,34 @@
 //
 #define TABLE_MAX_LOAD 0.75
 
-// TODO: delete
-// static Entry* hash_table_find_entry(Entry* entries, ObjectString* key, int capacity);
 static Entry* hash_table_find_entry_by_key(Entry* entries, ObjectString* key, int capacity);
 static Entry* hash_table_probing(Entry* entries, ObjectString* key, int capacity);
-static void hash_table_adjust_capacity(HashTable* table, int capacity);
-static Entry hash_table_make_tombstone();
-static Entry hash_table_make_empty_entry();
-static bool hash_table_is_an_empty_entry(Entry* entry);
-static bool hash_table_is_a_tombstone_entry(Entry* entry);
+static void   hash_table_adjust_capacity(HashTable* table, int new_capacity, int old_capacity);
+static Entry  hash_table_make_tombstone();
+static Entry  hash_table_make_empty_entry();
+static bool   hash_table_is_an_empty_entry(Entry* entry);
+static bool   hash_table_is_a_tombstone_entry(Entry* entry);
 
-void hash_table_init(HashTable* table)
-{
-    table->entries = NULL;
-    table->count = 0;
+void hash_table_init(HashTable* table) {
+    table->entries  = NULL;
+    table->count    = 0;
     table->capacity = 0;
 }
 
-void hash_table_copy(HashTable* from, HashTable* to)
-{
-    for (int i = 0; i < from->capacity; i++)
-    {
+void hash_table_copy(HashTable* from, HashTable* to) {
+    for (int i = 0; i < from->capacity; i++) {
         Entry* entry = &from->entries[i];
-        if (entry->key != NULL)
-        {
+        if (entry->key != NULL) {
             hash_table_set_value(to, entry->key, entry->value);
         }
     }
 }
 
-bool hash_table_set_value(HashTable* table, ObjectString* key, Value value)
-{
+bool hash_table_set_value(HashTable* table, ObjectString* key, Value value) {
     if (table->count + 1 > table->capacity * TABLE_MAX_LOAD) {
+        int old_capacity = table->capacity;
         int capacity = table->capacity < 8 ? 8 : 2 * table->capacity;
-        hash_table_adjust_capacity(table, capacity);
+        hash_table_adjust_capacity(table, capacity, old_capacity);
     }
 
     Entry* entry = hash_table_find_entry_by_key(table->entries, key, table->capacity);
@@ -67,8 +61,7 @@ bool hash_table_set_value(HashTable* table, ObjectString* key, Value value)
     return is_new_key;
 }
 
-bool hash_table_get_value(HashTable* table, ObjectString* key, Value* value_out)
-{
+bool hash_table_get_value(HashTable* table, ObjectString* key, Value* value_out) {
     if (table->count == 0)
         return false;
 
@@ -80,8 +73,7 @@ bool hash_table_get_value(HashTable* table, ObjectString* key, Value* value_out)
     return true;
 }
 
-ObjectString* hash_table_get_key(HashTable* table, String string, uint32_t hash)
-{
+ObjectString* hash_table_get_key(HashTable* table, String string, uint32_t hash) {
     if (table->count == 0)
         return NULL;
 
@@ -103,8 +95,7 @@ ObjectString* hash_table_get_key(HashTable* table, String string, uint32_t hash)
     }
 }
 
-bool hash_table_delete(HashTable* table, ObjectString* key)
-{
+bool hash_table_delete(HashTable* table, ObjectString* key) {
     if (table->count == 0)
         return false;
 
@@ -118,8 +109,7 @@ bool hash_table_delete(HashTable* table, ObjectString* key)
     return true;
 }
 
-void hash_table_free(HashTable* table)
-{
+void hash_table_free(HashTable* table) {
     free(table->entries);
     // free(table);
     hash_table_init(table);
@@ -147,25 +137,22 @@ static bool hash_table_is_an_empty_entry(Entry* entry)
     return (entry->key == NULL && value_is_nil(entry->value));
 }
 
-static bool hash_table_is_a_tombstone_entry(Entry* entry)
-{
+static bool hash_table_is_a_tombstone_entry(Entry* entry) {
     return (
         entry->key == NULL &&
         value_is_boolean(entry->value) &&
         value_as_boolean(entry->value) == true);
 }
 
-static bool hash_table_is_hash_collision(ObjectString* a, ObjectString* b)
-{
+static bool hash_table_is_hash_collision(ObjectString* a, ObjectString* b) {
     return (
         a->length == b->length &&
-        a->hash == b->hash &&
+        a->hash == b->hash     &&
         memcmp(a->characters, b->characters, a->length) != 0
-        );
+    );
 }
 
-static bool hash_table_is_key_collision(Entry* entry, ObjectString* key)
-{
+static bool hash_table_is_key_collision(Entry* entry, ObjectString* key) {
     if (entry->key->length != key->length) return true;
     if (entry->key->hash != key->hash) return true;
     if (memcmp(entry->key->characters, key->characters, entry->key->length) != 0) return true;
@@ -179,8 +166,7 @@ static bool hash_table_is_key_collision(Entry* entry, ObjectString* key)
     //     memcmp(entry->key->characters, key->characters, entry->key->length) != 0);
 }
 
-static Entry* hash_table_find_entry_by_key(Entry* entries, ObjectString* key, int capacity)
-{
+static Entry* hash_table_find_entry_by_key(Entry* entries, ObjectString* key, int capacity) {
     uint32_t index = key->hash % capacity;
     Entry* entry = &entries[index];
 
@@ -207,8 +193,7 @@ static Entry* hash_table_find_entry_by_key(Entry* entries, ObjectString* key, in
 //
 // Return: entry-found | entry-empty | entry-tombstone
 //
-static Entry* hash_table_probing(Entry* entries, ObjectString* key, int capacity)
-{
+static Entry* hash_table_probing(Entry* entries, ObjectString* key, int capacity) {
     uint32_t index = key->hash % capacity;
     Entry* tombstone = NULL;
 
@@ -251,13 +236,12 @@ static Entry* hash_table_probing(Entry* entries, ObjectString* key, int capacity
 //     }
 // }
 
-static void hash_table_adjust_capacity(HashTable* table, int capacity)
-{
+static void hash_table_adjust_capacity(HashTable* table, int new_capacity, int old_capacity) {
     // Allocate an empty array of Entry(Key/Value Pair)
     //
-    Entry* entries = (Entry*)realloc(NULL, sizeof(Entry) * capacity);
+    Entry* entries = Memory_AllocateArray(Entry, NULL, old_capacity, new_capacity);
     assert(entries);
-    for (int i = 0; i < capacity; i++) {
+    for (int i = 0; i < new_capacity; i++) {
         entries[i] = hash_table_make_empty_entry();
     }
 
@@ -267,19 +251,18 @@ static void hash_table_adjust_capacity(HashTable* table, int capacity)
     // hash_table_find_entry_by_key() to recalculate the new position.
     //
     table->count = 0;
-    for (int i = 0; i < table->capacity; i++)
-    {
+    for (int i = 0; i < table->capacity; i++) {
         Entry* entry = &table->entries[i];
         if (entry->key == NULL)
             continue;
 
-        Entry* dest = hash_table_find_entry_by_key(entries, entry->key, capacity);
-        dest->key = entry->key;
-        dest->value = entry->value;
+        Entry* dest = hash_table_find_entry_by_key(entries, entry->key, new_capacity);
+        dest->key     = entry->key;
+        dest->value   = entry->value;
         table->count += 1;
     }
 
     free(table->entries);
-    table->entries = entries;
-    table->capacity = capacity;
+    table->entries  = entries;
+    table->capacity = new_capacity;
 }

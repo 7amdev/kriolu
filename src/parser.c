@@ -1607,7 +1607,7 @@ static void parser_init_function(Parser* parser, Function* function, FunctionKin
     function->object = NULL;
     function->object = object_fn;
     function->depth = 0;
-    StackLocal_init(&function->locals, UINT8_COUNT);
+    StackLocal_init(&function->locals);
     StackLocal_push(&function->locals, (Token) { 0 }, 0, LocalAction_Default);
     ArrayLocalMetadata_init(&function->variable_dependencies, 0);
     LinkedList_push(parser->function, function);

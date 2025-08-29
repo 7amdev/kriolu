@@ -4,8 +4,6 @@ void StackFunctionCall_reset(StackFunctionCall* function_calls) {
     function_calls->top = 0;
 }
 
-// TODO: add parameter argument_cont
-//       rename frame_start -> stack_value_top
 FunctionCall* StackFunctionCall_push(StackFunctionCall* function_calls, ObjectClosure* closure, uint8_t* ip, Value* stack_value_top, int argument_count) {
     assert(function_calls->top < FRAME_STACK_MAX);
     if (function_calls->top == FRAME_STACK_MAX) return NULL;
