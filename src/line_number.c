@@ -36,6 +36,6 @@ int array_line_insert_3x(ArrayLineNumber* lines, int line) {
 }
 
 void array_line_free(ArrayLineNumber* lines) {
-    free(lines->items);
+    Memory_FreeArray(int, lines->items, lines->count);
     array_line_init(lines);
 }

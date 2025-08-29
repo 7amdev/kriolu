@@ -32,6 +32,6 @@ int array_instruction_insert_u24(ArrayInstruction* instructions, uint8_t byte1, 
 }
 
 void array_instruction_free(ArrayInstruction* instructions) {
-    free(instructions->items);
+    Memory_FreeArray(uint8_t, instructions->items, instructions->count);
     array_instruction_init(instructions);
 }

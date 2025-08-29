@@ -38,8 +38,9 @@ ObjectString* ObjectString_allocate(AllocateParams params) {
         if (params.task & AllocateTask_Initialize) {
             // TODO: assert mandatory params for this section
             //
-            ((Object*)object_st)->kind = ObjectKind_String;
-            LinkedList_push(*params.first, (Object*)object_st);
+            // ((Object*)object_st)->kind = ObjectKind_String;
+            // LinkedList_push(*params.first, (Object*)object_st);
+            Object_init((Object*)object_st, ObjectKind_String, params.first);
             object_st->characters = string_copy.characters;
             object_st->length = string_copy.length;
             object_st->hash = params.hash;
@@ -54,19 +55,28 @@ ObjectString* ObjectString_allocate(AllocateParams params) {
     return object_st;
 }
 
-ObjectFunction* ObjectFunction_allocate(Object** object_head) {
-    ObjectFunction* function = Memory_Allocate(ObjectFunction, 1);
-    assert(function);
+ObjectFunction* ObjectFunction_allocate(ObjectString* function_name, Object** object_head) {
+    ObjectFunction* object_fn = Memory_Allocate(ObjectFunction, 1);
+    assert(object_fn);
 
-    return function;
+    // ((Object*)object_fn)->kind = ObjectKind_Function;
+    // LinkedList_push(parser->objects, (Object*)object_fn);
+    Object_init((Object*)object_fn, ObjectKind_Function, object_head);
+    object_fn->arity = 0;
+    object_fn->name = function_name;
+    object_fn->variable_dependencies_count = 0;
+    Bytecode_init(&object_fn->bytecode);
+
+    return object_fn;
 }
 
 ObjectValue* ObjectValue_allocate(Object** object_head, Value* value_address) {
     ObjectValue* object_value = Memory_Allocate(ObjectValue, 1);
     assert(object_value);
 
-    ((Object*)object_value)->kind = ObjectKind_Heap_Value;
-    LinkedList_push(*object_head, (Object*)object_value);
+    // ((Object*)object_value)->kind = ObjectKind_Heap_Value;
+    // LinkedList_push(*object_head, (Object*)object_value);
+    Object_init((Object*)object_value, ObjectKind_Heap_Value, object_head);
     object_value->value_address = value_address;
     object_value->value = value_make_nil(); 
 
@@ -85,10 +95,9 @@ ObjectClosure* ObjectClosure_allocate(ObjectFunction* function, Object** object_
     ObjectClosure* closure = Memory_Allocate(ObjectClosure, 1);
     assert(closure);
 
-    // Initialization
-    //
-    ((Object*)closure)->kind =  ObjectKind_Closure;
-    LinkedList_push(*object_head, (Object*)closure);
+    // ((Object*)closure)->kind =  ObjectKind_Closure;
+    // LinkedList_push(*object_head, (Object*)closure);
+    Object_init((Object*)closure, ObjectKind_Closure, object_head);
     closure->function = function;
     closure->heap_values.items = items;
     closure->heap_values.count = item_count;
@@ -100,8 +109,9 @@ ObjectFunctionNative* ObjectFunctionNative_allocate(FunctionNative* function, Ob
     ObjectFunctionNative* native = Memory_Allocate(ObjectFunctionNative, 1);
     assert(native);
     
-    ((Object*)native)->kind = ObjectKind_Function_Native;
-    LinkedList_push(*object_head, (Object*)native);
+    // ((Object*)native)->kind = ObjectKind_Function_Native;
+    // LinkedList_push(*object_head, (Object*)native);
+    Object_init((Object*)native, ObjectKind_Function_Native, object_head);
     native->function = function;
     native->arity = arity;
 
@@ -151,7 +161,7 @@ void ObjectString_free(ObjectString* object_st) {
 }
 
 void ObjectFunction_free(ObjectFunction* function) {
-    ObjectString_free(((ObjectFunction*)function)->name);
+    ObjectString_free(function->name);
     Memory_Free(ObjectFunction, function);
     function = NULL;
 }
@@ -160,23 +170,26 @@ void Object_free(Object* object) {
     switch (object->kind)
     {
     case ObjectKind_String: {
-        ObjectString_free((ObjectString*)object);
+        ObjectString* object_st = (ObjectString*)object;
+        Memory_FreeArray(char, object_st->characters, object_st->length + 1);
+        ObjectString_free(object_st);
     } break;
     case ObjectKind_Function: {
-        ObjectFunction_free((ObjectFunction*)object);
+        ObjectFunction* object_fn = (ObjectFunction*)object;
+        Bytecode_free(&object_fn->bytecode);
+        ObjectFunction_free(object_fn);
     } break;
     case ObjectKind_Heap_Value : {
         Memory_Free(ObjectValue, object);
         object = NULL;
     } break;
     case ObjectKind_Closure : {
-        ObjectFunction_free(((ObjectClosure*)object)->function);
-        int count = ((ObjectClosure*)object)->heap_values.count;
-        for (int i = 0; i < count; i++) {
-            ObjectValue* object_value = ((ObjectClosure*)object)->heap_values.items[i];
-            Memory_Free(ObjectValue, object_value);
-        }
-        Memory_Free(ObjectClosure, object);
+        // NOTE: Closure doesn't own ObjectValue nor ObjectFunction. Other Closures might be using the same 
+        //       ObjectValue or ObjectFunction instance.
+        //
+        ObjectClosure* object_cl = (ObjectClosure*)object;
+        Memory_FreeArray(ObjectValue*, object_cl->heap_values.items, object_cl->heap_values.count);
+        Memory_Free(ObjectClosure, (ObjectClosure*)object);
         object = NULL;
     } break;
     case ObjectKind_Function_Native: {

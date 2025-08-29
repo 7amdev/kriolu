@@ -2,15 +2,9 @@
 
 
 bool value_negate_logically(Value value) {
-    // return (
-    //     value_is_nil(value) ||
-    //     (value_is_boolean(value) && !value_as_boolean(value)));
-
     if (value_is_nil(value))     return true;
     if (value_is_boolean(value)) return !value_as_boolean(value);
 
-    // Other Values
-    //
     return false;
 }
 
@@ -97,6 +91,6 @@ void value_print(Value value) {
 }
 
 void array_value_free(ArrayValue* values) {
-    free(values->items);
+    Memory_FreeArray(Value, values->items, values->count);
     array_value_init(values);
 }

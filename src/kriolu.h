@@ -423,7 +423,7 @@ void Object_print(Object* object);
 void Object_free(Object* object);
 
 ObjectString* ObjectString_allocate(AllocateParams params);
-ObjectFunction* ObjectFunction_allocate(Object** object_head);
+ObjectFunction* ObjectFunction_allocate(ObjectString* function_name, Object** object_head);
 ObjectValue* ObjectValue_allocate(Object** object_head, Value* value_address);
 ObjectClosure* ObjectClosure_allocate(ObjectFunction* function, Object** object_head);
 ObjectFunctionNative* ObjectFunctionNative_allocate(FunctionNative* function, Object** object_head, int arity);

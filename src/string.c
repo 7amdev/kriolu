@@ -96,8 +96,8 @@ bool string_equal(String a, String b) {
 }
 
 void string_free(String* string) {
-    free(string->characters);
-    string->characters = NULL;
-    string->length = 0;
-    free(string);
+    Memory_FreeArray(char, string->characters, string->length + 1);
+    // string->characters = NULL;
+    // string->length = 0;
+    // free(string);
 }

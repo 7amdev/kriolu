@@ -1,10 +1,13 @@
 #include "kriolu.h"
 
-// TODO: 
-// [] Review Object_free if its covering all the object's type
-// [] Implement a generic Stack API
-// [] Implement Generic Dynamic Array
-// [] Implement garbage collector
+///TODO: 
+// []  Implement a generic Stack API
+// []  Implement Generic Dynamic Array
+// []  Implement garbage collector
+// [x] HashTable free reroute to Memory_Free
+// [x] Object_free reroute to Memory_Free
+// [x] Bytecode free reroute to Memory_Free
+// [x] Review Object_free if its covering all the object's type
 // [x] Remove all the malloc, ralloc, and calloc by Mamory_allocate
 // [x] Review Garbage collection operation order
 // [x] Organize the API interface

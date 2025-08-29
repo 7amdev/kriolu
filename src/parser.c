@@ -1593,16 +1593,8 @@ static void parser_end_scope(Parser* parser) {
 }
 
 static void parser_init_function(Parser* parser, Function* function, FunctionKind function_kind, ObjectString* function_name) {
-    ObjectFunction* object_fn = ObjectFunction_allocate(NULL);
-    ((Object*)object_fn)->kind = ObjectKind_Function;
-    object_fn->arity = 0;
-    object_fn->name = function_name;
-    object_fn->variable_dependencies_count  = 0;
-    Bytecode_init(&object_fn->bytecode);
-    LinkedList_push(parser->objects, (Object*)object_fn);
+    ObjectFunction* object_fn = ObjectFunction_allocate(function_name, &parser->objects);
 
-    // Initialize Function
-    //
     function->function_kind = function_kind;
     function->object = NULL;
     function->object = object_fn;

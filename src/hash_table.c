@@ -22,7 +22,7 @@
 
 static Entry* hash_table_find_entry_by_key(Entry* entries, ObjectString* key, int capacity);
 static Entry* hash_table_probing(Entry* entries, ObjectString* key, int capacity);
-static void   hash_table_adjust_capacity(HashTable* table, int new_capacity, int old_capacity);
+static void   hash_table_adjust_capacity(HashTable* table, int new_capacity);
 static Entry  hash_table_make_tombstone();
 static Entry  hash_table_make_empty_entry();
 static bool   hash_table_is_an_empty_entry(Entry* entry);
@@ -45,9 +45,8 @@ void hash_table_copy(HashTable* from, HashTable* to) {
 
 bool hash_table_set_value(HashTable* table, ObjectString* key, Value value) {
     if (table->count + 1 > table->capacity * TABLE_MAX_LOAD) {
-        int old_capacity = table->capacity;
         int capacity = table->capacity < 8 ? 8 : 2 * table->capacity;
-        hash_table_adjust_capacity(table, capacity, old_capacity);
+        hash_table_adjust_capacity(table, capacity);
     }
 
     Entry* entry = hash_table_find_entry_by_key(table->entries, key, table->capacity);
@@ -110,8 +109,7 @@ bool hash_table_delete(HashTable* table, ObjectString* key) {
 }
 
 void hash_table_free(HashTable* table) {
-    free(table->entries);
-    // free(table);
+    Memory_FreeArray(Entry, table->entries, table->count);
     hash_table_init(table);
 }
 
@@ -236,10 +234,10 @@ static Entry* hash_table_probing(Entry* entries, ObjectString* key, int capacity
 //     }
 // }
 
-static void hash_table_adjust_capacity(HashTable* table, int new_capacity, int old_capacity) {
+static void hash_table_adjust_capacity(HashTable* table, int new_capacity) {
     // Allocate an empty array of Entry(Key/Value Pair)
     //
-    Entry* entries = Memory_AllocateArray(Entry, NULL, old_capacity, new_capacity);
+    Entry* entries = Memory_AllocateArray(Entry, NULL, table->capacity, new_capacity);
     assert(entries);
     for (int i = 0; i < new_capacity; i++) {
         entries[i] = hash_table_make_empty_entry();
@@ -262,7 +260,7 @@ static void hash_table_adjust_capacity(HashTable* table, int new_capacity, int o
         table->count += 1;
     }
 
-    free(table->entries);
+    Memory_FreeArray(Entry, table->entries, table->capacity);
     table->entries  = entries;
     table->capacity = new_capacity;
 }

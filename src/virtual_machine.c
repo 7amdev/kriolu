@@ -488,8 +488,7 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
 #undef READ_STRING
 }
 
-void VirtualMachine_runtime_error(VirtualMachine* vm, const char* format, ...)
-{
+void VirtualMachine_runtime_error(VirtualMachine* vm, const char* format, ...) {
     va_list args;
     va_start(args, format);
     vfprintf(stderr, format, args);

@@ -370,13 +370,8 @@ void Bytecode_disassemble(Bytecode* bytecode, const char* name) {
     }
 }
 
-void Bytecode_free(Bytecode* bytecode)
-{
+void Bytecode_free(Bytecode* bytecode) {
     array_instruction_free(&bytecode->instructions);
     array_line_free(&bytecode->lines);
     array_value_free(&bytecode->values);
-
-    array_instruction_init(&bytecode->instructions);
-    array_line_init(&bytecode->lines);
-    array_value_init(&bytecode->values);
 }
