@@ -52,7 +52,7 @@ String string_copy(const char* characters, int length) {
 //
 String string_copy_from_other(String other) {
     String string = { 0 };
-    string.characters = Memory_Allocate(char, other.length + 1);
+    string.characters = Memory_Allocate_Count(char, other.length + 1);
     assert(string.characters);
     memcpy(string.characters, other.characters, other.length);
     string.characters[other.length] = '\0';
@@ -68,7 +68,7 @@ String string_copy_from_other(String other) {
 String string_concatenate(String a, String b) {
     String string = { 0 };
     string.length = a.length + b.length;
-    string.characters = Memory_Allocate(char, string.length + 1);
+    string.characters = Memory_Allocate_Count(char, string.length + 1);
     assert(string.characters);
     memcpy(string.characters, a.characters, a.length);
     memcpy(string.characters + a.length, b.characters, b.length);

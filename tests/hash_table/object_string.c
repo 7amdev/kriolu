@@ -26,8 +26,9 @@
 // );
 
 void ObjectString_init(ObjectString* object_string, char* characters, int length, uint32_t hash, Object** object_head) {
-    Object_init((Object*)object_string, ObjectKind_String, object_head);
-    assert(object_string->object.kind == ObjectKind_String);
+    object_string->object.kind = ObjectKind_String;
+    if (object_head != NULL) LinkedList_push(*object_head, (Object*)object_string);
+
     object_string->characters = characters;
     object_string->length = length;
     object_string->hash = hash;

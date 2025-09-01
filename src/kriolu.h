@@ -19,10 +19,10 @@
 
 #define DEBUG_LOG_PARSER
 #define DEBUG_TRACE_INSTRUCTION true
+// #define DEBUG_GC_STRESS
+#define DEBUG_GC_TRACE
 // #define DEBUG_TRACE_EXECUTION
 // #define DEBUG_COMPILER_BYTECODE
-// #define DEBUG_GC_STRESS
-// #define DEBUG_GC_TRACE
 
 //
 // Token
@@ -345,8 +345,18 @@ typedef enum {
     ObjectKind_Function,
     ObjectKind_Function_Native,
     ObjectKind_Closure,
-    ObjectKind_Heap_Value
+    ObjectKind_Heap_Value,
+
+    ObjectKind_Count
 } ObjectKind;
+
+static const char* ObjectKind_text[] = {
+    [ObjectKind_String]          = "String",
+    [ObjectKind_Function]        = "Function",
+    [ObjectKind_Function_Native] = "Function Native",
+    [ObjectKind_Closure]         = "Closure",
+    [ObjectKind_Heap_Value]      = "Heap Value",
+};
 
 struct Object {
     ObjectKind kind;
@@ -852,7 +862,10 @@ void  stack_free(StackValue* stack);
 #define Megabytes(n) (n * 1024 * 1024)
 #define Gigabytes(n) (n * 1024 * 1024 * 1024)
 
-#define Memory_Allocate(type, count)  \
+#define Memory_Allocate(Type) \
+    Memory_Allocate_Count(Type, 1)
+
+#define Memory_Allocate_Count(type, count)  \
     (type*) Memory_allocate(NULL, 0, sizeof(type) * count)
 
 #define Memory_AllocateArray(type, pointer, old_count, new_count) \

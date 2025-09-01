@@ -85,6 +85,13 @@ void Memory_free_objects() {
 //
 
 static void Memory_collect_garbage() {
+#ifdef DEBUG_GC_TRACE
+    printf("-- Garbage Collector::Begin\n");
+#endif // DEBUG_GC_TRACE
+
+#ifdef DEBUG_GC_TRACE
+    printf("-- Garbage Collector::End\n");
+#endif // DEBUG_GC_TRACE
 }
 
 static void Memory_mark_roots() {

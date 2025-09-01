@@ -1,16 +1,25 @@
 #include "kriolu.h"
 
+
+#define Object_Allocate(Type, object_kind, object_head) \
+    (Type*)Object_allocate(object_kind, sizeof(Type), object_head)
+
 Object* Object_allocate(ObjectKind kind, size_t size, Object** object_head) {
-    Object* object = Memory_Allocate(Object, 1);
+    Object* object = (Object*) Memory_allocate(NULL, 0, size);
     assert(object);
-
-    Object_init(object, kind, object_head);
-    return object;
-}
-
-void Object_init(Object* object, ObjectKind kind, Object** object_head) {
     object->kind = kind;
     if (object_head != NULL) LinkedList_push(*object_head, object);
+
+#ifdef DEBUG_GC_TRACE
+    const char* object_kind = "Invalid object type!";
+    if (object->kind >= 0) 
+    if (object->kind < ObjectKind_Count)  
+        object_kind = ObjectKind_text[object->kind];
+        
+    printf("--  %p allocate %zu byte(s) for '%s'\n", (void*)object, size, object_kind);
+#endif // DEBUG_GC_TRACE
+
+    return object;
 }
 
 ObjectString* ObjectString_allocate(AllocateParams params) {
@@ -26,7 +35,7 @@ ObjectString* ObjectString_allocate(AllocateParams params) {
 
     if (object_st == NULL) {
         // .Allocate
-        object_st = Memory_Allocate(ObjectString, 1);
+        object_st = Object_Allocate(ObjectString, ObjectKind_String, params.first);
         assert(object_st);
 
         // .Copy String
@@ -38,9 +47,6 @@ ObjectString* ObjectString_allocate(AllocateParams params) {
         if (params.task & AllocateTask_Initialize) {
             // TODO: assert mandatory params for this section
             //
-            // ((Object*)object_st)->kind = ObjectKind_String;
-            // LinkedList_push(*params.first, (Object*)object_st);
-            Object_init((Object*)object_st, ObjectKind_String, params.first);
             object_st->characters = string_copy.characters;
             object_st->length = string_copy.length;
             object_st->hash = params.hash;
@@ -56,12 +62,9 @@ ObjectString* ObjectString_allocate(AllocateParams params) {
 }
 
 ObjectFunction* ObjectFunction_allocate(ObjectString* function_name, Object** object_head) {
-    ObjectFunction* object_fn = Memory_Allocate(ObjectFunction, 1);
+    ObjectFunction* object_fn = Object_Allocate(ObjectFunction, ObjectKind_Function, object_head);
     assert(object_fn);
 
-    // ((Object*)object_fn)->kind = ObjectKind_Function;
-    // LinkedList_push(parser->objects, (Object*)object_fn);
-    Object_init((Object*)object_fn, ObjectKind_Function, object_head);
     object_fn->arity = 0;
     object_fn->name = function_name;
     object_fn->variable_dependencies_count = 0;
@@ -71,12 +74,9 @@ ObjectFunction* ObjectFunction_allocate(ObjectString* function_name, Object** ob
 }
 
 ObjectValue* ObjectValue_allocate(Object** object_head, Value* value_address) {
-    ObjectValue* object_value = Memory_Allocate(ObjectValue, 1);
+    ObjectValue* object_value = Object_Allocate(ObjectValue, ObjectKind_Heap_Value, object_head);
     assert(object_value);
 
-    // ((Object*)object_value)->kind = ObjectKind_Heap_Value;
-    // LinkedList_push(*object_head, (Object*)object_value);
-    Object_init((Object*)object_value, ObjectKind_Heap_Value, object_head);
     object_value->value_address = value_address;
     object_value->value = value_make_nil(); 
 
@@ -87,17 +87,14 @@ ObjectClosure* ObjectClosure_allocate(ObjectFunction* function, Object** object_
     int item_count = function->variable_dependencies_count;
     ObjectValue** items = NULL;
     if (item_count > 0) {
-       items = Memory_Allocate(ObjectValue*, item_count);
+       items = Memory_Allocate_Count(ObjectValue*, item_count);
        assert(items);
        for (int i = 0; i < item_count; i++) items[i] = NULL;
     }
     
-    ObjectClosure* closure = Memory_Allocate(ObjectClosure, 1);
+    ObjectClosure* closure = Object_Allocate(ObjectClosure, ObjectKind_Closure, object_head);
     assert(closure);
 
-    // ((Object*)closure)->kind =  ObjectKind_Closure;
-    // LinkedList_push(*object_head, (Object*)closure);
-    Object_init((Object*)closure, ObjectKind_Closure, object_head);
     closure->function = function;
     closure->heap_values.items = items;
     closure->heap_values.count = item_count;
@@ -106,12 +103,9 @@ ObjectClosure* ObjectClosure_allocate(ObjectFunction* function, Object** object_
 }
 
 ObjectFunctionNative* ObjectFunctionNative_allocate(FunctionNative* function, Object** object_head, int arity) {
-    ObjectFunctionNative* native = Memory_Allocate(ObjectFunctionNative, 1);
+    ObjectFunctionNative* native = Object_Allocate(ObjectFunctionNative, ObjectKind_Function_Native, object_head);
     assert(native);
     
-    // ((Object*)native)->kind = ObjectKind_Function_Native;
-    // LinkedList_push(*object_head, (Object*)native);
-    Object_init((Object*)native, ObjectKind_Function_Native, object_head);
     native->function = function;
     native->arity = arity;
 
@@ -167,6 +161,15 @@ void ObjectFunction_free(ObjectFunction* function) {
 }
 
 void Object_free(Object* object) {
+#ifdef DEBUG_GC_TRACE
+    const char* object_kind = "Invalid object type!";
+    if (object->kind < ObjectKind_Count)  
+    if (object->kind >= 0) 
+        object_kind = ObjectKind_text[object->kind];
+        
+    printf("--  %p free type '%s'\n", (void*)object, object_kind);
+#endif // DEBUG_GC_TRACE
+
     switch (object->kind)
     {
     case ObjectKind_String: {
@@ -177,7 +180,9 @@ void Object_free(Object* object) {
     case ObjectKind_Function: {
         ObjectFunction* object_fn = (ObjectFunction*)object;
         Bytecode_free(&object_fn->bytecode);
-        ObjectFunction_free(object_fn);
+        ObjectString_free(object_fn->name);
+        Memory_Free(ObjectFunction, object_fn);
+        object_fn = NULL;
     } break;
     case ObjectKind_Heap_Value : {
         Memory_Free(ObjectValue, object);
