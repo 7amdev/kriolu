@@ -1,5 +1,10 @@
 .vscode
 .editorconfig
-build
+build/
+build_gdb/
 kriolu.exe
+codebase/.git
+codebase/.gitignore
+codebase/tests/
+codebase/build/
 DESCRIPTION.md
