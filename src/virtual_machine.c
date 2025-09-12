@@ -611,23 +611,21 @@ static bool VirtualMachine_call_function(VirtualMachine* vm, Value value, int ar
 }
 
 static ObjectValue* VirtualMachine_create_heap_value(VirtualMachine* vm, Value* value_address) {
-    ObjectValue* current = NULL;
-    ObjectValue* previous = NULL;
+    ObjectValue* next = NULL;
     LinkedList_foreach(ObjectValue, vm->heap_values, object_value) {
         if (object_value.curr->value_address == value_address) {
             return object_value.curr;
         }
         if (object_value.curr->value_address < value_address) {
-            current = object_value.curr;
-            previous = object_value.prev;
+            next = object_value.next;
             break;
         }
     }
 
     ObjectValue* new_object_value = ObjectValue_allocate(&vm->objects, value_address);
     if (LinkedList_is_empty(vm->heap_values)) LinkedList_push(vm->heap_values, new_object_value);
-    else if (previous == NULL)                LinkedList_push(vm->heap_values, new_object_value);
-    else                                      LinkedList_insert_after(previous, new_object_value);
+    else if (next == NULL)                    LinkedList_push(vm->heap_values, new_object_value);
+    else                                      LinkedList_insert_after(next, new_object_value);
 
     return new_object_value;
 }

@@ -11,7 +11,7 @@
 #include <stdarg.h>
 
 #include "time.h"
-#include "linked_list.h"
+#include "../codebase/codebase.h"
 
 // 
 // Debug defines
@@ -19,8 +19,8 @@
 
 #define DEBUG_LOG_PARSER
 #define DEBUG_TRACE_INSTRUCTION true
-// #define DEBUG_GC_STRESS
 #define DEBUG_GC_TRACE
+// #define DEBUG_GC_STRESS
 // #define DEBUG_TRACE_EXECUTION
 // #define DEBUG_COMPILER_BYTECODE
 
