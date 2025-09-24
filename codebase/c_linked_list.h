@@ -10,9 +10,10 @@
     (first) = (node);                       \
 } while (0)
 
-#define LinkedList_pop(first, node_out) do {      \
-    if (node_out) (node_out) = (first);           \
-    (first) = (first)->next;                      \
+#define LinkedList_pop(first, node_out) do {        \
+    if ((first) == NULL) break;                       \
+    if (node_out) *(node_out) = *(first);           \
+    (first) = (first)->next;                        \
 } while (0)
 
 // [first_in]  A pointer to the starting Node.
@@ -21,9 +22,9 @@
 #define LinkedList_peek(Type, first_in, offset_in, node_out) do {           \
     Type* loop  = (first_in);                                               \
     int _offset = (offset_in);                                              \
-    for (; _offset > 0 && loop != 0; loop = loop->next, _offset -= 1);   \
+    for (; _offset > 0 && loop != NULL; loop = loop->next, _offset -= 1);      \
     if (_offset != 0) { *(node_out) = (Type){0}; break; }                   \
-    if (loop == 0) { *(node_out) = (Type){0}; break; }                   \
+    if (loop == NULL) { *(node_out) = (Type){0}; break; }                      \
     *(node_out) = *loop;                                                    \
 } while (0)
 
@@ -48,9 +49,3 @@
 // TODO: #define LinkedList_remove_at(...)
 
 #endif // LinkedList_H
-
-
-#ifdef LinkedList_Test_Implementation
-
-
-#endif // LinkedList_Test

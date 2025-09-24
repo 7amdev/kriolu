@@ -22,31 +22,31 @@
 
 #define Queue(Type) struct { Type* first; Type* last; }
 
-#define Queue_Push_Back(first, last, node, node_member_next) do {   \
-    if ((first) == NULL) {                                            \
+#define Queue_push_back_custom(first, last, node, link_name) do {   \
+    if ((first) == NULL) {                                          \
         (first) = (node);                                           \
         (last)  = (node);                                           \
-        (node)->node_member_next = NULL;                            \
+        (node)->link_name = NULL;                                   \
         break;                                                      \
     }                                                               \
-    (node)->node_member_next = NULL;                                \
-    (last)->node_member_next = (node);                              \
-    (last)                   = (node);                              \
+    (node)->link_name = NULL;                                       \
+    (last)->link_name = (node);                                     \
+    (last)            = (node);                                     \
 } while (0)
 
-#define Queue_Pop_Front(first, last, node_member_next) do {         \
+#define Queue_pop_front_custom(first, last, link_name) do {         \
     if ((first) == (last)) {                                        \
         (first) = NULL;                                             \
         (last)  = NULL;                                             \
         break;                                                      \
     }                                                               \
-    (first) = (first)->node_member_next;                            \
+    (first) = (first)->link_name;                                   \
 } while (0)
 
 // Default API
 //
-#define Queue_push_back(first, last, node)  Queue_Push_Back((first), (last), (node), next)
-#define Queue_pop_front(first, last)        Queue_Pop_Front((first), (last), next)
+#define Queue_push_back(first, last, node)  Queue_push_back_custom((first), (last), (node), next)
+#define Queue_pop_front(first, last)        Queue_pop_front_custom((first), (last), next)
 #define Queue_is_empty(first, last) ((first) == (last))
 
 #endif // Queue_H

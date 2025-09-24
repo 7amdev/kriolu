@@ -11,6 +11,8 @@
 #define Stack_Assert assert
 #endif // Stack_Assert
 
+#include <stdbool.h>
+
 #define Stack_Items_Length(items) (sizeof(items) / sizeof(*(items)))
 
 #define Stack_push(stack, item_in, item_out)                                    \
@@ -30,7 +32,9 @@ do {                                                                            
 
 #define Stack_peek(stack, item_out, offset)                         \
 do {                                                                \
+    if (Stack_is_empty(stack)) break;                               \
     int index = (stack)->top - 1 - (offset);                        \
+    if (index < 0) break;                                           \
     Stack_Assert(index >= 0);                                       \
     Stack_Assert(index < (stack)->top);                             \
     if ((item_out) != NULL) *(item_out) = (stack)->items[index];    \
@@ -53,9 +57,9 @@ do {                                                                \
 // Stack Pointer Implementation
 // 
 
-#define StackPointer_count(stack)    (size_t)(  (stack)->top - (stack)->items  )
+#define StackPointer_count(stack)    (int)(  (stack)->top - (stack)->items  )
 #define StackPointer_is_full(stack)  ( ((stack)->top - (stack)->items) == Stack_Items_Length((stack)->items) )
-#define StackPointer_is_empty(stack) ( ((stack)->top - (stack)->items) == 0 )
+#define StackPointer_is_empty(stack) ( (stack)->top == (stack)->items )
 
 #define StackPointer_init(stack)    \
 do {                                \
@@ -68,8 +72,8 @@ do {                                \
 do {                                                        \
     Stack_Assert(!StackPointer_is_full(stack));             \
     *(stack)->top = (item_in);                              \
-    (stack)->top += 1;                                      \
     if (item_out) *(item_out) = *(stack)->top;              \
+    (stack)->top += 1;                                      \
 } while (0)
 
 #define StackPointer_pop(stack, item_out)                   \
@@ -80,8 +84,8 @@ do {                                                        \
 } while (0)
 
 typedef struct {
-    int offset;
-    int *error;
+    int   offset;
+    bool *error;
     const char **error_msg;
 } PeekOptions;
 
@@ -96,13 +100,14 @@ typedef struct {
 do {                                                                    \
     void *addr = (stack)->top - 1 - (options).offset;                   \
     if (addr < (stack)->items || addr >= (stack)->top) {                \
-        if ((options).error) *(options).error = 1;                      \
+        if ((options).error)                                            \
+            *(options).error = true;                                    \
         if ((options).error_msg)                                        \
-        *(options).error_msg = "Out-of-Bounds access lookup.";      \
+            *(options).error_msg = "Out-of-Bounds access lookup.";      \
         break;                                                          \
     }                                                                   \
-    if ((options).error_msg) *(options).error_msg = "";                 \
-    if ((options).error) *(options).error = 0;                          \
+    if ((options).error_msg)    *(options).error_msg = "";              \
+    if ((options).error)        *(options).error = false;               \
     if (item_out) *item_out = *((stack)->top - 1 - (options).offset);   \
 } while (0)
 

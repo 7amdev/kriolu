@@ -5,14 +5,14 @@
 #define DynamicArray_Initial_Capacity 256
 #endif // DynamicArray_Initial_Capacity
 
-#ifndef DynamicArray_Realloc 
+#ifndef DynamicArray_Realloc_Fn 
 #include <stdlib.h>
-#define DynamicArray_Realloc realloc
+#define DynamicArray_Realloc_Fn realloc
 #endif // DynamicArray_Realloc
 
-#ifndef DynamicArray_Free 
+#ifndef DynamicArray_Free_Fn
 #include <stdlib.h>
-#define DynamicArray_Free free
+#define DynamicArray_Free_Fn free
 #endif // DynamicArray_Free
 
 #ifndef DynamicArray_Assert 
@@ -22,7 +22,7 @@
 
 #define DynamicArrayHeader struct { size_t count; size_t capacity; }
 
-#define DynamicArray_ensure_capacity(d_array, items_count)                                          \
+#define DynamicArray_ensure_capacity(d_array, items_count)                         \
 do {                                                                                                \
     size_t new_capacity = (d_array)->count + (items_count);                                         \
     if (new_capacity <= (d_array)->capacity) break;                                                 \
@@ -30,7 +30,7 @@ do {                                                                            
     while (new_capacity > (d_array)->capacity) {                                                    \
         (d_array)->capacity *= 2;                                                                   \
     }                                                                                               \
-    (d_array)->items = DynamicArray_Realloc(                                                        \
+    (d_array)->items = DynamicArray_Realloc_Fn(                                                        \
         (d_array)->items,                                                                           \
         (d_array)->capacity * sizeof(*(d_array)->items)                                             \
     );                                                                                              \
@@ -38,7 +38,7 @@ do {                                                                            
 } while (0)
 
 #define DynamicArray_append(d_array, item)          \
-do {                                                \
+do {                                                         \
     DynamicArray_ensure_capacity((d_array), 1);     \
     (d_array)->items[(d_array)->count] = (item);    \
     (d_array)->count += 1;                          \
@@ -93,6 +93,6 @@ do {                                \
         ( (it).item += 1, (it).i += 1 )                                     \
     )
 
-#define DynamicArray_free(d_array) DynamicArray_Free((d_array)->items)
+#define DynamicArray_free(d_array) DynamicArray_Free_Fn((d_array)->items)
 
 #endif // DynamicArray_H
