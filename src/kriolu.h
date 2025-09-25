@@ -20,7 +20,7 @@
 #define DEBUG_LOG_PARSER
 #define DEBUG_TRACE_INSTRUCTION true
 #define DEBUG_GC_TRACE
-// #define DEBUG_GC_STRESS
+#define DEBUG_GC_STRESS
 // #define DEBUG_TRACE_EXECUTION
 // #define DEBUG_COMPILER_BYTECODE
 
@@ -359,8 +359,9 @@ static const char* ObjectKind_text[] = {
 };
 
 struct Object {
-    ObjectKind kind;
-    Object* next;
+    ObjectKind  kind;
+    bool        is_marked;
+    Object     *next;
 };
 
 typedef struct {
@@ -468,7 +469,7 @@ typedef struct {
 } Entry;
 
 struct HashTable {
-    Entry* entries;
+    Entry* items;
     int count;
     int capacity;
 };
@@ -879,7 +880,7 @@ void  stack_free(StackValue* stack);
 
 // TODO: rename 'Memory_allocate' to 'Memory_update' ???
 void* Memory_allocate(void* pointer, size_t old_size, size_t new_size);
-void  Memory_register(size_t* bytes_total_source);
+void  Memory_register(size_t* bytes_total_source, VirtualMachine *vm, Parser *parser);
 void  Memory_mark_object(Object* object);
 void  Memory_mark_value(Value value);
 void  Memory_free_objects();

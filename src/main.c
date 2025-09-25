@@ -76,6 +76,7 @@ int main(int argc, const char* argv[]) {
 
     Parser parser;
     VirtualMachine vm = { 0 };
+
     Parser_Init(&parser, source_code);
     VirtualMachine_init(&vm);
 

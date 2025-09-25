@@ -30,6 +30,8 @@ void VirtualMachine_init(VirtualMachine* vm) {
     hash_table_init(&vm->global_database);
     hash_table_init(&vm->string_database);
 
+    Memory_register(NULL, vm, NULL);
+
     VirtualMachine_define_function_native(vm, "rilogio", &FunctionNative_clock, 0);
 }
 

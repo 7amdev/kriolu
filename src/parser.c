@@ -69,6 +69,8 @@ void parser_init(Parser* parser, const char* source_code, ParserInitParams param
 
     StackBreak_init(&parser->breakpoints);
     StackBlock_init(&parser->blocks);
+
+    Memory_register(NULL, NULL, parser);
 }
 
 ObjectFunction* parser_parse(Parser* parser, ArrayStatement** return_statements, HashTable* string_database, Object** object_head) {

@@ -1,13 +1,14 @@
 #include "kriolu.h"
 
-
 #define Object_Allocate(Type, object_kind, object_head) \
     (Type*)Object_allocate(object_kind, sizeof(Type), object_head)
 
 Object* Object_allocate(ObjectKind kind, size_t size, Object** object_head) {
     Object* object = (Object*) Memory_allocate(NULL, 0, size);
     assert(object);
-    object->kind = kind;
+    
+    object->kind      = kind;
+    object->is_marked = false;
     if (object_head != NULL) LinkedList_push(*object_head, object);
 
 #ifdef DEBUG_GC_TRACE

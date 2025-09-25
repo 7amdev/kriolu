@@ -29,14 +29,14 @@ static bool   hash_table_is_an_empty_entry(Entry* entry);
 static bool   hash_table_is_a_tombstone_entry(Entry* entry);
 
 void hash_table_init(HashTable* table) {
-    table->entries  = NULL;
+    table->items  = NULL;
     table->count    = 0;
     table->capacity = 0;
 }
 
 void hash_table_copy(HashTable* from, HashTable* to) {
     for (int i = 0; i < from->capacity; i++) {
-        Entry* entry = &from->entries[i];
+        Entry* entry = &from->items[i];
         if (entry->key != NULL) {
             hash_table_set_value(to, entry->key, entry->value);
         }
@@ -49,7 +49,7 @@ bool hash_table_set_value(HashTable* table, ObjectString* key, Value value) {
         hash_table_adjust_capacity(table, capacity);
     }
 
-    Entry* entry = hash_table_find_entry_by_key(table->entries, key, table->capacity);
+    Entry* entry = hash_table_find_entry_by_key(table->items, key, table->capacity);
     bool is_new_key = (entry->key == NULL);
     if (hash_table_is_an_empty_entry(entry))
         table->count += 1;
@@ -64,7 +64,7 @@ bool hash_table_get_value(HashTable* table, ObjectString* key, Value* value_out)
     if (table->count == 0)
         return false;
 
-    Entry* entry = hash_table_find_entry_by_key(table->entries, key, table->capacity);
+    Entry* entry = hash_table_find_entry_by_key(table->items, key, table->capacity);
     if (entry == NULL) return false;
     if (entry->key == NULL) return false;
 
@@ -78,7 +78,7 @@ ObjectString* hash_table_get_key(HashTable* table, String string, uint32_t hash)
 
     uint32_t index = hash % table->capacity;
     for (;;) {
-        Entry* entry = &table->entries[index];
+        Entry* entry = &table->items[index];
         if (hash_table_is_an_empty_entry(entry))
             return NULL;
 
@@ -98,7 +98,7 @@ bool hash_table_delete(HashTable* table, ObjectString* key) {
     if (table->count == 0)
         return false;
 
-    Entry* entry = hash_table_find_entry_by_key(table->entries, key, table->capacity);
+    Entry* entry = hash_table_find_entry_by_key(table->items, key, table->capacity);
 
     if (hash_table_is_a_tombstone_entry(entry) ||
         hash_table_is_an_empty_entry(entry))
@@ -109,7 +109,7 @@ bool hash_table_delete(HashTable* table, ObjectString* key) {
 }
 
 void hash_table_free(HashTable* table) {
-    Memory_FreeArray(Entry, table->entries, table->count);
+    Memory_FreeArray(Entry, table->items, table->count);
     hash_table_init(table);
 }
 
@@ -250,7 +250,7 @@ static void hash_table_adjust_capacity(HashTable* table, int new_capacity) {
     //
     table->count = 0;
     for (int i = 0; i < table->capacity; i++) {
-        Entry* entry = &table->entries[i];
+        Entry* entry = &table->items[i];
         if (entry->key == NULL)
             continue;
 
@@ -260,7 +260,7 @@ static void hash_table_adjust_capacity(HashTable* table, int new_capacity) {
         table->count += 1;
     }
 
-    Memory_FreeArray(Entry, table->entries, table->capacity);
-    table->entries  = entries;
+    Memory_FreeArray(Entry, table->items, table->capacity);
+    table->items  = entries;
     table->capacity = new_capacity;
 }
