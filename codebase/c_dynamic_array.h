@@ -80,18 +80,26 @@ do {                                \
 //      DynamicArray_append(&persons, p2);
 //
 //      DynamicArray_foreach(Person, &persons, person) {
-//          printf("Index:  %zu\n", person.item->i);
+//          printf("Index:  %zu\n", person.i);
 //          printf("Name:   %s\n",  person.item->name);
 //          printf("Age:    %d\n",  person.item->age);
 //          printf("Gender: %d\n",  person.item->gender);
 //      }
 //
-#define DynamicArray_foreach(Type, d_array, it)                             \
-    for (                                                                   \
-        struct t { Type *item; size_t i; } (it) = { (d_array)->items, 0};   \
-        (it).i < (d_array)->count;                                          \
-        ( (it).item += 1, (it).i += 1 )                                     \
+#define DynamicArray_foreach(Type, d_array, it)                              \
+    for (                                                                    \
+        struct t__ { Type *item; size_t i; } (it) = { (d_array)->items, 0};  \
+        (it).item < (d_array)->items + (d_array)->count;                                           \
+        ( (it).item += 1, (it).i = (it).item - (d_array)->items )                                      \
     )
+#define DynamicArray_push(d_array, item)    \
+    DynamicArray_append((d_array), (item)) 
+
+#define DynamicArray_pop(d_array, item_out) do {                                \
+    if ((d_array)->count == 0) break;                                           \
+    (d_array)->count -= 1;                                                      \
+    if ((item_out) != NULL) *(item_out) = (d_array)->items[(d_array)->count];   \
+} while (0)
 
 #define DynamicArray_free(d_array) DynamicArray_Free_Fn((d_array)->items)
 
