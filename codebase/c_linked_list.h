@@ -11,7 +11,7 @@
 } while (0)
 
 #define LinkedList_pop(first, node_out) do {        \
-    if ((first) == NULL) break;                       \
+    if ((first) == NULL) break;                     \
     if (node_out) *(node_out) = *(first);           \
     (first) = (first)->next;                        \
 } while (0)
@@ -22,9 +22,9 @@
 #define LinkedList_peek(Type, first_in, offset_in, node_out) do {           \
     Type* loop  = (first_in);                                               \
     int _offset = (offset_in);                                              \
-    for (; _offset > 0 && loop != NULL; loop = loop->next, _offset -= 1);      \
+    for (; _offset > 0 && loop != NULL; loop = loop->next, _offset -= 1);   \
     if (_offset != 0) { *(node_out) = (Type){0}; break; }                   \
-    if (loop == NULL) { *(node_out) = (Type){0}; break; }                      \
+    if (loop == NULL) { *(node_out) = (Type){0}; break; }                   \
     *(node_out) = *loop;                                                    \
 } while (0)
 
@@ -36,11 +36,11 @@
     (base_node)->next = (new_node);                                     \
 } while (0)
 
-#define LinkedList_foreach(Type, node, it)                                                          \
-    for (                                                                                           \
-        struct t { Type* curr; Type* next; int i; } it = { (node), ((node) ? (node)->next: 0), 0};  \
-        (it).curr != 0;                                                                             \
-        (it).curr = (it).curr->next, (it).next = ((it).curr) ? (it).curr->next : 0, (it).i += 1     \
+#define LinkedList_foreach(Type, node, it)                                                                                  \
+    for (                                                                                                                   \
+        struct t__ { Type *prev; Type* curr; Type* next; int i; } it = { NULL, (node), ((node) ? (node)->next : 0), 0};     \
+        (it).curr != 0;                                                                                                     \
+        (it).prev = (it).curr, (it).curr = (it).curr->next, (it).next = ((it).curr) ? (it).curr->next : 0, (it).i += 1      \
     )
 
 #define LinkedList_is_empty(first) (first == 0)
