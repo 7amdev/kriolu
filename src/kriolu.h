@@ -308,7 +308,6 @@ typedef struct
     ArrayLineNumber lines;
 } Bytecode;
 
-
 #define Compiler_CompileInstruction_1Byte(bytecode, opcode, line) Bytecode_insert_instruction_1byte(bytecode, opcode, line, DEBUG_TRACE_INSTRUCTION)
 #define Compiler_CompileInstruction_2Bytes(bytecode, opcode, operand, line) Bytecode_insert_instruction_2bytes(bytecode, opcode, operand, line, DEBUG_TRACE_INSTRUCTION)
 #define Compiler_CompileInstruction_Constant(bytecode, value, line) Bytecode_insert_instruction_constant(bytecode, value, line, DEBUG_TRACE_INSTRUCTION)
@@ -878,11 +877,10 @@ void  stack_free(StackValue* stack);
 #define Memory_FreeArray(type, pointer, old_count) \
     Memory_allocate(pointer, sizeof(type) * old_count, 0)
 
-// TODO: rename 'Memory_allocate' to 'Memory_update' ???
-void* Memory_allocate(void* pointer, size_t old_size, size_t new_size);
 void  Memory_register(size_t* bytes_total_source, VirtualMachine *vm, Parser *parser);
-void  Memory_mark_object(Object* object);
-void  Memory_mark_value(Value value);
+void* Memory_allocate(void* pointer, size_t old_size, size_t new_size);
+void  Memory_mark_object_gray(Object* object);
+void  Memory_mark_value_gray(Value value);
 void  Memory_free_objects();
 
 //

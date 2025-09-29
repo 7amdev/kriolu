@@ -128,9 +128,7 @@ void Object_print(Object* object) {
     case ObjectKind_String: {
         ObjectString* string = ((ObjectString*)object);
         printf("%.10s", string->characters);
-        if (string->length > 10)
-            printf("...");
-
+        if (string->length > 10) printf("...");
     } break;
     case ObjectKind_Function: {
         ObjectFunction* function = (ObjectFunction*)object;
