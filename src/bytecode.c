@@ -63,27 +63,23 @@ int Bytecode_insert_instruction_constant(Bytecode* bytecode, Value value, int li
     assert(value_index > -1);
 
     if (value_index < 256) {
-        // int opcode_index = bytecode->instructions.count;
         return Bytecode_insert_instruction_2bytes(
             bytecode,
-            OpCode_Stack_Push_Literal,       // OpCode
-            (uint8_t)value_index,  // Operand
+            OpCode_Stack_Push_Literal,      // OpCode
+            (uint8_t)value_index,           // Operand
             line_number,
             DEBUG_TRACE_INSTRUCTION
         );
-        // if (debug_trace_on) Bytecode_disassemble_instruction(bytecode, opcode_index);
-        // return result;
     }
 
     uint8_t byte1 = (value_index >> 0 & 0xff);
     uint8_t byte2 = (value_index >> 8 & 0xff);
     uint8_t byte3 = (value_index >> 16 & 0xff);
 
-
     return Bytecode_insert_instruction_4bytes(
         bytecode,
         OpCode_Stack_Push_Literal_Long,     // OpCode
-        byte1, byte2, byte3,      // Operand
+        byte1, byte2, byte3,                // Operand
         line_number,
         DEBUG_TRACE_INSTRUCTION
     );
@@ -119,7 +115,6 @@ void Bytecode_insert_instruction_closure(Bytecode* bytecode, Value value, int li
 }
 
 // Jumps Forward
-// TODO: implement custom Debug_Trace
 int Bytecode_insert_instruction_jump(Bytecode* bytecode, OpCode opcode, int line, bool debug_trace_on) {
     int instruction_start = Bytecode_insert_instruction_1byte(bytecode, opcode, line, false);
     Bytecode_insert_instruction_1byte(bytecode, 0xff, line, false);
@@ -308,7 +303,7 @@ int Bytecode_disassemble_instruction(Bytecode* bytecode, int offset)
     if (opcode == OpCode_Copy_From_Heap_To_Stack)
         return Bytecode_debug_instruction_local(bytecode, "OPCODE_COPY_FROM_HEAP_TO_STACK", (offset + 2));
     if (opcode == OpCode_Move_Value_To_Heap)
-        return Bytecode_debug_instruction_byte("OpCode_Move_Value_To_Heap", (offset + 1));
+        return Bytecode_debug_instruction_byte("OPCODE_MOVE_VALUE_TO_HEAP", (offset + 1));
     if (opcode == OpCode_Call_Function)
         return Bytecode_debug_instruction_call(bytecode, "OPCODE_CALL_FUNCTION", (offset + 2));
     if (opcode == OpCode_Negation)

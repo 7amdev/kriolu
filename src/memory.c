@@ -17,6 +17,8 @@
 //    3.1 Pick gray object. Turn any white objects that the object mentions to gray
 //    3.2 Mark the original object Black
 
+#define Memory_Threshold_Growth_Factor 2
+
 typedef struct {
     DynamicArrayHeader;
     Object** items;
@@ -34,6 +36,7 @@ static void Memory_mark_roots();
 static void Memory_mark_object_black(Object *object);       // TODO: delete function
 static void Memory_mark_values_gray(ArrayValue *values);
 static void Memory_blacken_objects();
+static void Memory_sweep_string_database();
 static void Memory_sweep();
 static void Memory_free_object(Object* object);
 
@@ -89,7 +92,7 @@ void Memory_mark_object_gray(Object* object) {
     DynamicArray_push(&M_Greys, object);
 
 #ifdef DEBUG_GC_TRACE
-    printf("-- '%p' mark ", (void*)object);
+    printf("--   '%p' mark ", (void*)object);
     Object_print(object);
     printf("\n");
 #endif // DEBUG_GC_TRACE
@@ -110,12 +113,24 @@ void Memory_free_objects() {
 static void Memory_collect_garbage() {
 #ifdef DEBUG_GC_TRACE
     printf("-- Garbage Collector::Begin\n");
+    size_t size_before = *M_bytes_total;
 #endif // DEBUG_GC_TRACE
 
     Memory_mark_roots();        // NOTE: Mark objects as 'Gray'.
     Memory_blacken_objects();   //       Mark objects as 'Black'
+    Memory_sweep_string_database();
+    Memory_sweep();
+
+    bytes_threshold = *M_bytes_total * Memory_Threshold_Growth_Factor;
 
 #ifdef DEBUG_GC_TRACE
+    printf(
+        "--   Collected '%zu' bytes from (from '%zu' to '%zu') next at '%zu'\n", 
+        size_before - *M_bytes_total, 
+        size_before, 
+        *M_bytes_total, 
+        bytes_threshold
+    );
     printf("-- Garbage Collector::End\n");
 #endif // DEBUG_GC_TRACE
 }
@@ -151,8 +166,10 @@ static void Memory_mark_roots() {
 
     // Mark Parser's functions chains
     // 
-    LinkedList_foreach(Function, M_parser->function, function) {
-        Memory_mark_object_gray((Object*)function.curr->object);
+    if (M_parser) {
+        LinkedList_foreach(Function, M_parser->function, function) {
+            Memory_mark_object_gray((Object*)function.curr->object);
+        }
     }
 }
 
@@ -192,11 +209,49 @@ static void Memory_blacken_objects() {
         }
 
 #ifdef DEBUG_GC_TRACE
-    printf("-- '%p' blacken ", (void*)object);
+    printf("--   '%p' blacken ", (void*)object);
     Object_print(object);
     printf("\n");
 #endif // DEBUG_GC_TRACE
     }
+}
+
+static void Memory_sweep_string_database() {
+    for (int i = 0; i < M_vm->string_database.capacity; i++) {
+        Entry *entry = &M_vm->string_database.items[i];
+        if (entry->key != NULL) 
+        if (entry->key->object.is_marked == false) 
+        {
+            hash_table_delete(&M_vm->string_database, entry->key);
+        }
+    }
+}
+
+static void Memory_sweep() {
+    LinkedList_foreach(Object, M_vm->objects, object) {
+        if (object.curr->is_marked) {
+            object.curr->is_marked = false;
+            continue;
+        }
+        if (object.prev == NULL) M_vm->objects = object.curr->next;
+        else object.prev->next = object.curr->next;
+        
+        Object_free(object.curr);
+    }
+    //
+    // OR 
+    //
+    // Object *previous = NULL;
+    // LinkedList_foreach(Object, M_vm->objects, object) {
+    //     Object* current = object.curr;
+    //     if (current->is_marked) {
+    //         previous = current;
+    //         continue;
+    //     } 
+    //
+    //     if (previous == NULL) M_vm->objects = current->next;
+    //     else previous->next = current->next;
+    // }
 }
 
 // TODO: delete function
@@ -234,8 +289,13 @@ static void Memory_mark_values_gray(ArrayValue *values) {
     }
 }
 
-static void Memory_sweep() {
+static void Memory_free_object(Object* object) {
 }
 
-static void Memory_free_object(Object* object) {
+void Memory_transaction_push(Value value) {
+    stack_value_push(&M_vm->stack_value, value);
+}
+
+void Memory_transaction_pop() {
+    stack_value_pop(&M_vm->stack_value);
 }

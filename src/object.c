@@ -17,7 +17,7 @@ Object* Object_allocate(ObjectKind kind, size_t size, Object** object_head) {
     if (object->kind < ObjectKind_Count)  
         object_kind = ObjectKind_text[object->kind];
         
-    printf("--  %p allocate %zu byte(s) for '%s'\n", (void*)object, size, object_kind);
+    printf("++ '%p' allocate %zu byte(s) for '%s'\n", (void*)object, size, object_kind);
 #endif // DEBUG_GC_TRACE
 
     return object;
@@ -38,6 +38,11 @@ ObjectString* ObjectString_allocate(AllocateParams params) {
         // .Allocate
         object_st = Object_Allocate(ObjectString, ObjectKind_String, params.first);
         assert(object_st);
+        object_st->characters = NULL; 
+        object_st->length = 0;
+        object_st->hash = 0; 
+        
+        Memory_transaction_push(value_make_object_string(object_st));
 
         // .Copy String
         String string_copy = params.string;
@@ -57,6 +62,8 @@ ObjectString* ObjectString_allocate(AllocateParams params) {
         // TODO: assert mandatory params for this section
         if (params.task & AllocateTask_Intern)
             hash_table_set_value(params.table, object_st, value_make_nil());
+        
+        Memory_transaction_pop();
     }
 
     return object_st;
@@ -119,7 +126,7 @@ void Object_print_function(ObjectFunction* function) {
         return;
     }
 
-    printf("<fn %s>", function->name->characters);
+    printf("<fn '%s'>", function->name->characters);
 }
 
 void Object_print(Object* object) {
@@ -127,7 +134,7 @@ void Object_print(Object* object) {
     {
     case ObjectKind_String: {
         ObjectString* string = ((ObjectString*)object);
-        printf("%.10s", string->characters);
+        printf("<string '%.10s'>", string->characters);
         if (string->length > 10) printf("...");
     } break;
     case ObjectKind_Function: {
@@ -148,7 +155,7 @@ void Object_print(Object* object) {
 }
 
 void ObjectString_free(ObjectString* object_st) {
-    Memory_Free(char*, object_st->characters);
+    // Memory_Free(char*, object_st->characters);
     Memory_Free(ObjectString, object_st);
     object_st = NULL;
 }
@@ -166,20 +173,23 @@ void Object_free(Object* object) {
     if (object->kind >= 0) 
         object_kind = ObjectKind_text[object->kind];
         
-    printf("--  %p free type '%s'\n", (void*)object, object_kind);
+    printf("--   '%p' free type '%s'\n", (void*)object, object_kind);
 #endif // DEBUG_GC_TRACE
 
     switch (object->kind)
     {
     case ObjectKind_String: {
         ObjectString* object_st = (ObjectString*)object;
-        Memory_FreeArray(char, object_st->characters, object_st->length + 1);
-        ObjectString_free(object_st);
+        if (object_st->characters != NULL) {
+            Memory_FreeArray(char, object_st->characters, object_st->length + 1);
+        };
+        Memory_Free(ObjectString, object_st);
+        // ObjectString_free(object_st);
     } break;
     case ObjectKind_Function: {
         ObjectFunction* object_fn = (ObjectFunction*)object;
         Bytecode_free(&object_fn->bytecode);
-        ObjectString_free(object_fn->name);
+        // ObjectString_free(object_fn->name);
         Memory_Free(ObjectFunction, object_fn);
         object_fn = NULL;
     } break;
@@ -193,7 +203,8 @@ void Object_free(Object* object) {
         //
         ObjectClosure* object_cl = (ObjectClosure*)object;
         Memory_FreeArray(ObjectValue*, object_cl->heap_values.items, object_cl->heap_values.count);
-        Memory_Free(ObjectClosure, (ObjectClosure*)object);
+        Memory_Free(ObjectClosure, object);
+        // Memory_Free(ObjectClosure, (ObjectClosure*)object);
         object = NULL;
     } break;
     case ObjectKind_Function_Native: {

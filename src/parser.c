@@ -58,14 +58,16 @@ void parser_init(Parser* parser, const char* source_code, ParserInitParams param
     parser->interpolation_count_value_pushed = 0;
     parser->continue_jump_to = -1;
 
+    hash_table_init(&parser->table_strings);
     parser->string_database = params.string_database;
     if (parser->string_database == NULL) {
-        hash_table_init(&parser->table_strings);
         parser->string_database = &parser->table_strings;
     }
 
+    parser->objects = NULL;
     parser->object_head = params.object_head;
-    if (parser->object_head == NULL) parser->object_head = &parser->objects;
+    if (parser->object_head == NULL)  
+        parser->object_head = &parser->objects;
 
     StackBreak_init(&parser->breakpoints);
     StackBlock_init(&parser->blocks);
@@ -92,11 +94,15 @@ ObjectFunction* parser_parse(Parser* parser, ArrayStatement** return_statements,
 
     ObjectFunction* compiled_script = parser_end_function(parser, &function);
 
-    if (return_statements != NULL) *return_statements = statements;
-    if (string_database != NULL)   *string_database = *parser->string_database;
-    if (object_head != NULL)       *object_head = parser->objects;
+    if (return_statements != NULL) *return_statements =  statements;
+    if (string_database   != NULL) *string_database   = *parser->string_database;
+    if (object_head       != NULL) *object_head       =  parser->objects;
 
-    return parser->had_error ? NULL : compiled_script;
+    return (
+        parser->had_error 
+        ? NULL 
+        : compiled_script
+    );
 }
 
 static void parser_advance(Parser* parser)
@@ -274,7 +280,11 @@ static void parser_end_block(Parser* parser, BlockType block_type) {
         if (StackBlock_is_empty(&parser->blocks)) break;
         if (breakpoint.block_depth < top_block_index) break;
 
-        Compiler_PatchInstructionJump(parser_get_current_bytecode(parser), breakpoint.operand_index);
+        Compiler_PatchInstructionJump(
+            parser_get_current_bytecode(parser), 
+            breakpoint.operand_index
+        );
+
         StackBreak_pop(breakpoints);
     }
 
@@ -685,13 +695,22 @@ static int parser_parse_identifier(Parser* parser, const char* error_message) {
             .task = AllocateTask_Check_If_Interned | AllocateTask_Copy_String | AllocateTask_Initialize | AllocateTask_Intern,
             .string = source_string,
             .hash = source_hash,
-            .first = &parser->objects,
+            // .first = &parser->objects,
+            .first = parser->object_head,
             .table = parser->string_database
         );
         Value value_string = value_make_object_string(identifier_string);
-        value_index = Compiler_CompileValue(parser_get_current_bytecode(parser), value_string);
-        if (value_index > UINT8_MAX)
-            parser_error(parser, &parser->token_current, "Too many constants.");
+        Memory_transaction_push(value_string);
+        {
+            value_index = Compiler_CompileValue(
+                parser_get_current_bytecode(parser), 
+                value_string
+            );
+
+            if (value_index > UINT8_MAX)
+                parser_error(parser, &parser->token_current, "Too many constants.");
+        }
+        Memory_transaction_pop();
     } else {  // Parse Local Function Name 
         if (StackLocal_is_full(&parser->function->locals)) {
             parser_error(parser, &parser->token_previous, "Too many local variables in a scope.");
@@ -784,10 +803,17 @@ static ObjectFunction* parser_parse_function_paramenters_and_body(Parser* parser
         ),
         .string = source_string,
         .hash = source_hash,
-        .first = &parser->objects,
+        // .first = &parser->objects,
+        .first = parser->object_head,
         .table = parser->string_database
     );
-    parser_init_function(parser, &function, function_kind, function_name);
+
+    Memory_transaction_push(value_make_object_string(function_name));
+    {
+        parser_init_function(parser, &function, function_kind, function_name);
+    }
+    Memory_transaction_pop();
+
     parser_begin_scope(parser);
 
     parser_consume(parser, Token_Left_Parenthesis, "Expect a '(' after the function name.");
@@ -820,43 +846,37 @@ static ObjectFunction* parser_parse_function_paramenters_and_body(Parser* parser
 
     ObjectFunction* object_fn = parser_end_function(parser, &function);
 
-    Compiler_CompileInstruction_Closure(
-        parser_get_current_bytecode(parser),
-        value_make_object(object_fn),
-        parser->token_previous.line_number
-    );
-
-    for (int i = 0; i < object_fn->variable_dependencies_count; i++) {
-        // Compile Instruction
-        //
-        Bytecode_insert_instruction_1byte(
+    Memory_transaction_push(value_make_object(object_fn));
+    {
+        Compiler_CompileInstruction_Closure(
             parser_get_current_bytecode(parser),
-            function.variable_dependencies.items[i].location,
-            parser->token_previous.line_number,
-            false
+            value_make_object(object_fn),
+            parser->token_previous.line_number
         );
-        Bytecode_insert_instruction_1byte(
-            parser_get_current_bytecode(parser),
-            (uint8_t)function.variable_dependencies.items[i].index,
-            parser->token_previous.line_number,
-            false
-        );
-
-        // Compiler_CompileInstruction_1Byte(
-        //     parser_get_current_bytecode(parser),
-        //     function.variable_dependencies.items[i].location,
-        //     parser->token_previous.line_number
-        // );
-        //
-        // Compiler_CompileInstruction_1Byte(
-        //     parser_get_current_bytecode(parser),
-        //     (uint8_t)function.variable_dependencies.items[i].index,
-        //     parser->token_previous.line_number
-        // );
-    }
+    
+        for (int i = 0; i < object_fn->variable_dependencies_count; i++) {
+            // Compile 1(one) Byte Instruction
+            //
+            Bytecode_insert_instruction_1byte(
+                parser_get_current_bytecode(parser),
+                function.variable_dependencies.items[i].location,
+                parser->token_previous.line_number,
+                false
+            );
+    
+            // Compile 1(one) Byte Instruction
+            //
+            Bytecode_insert_instruction_1byte(
+                parser_get_current_bytecode(parser),
+                (uint8_t)function.variable_dependencies.items[i].index,
+                parser->token_previous.line_number,
+                false
+            );
+        }
+    } 
+    Memory_transaction_pop();
 
     return object_fn;
-
 }
 
 static Statement* parser_parse_declaration_variable(Parser* parser) {
@@ -896,7 +916,8 @@ static Statement* parser_parse_declaration_variable(Parser* parser) {
                 AllocateTask_Intern),
             .string = source_string,
             .hash = source_hash,
-            .first = &parser->objects,
+            // .first = &parser->objects,
+            .first = parser->object_head,
             .table = parser->string_database
         );
 
@@ -941,42 +962,51 @@ static Statement* parser_parse_declaration_variable(Parser* parser) {
         ),
         .string = source_string,
         .hash = source_hash,
-        .first = &parser->objects,
+        // .first = &parser->objects,
+        .first = parser->object_head,
         .table = parser->string_database
     );
 
     Value value_string = value_make_object_string(statement.variable_declaration.identifier);
-    int value_index = Compiler_CompileValue(parser_get_current_bytecode(parser), value_string);
-    if (value_index > UINT8_MAX) {
-        parser_error(parser, &parser->token_current, "Too many constants.");
-        global_index = 0;
-    } else {
-        global_index = value_index;
-    }
+    Memory_transaction_push(value_string);
+    {
+        int value_index = Compiler_CompileValue(
+            parser_get_current_bytecode(parser), 
+            value_string
+        );
 
-    // Check for assignment
-    // 
-    if (parser_match_then_advance(parser, Token_Equal)) {
-        statement.variable_declaration.rhs = parser_parse_expression(parser, OperatorPrecedence_Assignment);
-    } else {
-        Compiler_CompileInstruction_1Byte(
+        if (value_index > UINT8_MAX) {
+            parser_error(parser, &parser->token_current, "Too many constants.");
+            global_index = 0;
+        } else {
+            global_index = value_index;
+        }
+
+        // Check for assignment
+        // 
+        if (parser_match_then_advance(parser, Token_Equal)) {
+            statement.variable_declaration.rhs = parser_parse_expression(parser, OperatorPrecedence_Assignment);
+        } else {
+            Compiler_CompileInstruction_1Byte(
+                parser_get_current_bytecode(parser),
+                OpCode_Stack_Push_Literal_Nil,
+                parser->token_previous.line_number
+            );
+            statement.variable_declaration.rhs = expression_allocate(expression_make_nil());
+        }
+
+        parser_consume(parser, Token_Semicolon, "Expected ';' after expression.");
+
+        // Define Global Varible
+        //
+        Compiler_CompileInstruction_2Bytes(
             parser_get_current_bytecode(parser),
-            OpCode_Stack_Push_Literal_Nil,
+            OpCode_Define_Global,
+            global_index,
             parser->token_previous.line_number
         );
-        statement.variable_declaration.rhs = expression_allocate(expression_make_nil());
     }
-
-    parser_consume(parser, Token_Semicolon, "Expected ';' after expression.");
-
-    // Define Global Varible
-    //
-    Compiler_CompileInstruction_2Bytes(
-        parser_get_current_bytecode(parser),
-        OpCode_Define_Global,
-        global_index,
-        parser->token_previous.line_number
-    );
+    Memory_transaction_pop();
 
     return statement_allocate(statement);
 }
@@ -1171,14 +1201,24 @@ static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bo
                 AllocateTask_Intern),
             .string = source_string,
             .hash = source_hash,
-            .first = &parser->objects,
+            // .first = &parser->objects,
+            .first = parser->object_head,
             .table = parser->string_database
         );
 
         Value v_string = value_make_object(string);
         Expression e_string = expression_make_string(string);
 
-        Compiler_CompileInstruction_Constant(parser_get_current_bytecode(parser), v_string, parser->token_previous.line_number);
+        Memory_transaction_push(v_string);
+        {
+            Compiler_CompileInstruction_Constant(
+                parser_get_current_bytecode(parser),
+                v_string,
+                parser->token_previous.line_number
+            );
+        }
+        Memory_transaction_pop();
+
         return expression_allocate(e_string);
     }
 
@@ -1198,7 +1238,8 @@ static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bo
                     AllocateTask_Intern),
                 .string = source_string,
                 .hash = source_hash,
-                .first = &parser->objects,
+                // .first = &parser->objects,
+                .first = parser->object_head,
                 .table = parser->string_database
             );
 
@@ -1208,7 +1249,15 @@ static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bo
             // Tracks on many values have it pushed to the stack on runtime.
             //
             parser->interpolation_count_value_pushed += 1;
-            Compiler_CompileInstruction_Constant(parser_get_current_bytecode(parser), v_string, parser->token_previous.line_number);
+            Memory_transaction_push(v_string);
+            {
+                Compiler_CompileInstruction_Constant(
+                    parser_get_current_bytecode(parser), 
+                    v_string, 
+                    parser->token_previous.line_number
+                );
+            }
+            Memory_transaction_pop();
 
             parser->interpolation_count_nesting += 1;
             if (parser->token_current.kind != Token_String_Interpolation)
@@ -1285,7 +1334,8 @@ static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bo
             ),
             .string = source_string,
             .hash = source_hash,
-            .first = &parser->objects,
+            // .first = &parser->objects,
+            .first = parser->object_head,
             .table = parser->string_database
         );
 
@@ -1309,18 +1359,22 @@ static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bo
             opcode_read = OpCode_Read_Global;
 
             Value value_string = value_make_object_string(variable_name);
-            int value_index = Compiler_CompileValue(
-                parser_get_current_bytecode(parser),
-                value_string
-            );
+            Memory_transaction_push(value_string);
+            {
+                int value_index = Compiler_CompileValue(
+                    parser_get_current_bytecode(parser),
+                    value_string
+                );
 
-            // TODO: Support for more than 256 value in a Scope
-            if (value_index <= UINT8_MAX) {
-                operand = value_index;
-            } else {
-                parser_error(parser, &parser->token_current, "Too many constants.");
-                operand = 0;
+                // TODO: Support for more than 256 value in a Scope
+                if (value_index <= UINT8_MAX) {
+                    operand = value_index;
+                } else {
+                    parser_error(parser, &parser->token_current, "Too many constants.");
+                    operand = 0;
+                }
             }
+            Memory_transaction_pop();
         }
 
         if (local_found && local_found->scope_depth == -1)
@@ -1595,15 +1649,15 @@ static void parser_end_scope(Parser* parser) {
 }
 
 static void parser_init_function(Parser* parser, Function* function, FunctionKind function_kind, ObjectString* function_name) {
-    ObjectFunction* object_fn = ObjectFunction_allocate(function_name, &parser->objects);
+    // ObjectFunction* object_fn = ObjectFunction_allocate(function_name, &parser->objects);
+    ObjectFunction* object_fn = ObjectFunction_allocate(function_name, parser->object_head);
 
     function->function_kind = function_kind;
-    function->object = NULL;
-    function->object = object_fn;
-    function->depth = 0;
+    function->object        = NULL;
+    function->object        = object_fn;
+    function->depth         = 0;
     StackLocal_init(&function->locals);
-    StackLocal_push(&function->locals, (Token) { 0 }, 0, LocalAction_Default);
-    ArrayLocalMetadata_init(&function->variable_dependencies, 0);
+    StackLocal_push(&function->locals, (Token) { 0 }, 0, LocalAction_Default); ArrayLocalMetadata_init(&function->variable_dependencies, 0);
     LinkedList_push(parser->function, function);
 }
 
@@ -1622,8 +1676,8 @@ static ObjectFunction* parser_end_function(Parser* parser, Function* function) {
         parser->token_previous.line_number
     );
 
-    // /NOTE: I dont need to free(popped_function), because its a 
-    //        stack value and it will be discaded by the caller function when returned.
+    ///NOTE: I dont need to free(popped_function), because its a 
+    //       stack value and it will be discaded by the caller function when returned.
     Function* popped_function = NULL;
     LinkedList_pop(parser->function, popped_function);
 

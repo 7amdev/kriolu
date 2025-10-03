@@ -882,6 +882,8 @@ void* Memory_allocate(void* pointer, size_t old_size, size_t new_size);
 void  Memory_mark_object_gray(Object* object);
 void  Memory_mark_value_gray(Value value);
 void  Memory_free_objects();
+void  Memory_transaction_push(Value value);
+void  Memory_transaction_pop();
 
 //
 // Virtual Machine

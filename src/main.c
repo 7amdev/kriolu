@@ -77,8 +77,13 @@ int main(int argc, const char* argv[]) {
     Parser parser;
     VirtualMachine vm = { 0 };
 
-    Parser_Init(&parser, source_code);
     VirtualMachine_init(&vm);
+    Parser_Init(
+        &parser, 
+        source_code, 
+        .string_database = &vm.string_database, 
+        .object_head = &vm.objects
+    );
 
     if (is_flag_parser) {
         ArrayStatement* statements = NULL;
@@ -95,13 +100,19 @@ int main(int argc, const char* argv[]) {
         ObjectFunction* script = parser_parse(&parser, NULL, &vm.string_database, &vm.objects);
         Bytecode_disassemble(&script->bytecode, "Script");
         // Bytecode_free(&bytecode);
-
         return 0;
     }
 
     // TODO: make ArrayStatements optional and last 
     //
-    ObjectFunction* script = parser_parse(&parser, NULL, &vm.string_database, &vm.objects);
+    // ObjectFunction* script = parser_parse(&parser, NULL, &vm.string_database, &vm.objects);
+    ObjectFunction* script = parser_parse(&parser, NULL, NULL, NULL);
+    
+    assert(
+        (vm.stack_value.top == vm.stack_value.items) && 
+        "To avoid Collecting Object, Memory has pushed values onto stack while parsing and forgot to remove it."
+    );
+
     VirtualMachine_interpret(&vm, script);
 
     // Bytecode_free(&bytecode);

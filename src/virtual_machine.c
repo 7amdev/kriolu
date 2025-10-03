@@ -22,7 +22,7 @@ static Value FunctionNative_clock(VirtualMachine* vm, int argument_count, Value*
 //
 
 void VirtualMachine_init(VirtualMachine* vm) {
-    vm->objects = NULL;
+    vm->objects     = NULL;
     vm->heap_values = NULL;
 
     stack_value_reset(&vm->stack_value);
@@ -531,7 +531,7 @@ void VirtualMachine_free(VirtualMachine* vm)
 static void VirtualMachine_define_function_native(VirtualMachine* vm, const char* function_name, FunctionNative* function, int arity) {
     String source_string = string_make(function_name, strlen(function_name));
     uint32_t source_hash = string_hash(source_string);
-    ObjectString* key = ObjectString_Allocate(
+    ObjectString* key    = ObjectString_Allocate(
         .task = (
             AllocateTask_Check_If_Interned |
             AllocateTask_Copy_String       |
@@ -543,16 +543,25 @@ static void VirtualMachine_define_function_native(VirtualMachine* vm, const char
         .first = &vm->objects,
         .table = &vm->string_database
     );
+
+    Memory_transaction_push(value_make_object(key));
     ObjectFunctionNative* value = ObjectFunctionNative_allocate(function, &vm->objects, arity);
-    stack_value_push(&vm->stack_value, value_make_object(key));
-    stack_value_push(&vm->stack_value, value_make_object(value));
-    { // Define or set a key/value pair in the global hashtable
+    Memory_transaction_push(value_make_object(value));
+
+    // stack_value_push(&vm->stack_value, value_make_object(key));
+    // stack_value_push(&vm->stack_value, value_make_object(value));
+
+    {   // Define or set a key/value pair in the global hashtable
         ObjectString* key = value_as_string(stack_value_peek(&vm->stack_value, 1));
         Value value = stack_value_peek(&vm->stack_value, 0);
         hash_table_set_value(&vm->global_database, key, value);
     }
-    stack_value_pop(&vm->stack_value);
-    stack_value_pop(&vm->stack_value);
+
+    Memory_transaction_pop();
+    Memory_transaction_pop();
+
+    // stack_value_pop(&vm->stack_value);
+    // stack_value_pop(&vm->stack_value);
 }
 
 static bool VirtualMachine_call_function(VirtualMachine* vm, Value value, int argument_count) {
