@@ -289,29 +289,31 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
                 value_is_string(stack_value_peek(&vm->stack_value, 0)) &&
                 value_is_string(stack_value_peek(&vm->stack_value, 1))
             ) {
-                Value b = stack_value_pop(&vm->stack_value);
-                Value a = stack_value_pop(&vm->stack_value);
-                ObjectString* os_a = value_as_string(a);
-                ObjectString* os_b = value_as_string(b);
-                String s_a = string_make(os_a->characters, os_a->length);
-                String s_b = string_make(os_b->characters, os_b->length);
+                Value b             = stack_value_peek(&vm->stack_value, 0);
+                Value a             = stack_value_peek(&vm->stack_value, 1);
+                ObjectString* os_a  = value_as_string(a);
+                ObjectString* os_b  = value_as_string(b);
+                String s_a          = string_make(os_a->characters, os_a->length);
+                String s_b          = string_make(os_b->characters, os_b->length);
 
-                String final = string_concatenate(s_a, s_b);
+                String final        = string_concatenate(s_a, s_b);
                 uint32_t final_hash = string_hash(final);
 
                 ObjectString* object_st = hash_table_get_key(&vm->string_database, final, final_hash);
                 if (object_st == NULL) {
                     object_st = ObjectString_Allocate(
-                        .task = AllocateTask_Initialize | AllocateTask_Intern,
+                        .task   = AllocateTask_Initialize | AllocateTask_Intern,
                         .string = final,
-                        .hash = final_hash,
-                        .first = &vm->objects,
-                        .table = &vm->string_database
+                        .hash   = final_hash,
+                        .first  = &vm->objects,
+                        .table  = &vm->string_database
                     );
                 } else {
                     string_free(&final);
                 }
 
+                stack_value_pop(&vm->stack_value);
+                stack_value_pop(&vm->stack_value);
                 stack_value_push(&vm->stack_value, value_make_object(object_st));
             } else {
                 VirtualMachine_runtime_error(vm, "Operands must be 2(two) numbers or 2(two) strings.");
