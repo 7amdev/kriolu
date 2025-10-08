@@ -120,6 +120,23 @@ ObjectFunctionNative* ObjectFunctionNative_allocate(FunctionNative* function, Ob
     return native;
 }
 
+ObjectClass* ObjectClass_alocate(ObjectString* name, Object** object_head) {
+    ObjectClass* klass = Object_Allocate(ObjectClass, ObjectKind_Class, object_head);
+    assert(klass);
+    klass->name = name;
+
+    return klass;
+}
+
+ObjectInstance* ObjectInstance_allocate(ObjectClass *klass, Object** object_head) {
+    ObjectInstance* instance = Object_Allocate(ObjectInstance, ObjectKind_Instance, object_head);
+    assert(instance);
+    instance->klass = klass;
+    hash_table_init(&instance->fields);
+
+    return instance;
+}
+
 void Object_print_function(ObjectFunction* function) {
     if (function->name == NULL) {
         printf("<script>");
@@ -152,7 +169,13 @@ void Object_print(Object* object) {
         Object_print_function(function);
     } break;
     case ObjectKind_Heap_Value: {
-        printf("Heap Value");
+        printf("<Heap Value>");
+    } break;
+    case ObjectKind_Class: {
+        printf("<class '%s'>", ((ObjectClass*)object)->name->characters);
+    } break;
+    case ObjectKind_Instance: {
+        printf("<instance of '%s'>", ((ObjectInstance*)object)->klass->name->characters);
     } break;
     }
 }
@@ -161,12 +184,6 @@ void ObjectString_free(ObjectString* object_st) {
     // Memory_Free(char*, object_st->characters);
     Memory_Free(ObjectString, object_st);
     object_st = NULL;
-}
-
-void ObjectFunction_free(ObjectFunction* function) {
-    ObjectString_free(function->name);
-    Memory_Free(ObjectFunction, function);
-    function = NULL;
 }
 
 void Object_free(Object* object) {
@@ -187,12 +204,10 @@ void Object_free(Object* object) {
             Memory_FreeArray(char, object_st->characters, object_st->length + 1);
         };
         Memory_Free(ObjectString, object_st);
-        // ObjectString_free(object_st);
     } break;
     case ObjectKind_Function: {
         ObjectFunction* object_fn = (ObjectFunction*)object;
         Bytecode_free(&object_fn->bytecode);
-        // ObjectString_free(object_fn->name);
         Memory_Free(ObjectFunction, object_fn);
         object_fn = NULL;
     } break;
@@ -207,12 +222,20 @@ void Object_free(Object* object) {
         ObjectClosure* object_cl = (ObjectClosure*)object;
         Memory_FreeArray(ObjectValue*, object_cl->heap_values.items, object_cl->heap_values.count);
         Memory_Free(ObjectClosure, object);
-        // Memory_Free(ObjectClosure, (ObjectClosure*)object);
         object = NULL;
     } break;
     case ObjectKind_Function_Native: {
         Memory_Free(ObjectFunctionNative, object);
         object = NULL;
+    } break;
+    case ObjectKind_Class: {
+        Memory_Free(ObjectClass, object);
+        object = NULL;
+    } break;
+    case ObjectKind_Instance: {
+        ObjectInstance* instance = (ObjectInstance*)object;
+        hash_table_free(&instance->fields);
+        Memory_Free(ObjectInstance, instance);
     } break;
     }
 }

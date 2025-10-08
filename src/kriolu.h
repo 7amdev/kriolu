@@ -256,31 +256,35 @@ typedef struct {
     int capacity;
 } ArrayValue;
 
-#define value_make_Runtime_Error() ((Value){.kind = Value_Runtime_Error, .as = {.number = 0}})
-#define value_make_boolean(value) ((Value){.kind = Value_Boolean, .as = {.boolean = value}})
-#define value_make_number(value) ((Value){.kind = Value_Number, .as = {.number = value}})
-#define value_make_object(value) ((Value){.kind = Value_Object, .as = {.object = (Object *)value}})
+#define value_make_Runtime_Error()      ((Value){.kind = Value_Runtime_Error, .as = {.number = 0}})
+#define value_make_boolean(value)       ((Value){.kind = Value_Boolean, .as = {.boolean = value}})
+#define value_make_number(value)        ((Value){.kind = Value_Number, .as = {.number = value}})
+#define value_make_object(value)        ((Value){.kind = Value_Object, .as = {.object = (Object *)value}})
 #define value_make_object_string(value) ((Value){.kind = Value_Object, .as = {.object = (Object *)value}})
-#define value_make_nil() ((Value){.kind = Value_Nil, .as = {.number = 0}})
+#define value_make_nil()                ((Value){.kind = Value_Nil, .as = {.number = 0}})
 
-#define value_as_boolean(value) ((value).as.boolean)
-#define value_as_number(value) ((value).as.number)
-#define value_as_nil(value) ((value).as.number)
-#define value_as_object(value) ((value).as.object)
-#define value_as_string(value) ((ObjectString *)value_as_object(value))
+#define value_as_boolean(value)         ((value).as.boolean)
+#define value_as_number(value)          ((value).as.number)
+#define value_as_nil(value)             ((value).as.number)
+#define value_as_object(value)          ((value).as.object)
+#define value_as_string(value)          ((ObjectString *)value_as_object(value))
 #define value_as_function_object(value) ((ObjectFunction *)value_as_object(value))
 #define value_as_function_native(value) ((ObjectFunctionNative*)value_as_object(value))
-#define value_as_closure(value) ((ObjectClosure*)value_as_object(value))
+#define value_as_closure(value)         ((ObjectClosure*)value_as_object(value))
+#define value_as_class(value)           ((ObjectClass*)value_as_object(value))
+#define value_as_instance(value)        ((ObjectInstance*)value_as_object(value))
 
-#define value_is_runtime_error(value) ((value).kind == Value_Runtime_Error)
-#define value_is_boolean(value) ((value).kind == Value_Boolean)
-#define value_is_number(value) ((value).kind == Value_Number)
-#define value_is_object(value) ((value).kind == Value_Object)
-#define value_is_nil(value) ((value).kind == Value_Nil)
-#define value_is_string(value) object_validate_kind_from_value(value, ObjectKind_String)
-#define value_is_function(value) object_validate_kind_from_value(value, ObjectKind_Function)
-#define value_is_function_native(value) object_validate_kind_from_value(value, ObjectKind_Function_Native)
-#define value_is_closure(value) object_validate_kind_from_value(value, ObjectKind_Closure)
+#define value_is_runtime_error(value)   ((value).kind == Value_Runtime_Error)
+#define value_is_boolean(value)         ((value).kind == Value_Boolean)
+#define value_is_number(value)          ((value).kind == Value_Number)
+#define value_is_object(value)          ((value).kind == Value_Object)
+#define value_is_nil(value)             ((value).kind == Value_Nil)
+#define value_is_string(value)          Object_check_value_kind(value, ObjectKind_String)
+#define value_is_function(value)        Object_check_value_kind(value, ObjectKind_Function)
+#define value_is_function_native(value) Object_check_value_kind(value, ObjectKind_Function_Native)
+#define value_is_closure(value)         Object_check_value_kind(value, ObjectKind_Closure)
+#define value_is_class(value)           Object_check_value_kind((value), ObjectKind_Class)
+#define value_is_instance(value)        Object_check_value_kind((value), ObjectKind_Instance)
 
 #define value_get_object_type(value) value_as_object(value)->kind
 #define value_get_string_chars(value) (value_as_string(value)->characters)
@@ -331,11 +335,51 @@ int  Bytecode_disassemble_instruction(Bytecode* bytecode, int offset);
 void Bytecode_free(Bytecode* bytecode);
 
 //
+// HashTable
+//
+
+// HashTable:
+//     Associates a set of Keys to a set of Values.
+//     Each Key/Value pair is an Entry in the Table.
+//     Constant time lookup.
+//
+//  HashTable
+// key  | Value
+// ---------------
+// 1248   "Hello"  -> Entry  <- *entries
+// 4323    9892    -> Entry
+//
+// Entries: [{1248, "Hello"}, {4323, 9892}, ...]
+//           ---------------  ------------
+//                Entry           Entry
+
+typedef struct HashTable HashTable;
+typedef struct ObjectString ObjectString;
+
+typedef struct {
+    ObjectString* key;
+    Value value;
+} Entry;
+
+struct HashTable {
+    Entry* items;
+    int count;
+    int capacity;
+};
+
+void hash_table_init(HashTable* table);
+void hash_table_copy(HashTable* from, HashTable* to); // tableAddAll
+bool hash_table_set_value(HashTable* table, ObjectString* key, Value value);
+bool hash_table_get_value(HashTable* table, ObjectString* key, Value* value_out);
+ObjectString* hash_table_get_key(HashTable* table, String string, uint32_t hash);
+bool hash_table_delete(HashTable* table, ObjectString* key);
+void hash_table_free(HashTable* table);
+
+//
 // Object / Runtime Values
 //
 
 typedef struct VirtualMachine VirtualMachine;
-typedef struct HashTable HashTable;
 
 typedef enum {
     ObjectKind_Invalid,
@@ -344,6 +388,8 @@ typedef enum {
     ObjectKind_Function,
     ObjectKind_Function_Native,
     ObjectKind_Closure,
+    ObjectKind_Class,
+    ObjectKind_Instance,
     ObjectKind_Heap_Value,
 
     ObjectKind_Count
@@ -363,13 +409,16 @@ struct Object {
     Object     *next;
 };
 
-typedef struct {
+// NOTE: Forward declared in the HashTable section
+//       'typedef struct ObjectString ObjectString;'
+// 
+struct ObjectString {
     Object object;
 
     char* characters;
     int length;
     uint32_t hash;
-} ObjectString;
+};
 
 typedef struct {
     Object object;
@@ -409,6 +458,17 @@ typedef struct {
     ArrayObjectValue heap_values;
 } ObjectClosure;
 
+typedef struct {
+    Object object;
+    ObjectString* name;
+} ObjectClass;
+
+typedef struct {
+    Object object;
+    ObjectClass *klass;
+    HashTable fields;
+} ObjectInstance;
+
 typedef enum {
     AllocateTask_Initialize         = (1 << 0),     
     AllocateTask_Intern             = (1 << 1),       
@@ -424,62 +484,25 @@ typedef struct {
     Object     **first;    // Initialization
 } AllocateParams;
 
-#define ObjectString_Allocate(...) \
-    ObjectString_allocate((AllocateParams){__VA_ARGS__})
-
 Object* Object_allocate(ObjectKind kind, size_t size, Object** object_head);
 void Object_init(Object* object, ObjectKind kind, Object** object_head);
 void Object_print(Object* object);
 void Object_free(Object* object);
+inline bool Object_check_value_kind(Value value, ObjectKind object_kind) {
+    return (
+        value_is_object(value) && 
+        value_as_object(value)->kind == object_kind
+    );
+}
 
+#define ObjectString_Allocate(...) ObjectString_allocate((AllocateParams){__VA_ARGS__})
 ObjectString* ObjectString_allocate(AllocateParams params);
 ObjectFunction* ObjectFunction_allocate(ObjectString* function_name, Object** object_head);
 ObjectValue* ObjectValue_allocate(Object** object_head, Value* value_address);
 ObjectClosure* ObjectClosure_allocate(ObjectFunction* function, Object** object_head);
 ObjectFunctionNative* ObjectFunctionNative_allocate(FunctionNative* function, Object** object_head, int arity);
-
-// inline bool object_validate_kind_from_value(Value value, ObjectKind object_kind);
-// inline bool object_validate_kind_from_value(Value value, ObjectKind object_kind) {
-//     return (value_is_object(value) && value_as_object(value)->kind == object_kind);
-// }
-
-//
-// HashTable
-//
-
-// HashTable:
-//     Associates a set of Keys to a set of Values.
-//     Each Key/Value pair is an Entry in the Table.
-//     Constant time lookup.
-//
-//  HashTable
-// key  | Value
-// ---------------
-// 1248   "Hello"  -> Entry  <- *entries
-// 4323    9892    -> Entry
-//
-// Entries: [{1248, "Hello"}, {4323, 9892}, ...]
-//           ---------------  ------------
-//                Entry           Entry
-
-typedef struct {
-    ObjectString* key;
-    Value value;
-} Entry;
-
-struct HashTable {
-    Entry* items;
-    int count;
-    int capacity;
-};
-
-void hash_table_init(HashTable* table);
-void hash_table_copy(HashTable* from, HashTable* to); // tableAddAll
-bool hash_table_set_value(HashTable* table, ObjectString* key, Value value);
-bool hash_table_get_value(HashTable* table, ObjectString* key, Value* value_out);
-ObjectString* hash_table_get_key(HashTable* table, String string, uint32_t hash);
-bool hash_table_delete(HashTable* table, ObjectString* key);
-void hash_table_free(HashTable* table);
+ObjectClass* ObjectClass_alocate(ObjectString* name, Object** object_head);
+ObjectInstance* ObjectInstance_allocate(ObjectClass *klass, Object** object_head);
 
 //
 // Abstract Syntax Tree

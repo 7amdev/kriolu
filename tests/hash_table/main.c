@@ -17,7 +17,7 @@ ObjectString ObjectString_from_string(String string);
 ObjectString* ObjectString_is_interned(HashTable* table, String string);
 void ObjectString_free(ObjectString* string);
 
-inline bool object_validate_kind_from_value(Value value, ObjectKind object_kind) {
+inline bool Object_check_value_kind(Value value, ObjectKind object_kind) {
     return (value_is_object(value) && value_as_object(value)->kind == object_kind);
 }
 

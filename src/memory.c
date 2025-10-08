@@ -35,6 +35,7 @@ static void Memory_collect_garbage();
 static void Memory_mark_roots();
 static void Memory_mark_object_black(Object *object);       // TODO: delete function
 static void Memory_mark_values_gray(ArrayValue *values);
+static void Memory_mark_hashtable_gray(HashTable* table);
 static void Memory_blacken_objects();
 static void Memory_sweep_string_database();
 static void Memory_sweep();
@@ -84,31 +85,13 @@ void* Memory_allocate(void* pointer, size_t old_size, size_t new_size) {
     return result;
 }
 
-void Memory_mark_object_gray(Object* object) {
-    if (object == NULL)    return;
-    if (object->is_marked) return;
-
-    object->is_marked = true;
-    DynamicArray_push(&M_Greys, object);
-
-#ifdef DEBUG_GC_TRACE
-    printf("--   '%p' mark ", (void*)object);
-    Object_print(object);
-    printf("\n");
-#endif // DEBUG_GC_TRACE
-}
-
-void Memory_mark_value_gray(Value value) {
-    if (value_is_object(value)) 
-        Memory_mark_object_gray(value_as_object(value));
-}
-
 void Memory_free_objects() {
 }
 
 //
 // Private
 //
+
 
 static void Memory_collect_garbage() {
 #ifdef DEBUG_GC_TRACE
@@ -146,11 +129,16 @@ static void Memory_mark_roots() {
 
     // Mark Globals - HashTable
     //
-    for (int i = 0; i < M_vm->global_database.capacity; i++) {
-        Entry *entry = &M_vm->global_database.items[i];
-        Memory_mark_object_gray((Object*)entry->key);
-        Memory_mark_value_gray(entry->value);
-    }
+    Memory_mark_hashtable_gray(&M_vm->global_database);
+
+    // TODO: delete code bellow. Its been replaced by 
+    //       the function 'Memory_mark_hashtable_gray'
+    //
+    // for (int i = 0; i < M_vm->global_database.capacity; i++) {
+    //     Entry *entry = &M_vm->global_database.items[i];
+    //     Memory_mark_object_gray((Object*)entry->key);
+    //     Memory_mark_value_gray(entry->value);
+    // }
 
     // Mark FunctionCalls
     //
@@ -170,6 +158,33 @@ static void Memory_mark_roots() {
         LinkedList_foreach(Function, M_parser->function, function) {
             Memory_mark_object_gray((Object*)function.curr->object);
         }
+    }
+}
+
+static void Memory_mark_object_gray(Object* object) {
+    if (object == NULL)    return;
+    if (object->is_marked) return;
+
+    object->is_marked = true;
+    DynamicArray_push(&M_Greys, object);
+
+#ifdef DEBUG_GC_TRACE
+    printf("--   '%p' mark ", (void*)object);
+    Object_print(object);
+    printf("\n");
+#endif // DEBUG_GC_TRACE
+}
+
+static void Memory_mark_value_gray(Value value) {
+    if (value_is_object(value)) 
+        Memory_mark_object_gray(value_as_object(value));
+}
+
+static void Memory_mark_hashtable_gray(HashTable* table) {
+    for (int i = 0; i < table->capacity; i++) {
+        Entry *entry = &table->items[i];
+        Memory_mark_object_gray((Object*)entry->key);
+        Memory_mark_value_gray(entry->value);
     }
 }
 
@@ -202,6 +217,15 @@ static void Memory_blacken_objects() {
         } break;
         case ObjectKind_Heap_Value: {
             Memory_mark_value_gray(((ObjectValue*)object)->value);
+        } break;
+        case ObjectKind_Class: {
+            ObjectClass* klass = (ObjectClass*)object;
+            Memory_mark_object_gray((Object*)klass->name);
+        } break;
+        case ObjectKind_Instance: {
+            ObjectInstance* instance = (ObjectInstance*)object;
+            Memory_mark_object_gray((Object*)instance->klass);
+            Memory_mark_hashtable_gray(&instance->fields);
         } break;
         case ObjectKind_Function_Native: 
         case ObjectKind_String: 

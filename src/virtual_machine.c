@@ -14,8 +14,11 @@ static void VirtualMachine_define_function_native(VirtualMachine* vm, const char
 static bool VirtualMachine_call_function(VirtualMachine* vm, Value function, int argument_count);
 static ObjectValue* VirtualMachine_create_heap_value(VirtualMachine* vm, Value* value_address);
 static void VirtualMachine_move_value_from_stack_to_heap(VirtualMachine* vm, Value* value_address);
-static inline bool object_validate_kind_from_value(Value value, ObjectKind object_kind);
 static Value FunctionNative_clock(VirtualMachine* vm, int argument_count, Value* arguments);
+
+// TODO: delete code bellow
+//
+// static inline bool Object_check_value_kind(Value value, ObjectKind object_kind);
 
 //
 // Function Declarations
@@ -577,7 +580,7 @@ static bool VirtualMachine_call_function(VirtualMachine* vm, Value value, int ar
                 return false;
             }
 
-            if (StackFunctionCall_is_empty(&vm->function_calls)) {
+            if (StackFunctionCall_is_full(&vm->function_calls)) {
                 VirtualMachine_runtime_error(vm, "Function Call Stack Overflow.");
                 return false;
             }
@@ -615,6 +618,11 @@ static bool VirtualMachine_call_function(VirtualMachine* vm, Value value, int ar
 
             return true;
         }
+        case ObjectKind_Class: {
+            ObjectClass* klass = value_as_class(value);
+            ObjectInstance* instance = ObjectInstance_allocate(klass, &vm->objects);
+            vm->stack_value.items[-argument_count - 1] = value_make_object(instance);
+        } break;
         default: break;
         }
     }
@@ -655,9 +663,11 @@ static void VirtualMachine_move_value_from_stack_to_heap(VirtualMachine* vm, Val
     }
 }
 
-static inline bool object_validate_kind_from_value(Value value, ObjectKind object_kind) {
-    return (value_is_object(value) && value_as_object(value)->kind == object_kind);
-}
+// TODO: delete code bellow
+//
+// static inline bool Object_check_value_kind(Value value, ObjectKind object_kind) {
+//     return (value_is_object(value) && value_as_object(value)->kind == object_kind);
+// }
 
 static Value FunctionNative_clock(VirtualMachine* vm, int argument_count, Value* arguments) {
     if (argument_count > 0) {
