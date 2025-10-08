@@ -204,31 +204,26 @@ static Statement* parser_parse_statement(Parser* parser, BlockType block_type) {
 
     Statement* statement = { 0 };
 
-    if (parser_match_then_advance(parser, Token_Funson))
-        statement = parser_parse_declaration_function(parser);
-    else if (parser_match_then_advance(parser, Token_Mimoria))
-        statement = parser_parse_declaration_variable(parser);
-    else if (parser_match_then_advance(parser, Token_Imprimi))
-        statement = parser_parse_instruction_print(parser);
-    else if (parser_match_then_advance(parser, Token_Si))
-        statement = parser_parse_instruction_if(parser);
-    else if (parser_match_then_advance(parser, Token_Left_Brace)) {
-        parser_begin_scope(parser);
-        statement = parser_parse_instruction_block(parser, block_type);
-        parser_end_scope(parser);
-    } else if (parser_match_then_advance(parser, Token_Timenti))
-        statement = parser_instruction_while(parser);
-    else if (parser_match_then_advance(parser, Token_Di))
-        statement = parser_instruction_for(parser);
-    else if (parser_match_then_advance(parser, Token_Pa))
-        statement = parser_instruction_for(parser);
-    else if (parser_match_then_advance(parser, Token_Sai))
-        statement = parser_instruction_break(parser);
-    else if (parser_match_then_advance(parser, Token_Salta))
-        statement = parser_instruction_continue(parser);
-    else if (parser_match_then_advance(parser, Token_Divolvi))
-        statement = parser_instruction_return(parser);
-    else statement = parser_parse_statement_expression(parser);
+    if (parser_match_then_advance(parser, Token_Funson))      statement = parser_parse_declaration_function(parser);          else 
+    if (parser_match_then_advance(parser, Token_Mimoria))     statement = parser_parse_declaration_variable(parser);          else 
+    if (parser_match_then_advance(parser, Token_Imprimi))     statement = parser_parse_instruction_print(parser);             else 
+    if (parser_match_then_advance(parser, Token_Si))          statement = parser_parse_instruction_if(parser);                else 
+    if (parser_match_then_advance(parser, Token_Di))          statement = parser_instruction_for(parser);                     else 
+    if (parser_match_then_advance(parser, Token_Pa))          statement = parser_instruction_for(parser);                     else 
+    if (parser_match_then_advance(parser, Token_Sai))         statement = parser_instruction_break(parser);                   else 
+    if (parser_match_then_advance(parser, Token_Salta))       statement = parser_instruction_continue(parser);                else 
+    if (parser_match_then_advance(parser, Token_Divolvi))     statement = parser_instruction_return(parser);                  else 
+    if (parser_match_then_advance(parser, Token_Left_Brace))  statement = parser_parse_instruction_block(parser, block_type); else
+    if (parser_match_then_advance(parser, Token_Timenti))     statement = parser_instruction_while(parser);
+    else                                                      statement = parser_parse_statement_expression(parser);
+    
+    // TODO: delete code bellow
+    //
+    // if (parser_match_then_advance(parser, Token_Left_Brace)) {
+    //     parser_begin_scope(parser);
+    //     statement = parser_parse_instruction_block(parser, block_type);
+    //     parser_end_scope(parser);
+    // } else 
 
     if (parser->panic_mode)
         parser_synchronize(parser);
@@ -291,6 +286,7 @@ static void parser_end_block(Parser* parser, BlockType block_type) {
     StackBlock_pop(blocks);
 }
 static Statement* parser_parse_instruction_block(Parser* parser, BlockType block_type) {
+    parser_begin_scope(parser);
     if (block_type == BlockType_Clean) parser_begin_block(parser, block_type);
 
     ArrayStatement* bloco = array_statement_allocate();
@@ -311,6 +307,8 @@ static Statement* parser_parse_instruction_block(Parser* parser, BlockType block
 
     if (block_type == BlockType_Clean) parser_end_block(parser, block_type);
 
+    parser_end_scope(parser);
+    
     Statement statement = { 0 };
     statement.kind = StatementKind_Block;
     statement.bloco = bloco;
