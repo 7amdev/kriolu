@@ -19,8 +19,8 @@
 
 #define DEBUG_LOG_PARSER
 #define DEBUG_TRACE_INSTRUCTION true
-#define DEBUG_GC_TRACE
-#define DEBUG_GC_STRESS
+// #define DEBUG_GC_TRACE
+// #define DEBUG_GC_STRESS
 // #define DEBUG_TRACE_EXECUTION
 // #define DEBUG_COMPILER_BYTECODE
 
@@ -207,6 +207,7 @@ enum {
     OpCode_Copy_From_Stack_To_Heap,
     OpCode_Loop,
     OpCode_Call_Function,
+    OpCode_Class,
 
     OpCode_Return
 };
@@ -294,9 +295,9 @@ bool value_is_falsey(Value value);
 bool value_is_equal(Value a, Value b);
 void value_print(Value value);
 
-void array_value_init(ArrayValue* values);
-uint32_t array_value_insert(ArrayValue* values, Value value);
-void array_value_free(ArrayValue* values);
+void ArrayValue_init(ArrayValue* values);
+uint32_t ArrayValue_insert(ArrayValue* values, Value value);
+void ArrayValue_free(ArrayValue* values);
 
 //
 // Bytecode
@@ -318,7 +319,7 @@ typedef struct
 #define Compiler_CompileInstruction_Closure(bytecode, value, line) Bytecode_insert_instruction_closure(bytecode, value, line, DEBUG_TRACE_INSTRUCTION)
 #define Compiler_CompileInstruction_Jump(bytecode, opcode, line) Bytecode_insert_instruction_jump(bytecode, opcode, line, DEBUG_TRACE_INSTRUCTION)
 #define Compiler_CompileInstruction_Loop(bytecode, start_index, line) Bytecode_emit_instruction_loop(bytecode, start_index, line, DEBUG_TRACE_INSTRUCTION)
-#define Compiler_CompileValue(bytecode, value) array_value_insert(&bytecode->values, value)
+#define Compiler_CompileValue(bytecode, value) ArrayValue_insert(&bytecode->values, value)
 #define Compiler_PatchInstructionJump(bytecode, operand_index) Bytecode_patch_instruction_jump(bytecode, operand_index, DEBUG_TRACE_INSTRUCTION)
 
 void Bytecode_init(Bytecode* bytecode);

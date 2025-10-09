@@ -8,7 +8,7 @@
 
 void Bytecode_init(Bytecode* bytecode) {
     array_instruction_init(&bytecode->instructions);
-    array_value_init(&bytecode->values);
+    ArrayValue_init(&bytecode->values);
     array_line_init(&bytecode->lines);
 }
 
@@ -25,12 +25,12 @@ int Bytecode_insert_instruction_1byte(Bytecode* bytecode, OpCode opcode, int lin
 }
 
 int Bytecode_insert_instruction_2bytes(Bytecode* bytecode, OpCode opcode, uint8_t operand, int line_number, bool debug_trace_on) {
-    int opcode_index = array_instruction_insert(&bytecode->instructions, opcode);
+    int opcode_index      = array_instruction_insert(&bytecode->instructions, opcode);
     int line_opcode_index = array_line_insert(&bytecode->lines, line_number);
 
     assert(opcode_index == line_opcode_index);
 
-    int operand_index = array_instruction_insert(&bytecode->instructions, operand);
+    int operand_index      = array_instruction_insert(&bytecode->instructions, operand);
     int line_operand_index = array_line_insert(&bytecode->lines, line_number);
 
     assert(operand_index == line_operand_index);
@@ -59,7 +59,7 @@ static int Bytecode_insert_instruction_4bytes(Bytecode* bytecode, OpCode opcode,
 }
 
 int Bytecode_insert_instruction_constant(Bytecode* bytecode, Value value, int line_number, bool debug_trace_on) {
-    int value_index = array_value_insert(&bytecode->values, value);
+    int value_index = ArrayValue_insert(&bytecode->values, value);
     assert(value_index > -1);
 
     if (value_index < 256) {
@@ -86,7 +86,7 @@ int Bytecode_insert_instruction_constant(Bytecode* bytecode, Value value, int li
 }
 
 void Bytecode_insert_instruction_closure(Bytecode* bytecode, Value value, int line_number, bool debug_trace_on) {
-    int value_index = array_value_insert(&bytecode->values, value);
+    int value_index = ArrayValue_insert(&bytecode->values, value);
     assert(value_index > -1);
 
     if (value_index < 256) {
@@ -296,6 +296,8 @@ int Bytecode_disassemble_instruction(Bytecode* bytecode, int offset)
         return Bytecode_debug_instruction_2bytes(bytecode, "OPCODE_DEFINE_GLOBAL", (offset + 2));
     if (opcode == OpCode_Read_Global)
         return Bytecode_debug_instruction_2bytes(bytecode, "OPCODE_READ_GLOBAL", (offset + 2));
+    if (opcode == OpCode_Class)
+        return Bytecode_debug_instruction_2bytes(bytecode, "OPCODE_CLASS", (offset + 2));
     if (opcode == OpCode_Assign_Global)
         return Bytecode_debug_instruction_2bytes(bytecode, "OPCODE_ASSIGN_GLOBAL", (offset + 2));
     if (opcode == OpCode_Copy_From_Stack_To_Heap)
@@ -368,5 +370,5 @@ void Bytecode_disassemble(Bytecode* bytecode, const char* name) {
 void Bytecode_free(Bytecode* bytecode) {
     array_instruction_free(&bytecode->instructions);
     array_line_free(&bytecode->lines);
-    array_value_free(&bytecode->values);
+    ArrayValue_free(&bytecode->values);
 }

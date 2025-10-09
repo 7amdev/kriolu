@@ -218,6 +218,13 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
             current_function_call = StackFunctionCall_peek(&vm->function_calls, 0);
             break;
         }
+        case OpCode_Class:
+        {
+            ObjectClass* klass = ObjectClass_alocate(READ_STRING(), &vm->objects);
+            Value klass_value = value_make_object(klass);
+            stack_value_push(&vm->stack_value, klass_value);
+            break;
+        }
         case OpCode_Copy_From_Heap_To_Stack: {
             uint8_t index = READ_BYTE_THEN_INCREMENT();
             stack_value_push(
@@ -621,8 +628,10 @@ static bool VirtualMachine_call_function(VirtualMachine* vm, Value value, int ar
         case ObjectKind_Class: {
             ObjectClass* klass = value_as_class(value);
             ObjectInstance* instance = ObjectInstance_allocate(klass, &vm->objects);
-            vm->stack_value.items[-argument_count - 1] = value_make_object(instance);
-        } break;
+            vm->stack_value.top[-argument_count - 1] = value_make_object(instance);
+
+            return true;
+        } 
         default: break;
         }
     }

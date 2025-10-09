@@ -36,13 +36,13 @@ bool value_is_equal(Value a, Value b) {
     return false;
 }
 
-void array_value_init(ArrayValue* values) {
+void ArrayValue_init(ArrayValue* values) {
     values->items = NULL;
     values->count = 0;
     values->capacity = 0;
 }
 
-uint32_t array_value_insert(ArrayValue* values, Value value) {
+uint32_t ArrayValue_insert(ArrayValue* values, Value value) {
     if (values->capacity < values->count + 1) {
         int old_capacity = values->capacity;
         values->capacity = values->capacity < 8 ? 8 : 2 * values->capacity;
@@ -90,7 +90,7 @@ void value_print(Value value) {
     }
 }
 
-void array_value_free(ArrayValue* values) {
+void ArrayValue_free(ArrayValue* values) {
     Memory_FreeArray(Value, values->items, values->count);
-    array_value_init(values);
+    ArrayValue_init(values);
 }

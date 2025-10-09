@@ -100,12 +100,15 @@ ObjectClosure* ObjectClosure_allocate(ObjectFunction* function, Object** object_
        for (int i = 0; i < item_count; i++) items[i] = NULL;
     }
     
+    Memory_transaction_push(value_make_object(items));
+//  {
     ObjectClosure* closure = Object_Allocate(ObjectClosure, ObjectKind_Closure, object_head);
     assert(closure);
-
     closure->function = function;
     closure->heap_values.items = items;
     closure->heap_values.count = item_count;
+//  }
+    Memory_transaction_pop();
 
     return closure;
 }

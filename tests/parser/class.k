@@ -1,0 +1,2 @@
+klasi Animal {}
+imprimi Animal();
