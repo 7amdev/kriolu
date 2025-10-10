@@ -18,7 +18,7 @@
 // 
 
 #define DEBUG_LOG_PARSER
-#define DEBUG_TRACE_INSTRUCTION true
+#define DEBUG_TRACE_INSTRUCTION true    // TODO: rename 'DEBUG_VM_TRACE_INSTRUCTION true'
 // #define DEBUG_GC_TRACE
 // #define DEBUG_GC_STRESS
 // #define DEBUG_TRACE_EXECUTION
@@ -208,6 +208,8 @@ enum {
     OpCode_Loop,
     OpCode_Call_Function,
     OpCode_Class,
+    OpCode_Object_Set_Property,
+    OpCode_Object_Get_Property,
 
     OpCode_Return
 };
@@ -302,15 +304,35 @@ void ArrayValue_free(ArrayValue* values);
 //
 // Bytecode
 //
-
+// TODO: VM debugging mode shows the source code responsable to
+//       for the instructions bellow.
+//
+// #define DEBUG_VM_SHOW_SOURCE_CODE
+//
+// typedef struct {
+//     const char* source_start;
+//     size_t      source_length;
+//     size_t      instruction_start_offset;
+// } SourceCode; 
+// 
+// typedef struct {
+//     SourceCode* items;
+//     int         count;
+//     int         capacity;
+//} DArraySourceCode;
+// 
+// SourceCode ArraySourceCode_search_by_instruction_offset(int instruction_offset) {
+//     // TODO: Binary search implementation... 
+// }
+//
 // Bytecode is a series of instructions. Eventually, we'll store
 // some other data along with instructions, so ...
 //
 typedef struct
 {
     ArrayInstruction instructions;
-    ArrayValue values;
-    ArrayLineNumber lines;
+    ArrayValue       values;
+    ArrayLineNumber  lines;
 } Bytecode;
 
 #define Compiler_CompileInstruction_1Byte(bytecode, opcode, line) Bytecode_insert_instruction_1byte(bytecode, opcode, line, DEBUG_TRACE_INSTRUCTION)
@@ -755,17 +777,17 @@ void      StackFunction_free(StackFunction* stack_function);
 typedef enum {
     OperatorPrecedence_Invalid,
 
-    OperatorPrecedence_Assignment,                  // =
-    OperatorPrecedence_Or,                          // or
-    OperatorPrecedence_And,                         // and
-    OperatorPrecedence_Equality,                    // == =/=
-    OperatorPrecedence_Comparison,                  // < > <= >=
-    OperatorPrecedence_Addition_And_Subtraction,    // + -
-    OperatorPrecedence_Multiplication_And_Division, // * /
-    OperatorPrecedence_Negate,                      // Unary:  -
-    OperatorPrecedence_Exponentiation,              // ^   ex: -2^2 = -1 * 2^2 = -4
-    OperatorPrecedence_Not,                         // Unary: ka
-    OperatorPrecedence_Grouping_FunctionCall_And_ObjectGet,       // . (
+    OperatorPrecedence_Assignment,                                      // =
+    OperatorPrecedence_Or,                                              // or
+    OperatorPrecedence_And,                                             // and
+    OperatorPrecedence_Equality,                                        // == =/=
+    OperatorPrecedence_Comparison,                                      // < > <= >=
+    OperatorPrecedence_Addition_And_Subtraction,                        // + -
+    OperatorPrecedence_Multiplication_And_Division,                     // * /
+    OperatorPrecedence_Negate,                                          // Unary:  -
+    OperatorPrecedence_Exponentiation,                                  // ^   ex: -2^2 = -1 * 2^2 = -4
+    OperatorPrecedence_Not,                                             // Unary: ka
+    OperatorPrecedence_Subcript_Call_ObjectGettersSetters_Grouping,     // . ( [] ()
 
     OperatorPrecedence_Max
 } OperatorPrecedence;

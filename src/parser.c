@@ -27,6 +27,7 @@ static Statement* parser_parse_statement_expression(Parser* parser); // TODO: re
 static Expression* parser_parse_expression(Parser* parser, OperatorPrecedence operator_precedence_previous);
 static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bool can_assign);
 static Expression* parser_parse_operator_function_call(Parser* parser, Expression* left_operand);
+static Expression* parser_parse_operator_object_getter_and_setter(Parser* parser, Expression* left_expression, bool can_assign);
 static Expression* parser_parse_operators_logical(Parser* parser, Expression* left_operand);
 static Expression* parser_parse_operators_arithmetic(Parser* parser, Expression* left_operand);
 static Expression* parser_parse_operators_relational(Parser* parser, Expression* left_operand);
@@ -777,6 +778,12 @@ static void parser_initialize_local_identifier(Parser* parser) {
 }
 
 static Statement* parser_parse_declaration_class(Parser* parser) {
+    // TODO: 
+    // SourceCode source_code = { 
+    //     .source_start =  parser->token_previous.start,
+    //     .source_length = 0,
+    //     .instruction_start_offset = -1
+    // };
     const char* source_statement = parser->token_previous.start;
 
     parser_consume(parser, Token_Identifier, "Expected a class name.");
@@ -832,6 +839,8 @@ static Statement* parser_parse_declaration_class(Parser* parser) {
     // Tells the VM to create a new instance of ObjectClass and 
     // push it into the Value Stack.
     // 
+    // TODO: source_code.instruction_start_offset = Compler_CompileInstruction_2Bytes(...)
+    //
     Compiler_CompileInstruction_2Bytes(
         parser_get_current_bytecode(parser),
         OpCode_Class,
@@ -859,7 +868,11 @@ static Statement* parser_parse_declaration_class(Parser* parser) {
     parser_consume(parser, Token_Right_Brace, "Expected '}' after class body.");
 
     int statement_length = (int)(parser->token_current.start - source_statement);
-    printf("%.*s", statement_length, source_statement);
+
+    // TODO: source_code.soruce_length = statement_length;
+    //       DArraySourceCode_append(parser_get_current_bytecode(parser), source_code);
+
+    // printf("%.*s", statement_length, source_statement);
     
     return NULL;
 }
@@ -1232,7 +1245,7 @@ static OperatorMetadata parser_get_operator_metadata(TokenKind kind)
     case Token_Left_Parenthesis: {
         // TODO: case Token_Left_Bracket: -- Array Subscript
         OperatorMetadata operator_metadata = { 0 };
-        operator_metadata.precedence = OperatorPrecedence_Grouping_FunctionCall_And_ObjectGet;
+        operator_metadata.precedence = OperatorPrecedence_Subcript_Call_ObjectGettersSetters_Grouping;
         operator_metadata.is_left_associative = true;
         operator_metadata.is_right_associative = false;
         return operator_metadata;
@@ -1243,16 +1256,24 @@ static OperatorMetadata parser_get_operator_metadata(TokenKind kind)
 static Expression* parser_parse_expression(Parser* parser, OperatorPrecedence operator_precedence_previous) {
     parser_advance(parser);
 
-    bool can_assign = (operator_precedence_previous <= OperatorPrecedence_Assignment);
+    bool can_assign        = (operator_precedence_previous <= OperatorPrecedence_Assignment);
     Expression* expression = parser_parse_unary_literals_and_identifier(parser, can_assign);
 
-    TokenKind operator_kind_current = parser->token_current.kind;
+    TokenKind operator_kind_current   = parser->token_current.kind;
     OperatorMetadata operator_current = parser_get_operator_metadata(operator_kind_current);
 
     for (;;) {
-        if (operator_current.is_left_associative && operator_current.precedence <= operator_precedence_previous) break;
-        if (operator_current.is_right_associative && operator_current.precedence < operator_precedence_previous) break;
-        if (parser->token_current.kind == Token_Equal) break;
+        if (
+            operator_current.is_left_associative && 
+            operator_current.precedence <= operator_precedence_previous
+        ) break;
+        if (
+            operator_current.is_right_associative && 
+            operator_current.precedence < operator_precedence_previous
+        ) break;
+        if (
+            parser->token_current.kind == Token_Equal
+        ) break;
 
         parser_advance(parser);
 
@@ -1264,6 +1285,8 @@ static Expression* parser_parse_expression(Parser* parser, OperatorPrecedence op
             expression = parser_parse_operators_relational(parser, expression);
         } else if (parser->token_previous.kind == Token_Left_Parenthesis) {
             expression = parser_parse_operator_function_call(parser, expression);
+        } else if (parser->token_previous.kind == Token_Dot) {
+            expression = parser_parse_operator_object_getter_and_setter(parser, expression, can_assign);
         }
 
         operator_current = parser_get_operator_metadata(parser->token_current.kind);
@@ -1723,6 +1746,57 @@ static Expression* parser_parse_operator_function_call(Parser* parser, Expressio
         argument_count,       // Operand
         parser->token_previous.line_number
     );
+    return NULL;
+}
+
+static Expression* parser_parse_operator_object_getter_and_setter(Parser* parser, Expression* left_expression, bool can_assign) {
+    parser_consume(parser, Token_Identifier, "Expected property name after '.'.");
+
+    // Register Identifier into Bytecode Values Array
+    //
+    String source_string = string_make(parser->token_previous.start, parser->token_previous.length);
+    uint32_t source_hash = string_hash(source_string);
+    ObjectString* identifier_string = ObjectString_Allocate(
+        .task = (
+            AllocateTask_Check_If_Interned  |
+            AllocateTask_Copy_String        |
+            AllocateTask_Initialize         |
+            AllocateTask_Intern
+        ),
+        .string = source_string,
+        .hash   = source_hash,
+        .first  = parser->object_head,
+        .table  = parser->string_database
+    );
+
+    Value value_string = value_make_object_string(identifier_string);
+    int property_name_index = -1;
+    Memory_transaction_push(value_string);
+    {
+        property_name_index = Compiler_CompileValue(
+            parser_get_current_bytecode(parser), 
+            value_string
+        );
+    }
+    Memory_transaction_pop();
+
+    if (can_assign && parser_match_then_advance(parser, Token_Equal)) {
+        parser_parse_expression(parser, OperatorPrecedence_Assignment);
+        Compiler_CompileInstruction_2Bytes(
+            parser_get_current_bytecode(parser),
+            OpCode_Object_Set_Property,             // OpCode
+            property_name_index,                    // Operand
+            parser->token_previous.line_number
+        );
+    } else {
+        Compiler_CompileInstruction_2Bytes(
+            parser_get_current_bytecode(parser),
+            OpCode_Object_Get_Property,             // OpCode
+            property_name_index,                    // Operand
+            parser->token_previous.line_number
+        );
+    }
+
     return NULL;
 }
 

@@ -225,6 +225,48 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
             stack_value_push(&vm->stack_value, klass_value);
             break;
         }
+        case OpCode_Object_Get_Property:
+        {
+            if (!value_is_instance(stack_value_peek(&vm->stack_value, 0))) {
+                VirtualMachine_runtime_error(vm, "Only instances have properties.");
+                return Interpreter_Runtime_Error;
+            }
+
+            ObjectInstance* instance    = value_as_instance(stack_value_peek(&vm->stack_value, 0));
+            ObjectString* property_name = READ_STRING();
+
+            Value value;
+            if (hash_table_get_value(&instance->fields, property_name, &value)) {
+                stack_value_pop(&vm->stack_value); // NOTE: Pop the Instance
+                stack_value_push(&vm->stack_value, value);
+                break;
+            }
+
+            VirtualMachine_runtime_error(vm, "Undefined property '%s'.", property_name->characters);
+            return Interpreter_Runtime_Error;
+        }
+        case OpCode_Object_Set_Property:
+        {
+            if (!value_is_instance(stack_value_peek(&vm->stack_value, 1))) {
+                VirtualMachine_runtime_error(vm, "Only instances have properties.");
+                return Interpreter_Runtime_Error;
+            }
+
+            ObjectInstance* instance      = value_as_instance(stack_value_peek(&vm->stack_value, 1));
+            ObjectString*   property_name = READ_STRING();
+
+            hash_table_set_value(
+                &instance->fields, 
+                property_name, 
+                stack_value_peek(&vm->stack_value, 0)
+            );
+
+            Value value = stack_value_pop(&vm->stack_value);
+            stack_value_pop(&vm->stack_value);  // NOTE: Pop the Instance
+            stack_value_push(&vm->stack_value, value);
+    
+            break;
+        }
         case OpCode_Copy_From_Heap_To_Stack: {
             uint8_t index = READ_BYTE_THEN_INCREMENT();
             stack_value_push(

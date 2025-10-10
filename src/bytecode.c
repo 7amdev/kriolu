@@ -298,6 +298,10 @@ int Bytecode_disassemble_instruction(Bytecode* bytecode, int offset)
         return Bytecode_debug_instruction_2bytes(bytecode, "OPCODE_READ_GLOBAL", (offset + 2));
     if (opcode == OpCode_Class)
         return Bytecode_debug_instruction_2bytes(bytecode, "OPCODE_CLASS", (offset + 2));
+    if (opcode == OpCode_Object_Get_Property)
+        return Bytecode_debug_instruction_2bytes(bytecode, "OPCODE_OBJ_GET_PROPERTY", (offset + 2));
+    if (opcode == OpCode_Object_Set_Property)
+        return Bytecode_debug_instruction_2bytes(bytecode, "OPCODE_OBJ_SET_PROPERTY", (offset + 2));
     if (opcode == OpCode_Assign_Global)
         return Bytecode_debug_instruction_2bytes(bytecode, "OPCODE_ASSIGN_GLOBAL", (offset + 2));
     if (opcode == OpCode_Copy_From_Stack_To_Heap)
