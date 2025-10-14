@@ -233,12 +233,27 @@ static Statement* parser_parse_statement(Parser* parser, BlockType block_type) {
     return statement;
 }
 
-static Statement* parser_parse_statement_expression(Parser* parser)
-{
+static Statement* parser_parse_statement_expression(Parser* parser) {
+    SourceCode source_code = { 
+        .source_start               =  parser->token_current.start,
+        .source_length              = 0,
+        .instruction_start_offset   = parser_get_current_bytecode(parser)->instructions.count
+    };
+
     Expression* expression = parser_parse_expression(parser, OperatorPrecedence_Assignment);
     parser_consume(parser, Token_Semicolon, "Expect ';' after expression.");
 
-    Compiler_CompileInstruction_1Byte(parser_get_current_bytecode(parser), OpCode_Stack_Pop, parser->token_previous.line_number);
+    source_code.source_length = (int)(parser->token_current.start - source_code.source_start);
+    DynamicArray_append(
+        &parser_get_current_bytecode(parser)->source_code, 
+        source_code
+    );
+
+    Compiler_CompileInstruction_1Byte(
+        parser_get_current_bytecode(parser), 
+        OpCode_Stack_Pop, 
+        parser->token_previous.line_number
+    );
 
     Statement statement = (Statement){
         .kind = StatementKind_Expression,
@@ -249,10 +264,26 @@ static Statement* parser_parse_statement_expression(Parser* parser)
 }
 
 static Statement* parser_parse_instruction_print(Parser* parser) {
+    SourceCode source_code = { 
+        .source_start               =  parser->token_previous.start,
+        .source_length              = 0,
+        .instruction_start_offset   = parser_get_current_bytecode(parser)->instructions.count
+    };
 
     Expression* expression = parser_parse_expression(parser, OperatorPrecedence_Assignment);
     parser_consume(parser, Token_Semicolon, "Expect ';' after expression.");
-    Compiler_CompileInstruction_1Byte(parser_get_current_bytecode(parser), OpCode_Print, parser->token_previous.line_number);
+
+    source_code.source_length = (int)(parser->token_current.start - source_code.source_start);
+    DynamicArray_append(
+        &parser_get_current_bytecode(parser)->source_code, 
+        source_code
+    );
+
+    Compiler_CompileInstruction_1Byte(
+        parser_get_current_bytecode(parser), 
+        OpCode_Print, 
+        parser->token_previous.line_number
+    );
 
     Statement statement = { 0 };
     statement.kind = StatementKind_Print;
@@ -778,13 +809,11 @@ static void parser_initialize_local_identifier(Parser* parser) {
 }
 
 static Statement* parser_parse_declaration_class(Parser* parser) {
-    // TODO: 
-    // SourceCode source_code = { 
-    //     .source_start =  parser->token_previous.start,
-    //     .source_length = 0,
-    //     .instruction_start_offset = -1
-    // };
-    const char* source_statement = parser->token_previous.start;
+    SourceCode source_code = { 
+        .source_start               =  parser->token_previous.start,
+        .source_length              = 0,
+        .instruction_start_offset   = -1
+    };
 
     parser_consume(parser, Token_Identifier, "Expected a class name.");
 
@@ -836,11 +865,11 @@ static Statement* parser_parse_declaration_class(Parser* parser) {
         );
     }
 
+    source_code.instruction_start_offset = parser_get_current_bytecode(parser)->instructions.count;
+    
     // Tells the VM to create a new instance of ObjectClass and 
     // push it into the Value Stack.
     // 
-    // TODO: source_code.instruction_start_offset = Compler_CompileInstruction_2Bytes(...)
-    //
     Compiler_CompileInstruction_2Bytes(
         parser_get_current_bytecode(parser),
         OpCode_Class,
@@ -867,12 +896,14 @@ static Statement* parser_parse_declaration_class(Parser* parser) {
     parser_consume(parser, Token_Left_Brace,  "Expected '{' before class body.");
     parser_consume(parser, Token_Right_Brace, "Expected '}' after class body.");
 
-    int statement_length = (int)(parser->token_current.start - source_statement);
+    // TODO: #ifdef DEBUG_SHOW_CODE
+    // 
+    source_code.source_length = (int)(parser->token_current.start - source_code.source_start);
+    DynamicArray_append(
+        &parser_get_current_bytecode(parser)->source_code, 
+        source_code
+    );
 
-    // TODO: source_code.soruce_length = statement_length;
-    //       DArraySourceCode_append(parser_get_current_bytecode(parser), source_code);
-
-    // printf("%.*s", statement_length, source_statement);
     
     return NULL;
 }
@@ -1024,6 +1055,12 @@ static Statement* parser_parse_declaration_variable(Parser* parser) {
     Statement statement = { 0 };
     statement.kind = StatementKind_Variable_Declaration;
 
+    SourceCode source_code = { 
+        .source_start               =  parser->token_previous.start,
+        .source_length              = 0,
+        .instruction_start_offset   = parser_get_current_bytecode(parser)->instructions.count
+    };
+
     parser_consume(parser, Token_Identifier, "Expect variable name.");
 
     do {
@@ -1075,8 +1112,17 @@ static Statement* parser_parse_declaration_variable(Parser* parser) {
             statement.variable_declaration.rhs = expression_allocate(expression_make_nil());
         }
 
+
         parser_consume(parser, Token_Semicolon, "Expected ';' after expression.");
 
+        // TODO: #ifdef DEBUG_SHOW_CODE
+        // 
+        source_code.source_length = (int)(parser->token_current.start - source_code.source_start);
+        DynamicArray_append(
+            &parser_get_current_bytecode(parser)->source_code, 
+            source_code
+        );
+        
         // Mark local as Initialized
         //
         Local* local = &parser->function->locals.items[parser->function->locals.top - 1];
@@ -1146,6 +1192,14 @@ static Statement* parser_parse_declaration_variable(Parser* parser) {
         );
     }
     Memory_transaction_pop();
+
+    // TODO: #ifdef DEBUG_SHOW_CODE
+    // 
+    source_code.source_length = (int)(parser->token_current.start - source_code.source_start);
+    DynamicArray_append(
+        &parser_get_current_bytecode(parser)->source_code, 
+        source_code
+    );
 
     return statement_allocate(statement);
 }

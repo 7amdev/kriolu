@@ -252,6 +252,80 @@ static int Bytecode_debug_instruction_4bytes(Bytecode* bytecode, const char* opc
     return ret_offset_increment;
 }
 
+static bool Bytecode_search_source_code(Bytecode* bytecode, int instruction_offset, SourceCode* source_out) {
+    if (bytecode->source_code.count == 0) return false;
+
+    int start              = 0;
+    int end                = bytecode->source_code.count;
+    int middle             = start + (end - start) / 2;
+    SourceCode* code_items = bytecode->source_code.items;
+
+    for (;;) {
+        int middle_value = code_items[middle].instruction_start_offset;
+        
+        if (middle_value == instruction_offset) {
+            *source_out = code_items[middle];
+            return true;
+        }
+        
+        if (instruction_offset > middle_value) 
+            start = middle + 1;
+        else
+            end = middle;
+        
+        middle = start + (end - start) / 2;
+        if (start >= end) break;
+    }
+
+    return false;
+}
+
+static bool Bytecode_is_whitespace(char c) {
+   if (c == ' ')  return true; 
+   if (c == '\t') return true; 
+   if (c == '\n') return true; 
+   if (c == '\r') return true; 
+
+   return false;
+}
+
+static void Bytecode_print_source_code(SourceCode source_code, int line_number) {
+    const char* indent = "          ";
+    int index          = 0; 
+    int offset         = 0;
+                      
+    printf("\n----------| Statement at line '%d':\n", line_number);
+    for (;;) {
+        if (index >= source_code.source_length) break;
+
+        if (source_code.source_start[index] == '\n') {
+            if (offset == 0) {
+                int len = printf("          | '");
+                len += printf("%.*s", index-offset, source_code.source_start + offset);
+
+                // NOTE: Because 'prinf("%.*s" ,...)' moves the cursor to the beggining 
+                //       of the same line it printed the text, i use have to move 
+                //       the cursor back to the end of the line.
+                printf("\x1b[%dG", len); 
+            } else {
+                int size = index-offset;
+                int len  = printf("\n%s| ", indent) - 1;
+                len += printf("%.*s", size, source_code.source_start + offset);
+                printf("\x1b[%dG", len);
+            } 
+
+            while (Bytecode_is_whitespace(source_code.source_start[index])) 
+                index += 1;
+
+            offset = index;
+            continue;
+        }
+
+        index += 1;
+    }
+    printf("'\n");
+}
+
 int Bytecode_disassemble_instruction(Bytecode* bytecode, int offset)
 {
     // TODO:                                 Operand
@@ -263,6 +337,11 @@ int Bytecode_disassemble_instruction(Bytecode* bytecode, int offset)
     // 000005 +2    2 OPCODE_CONSTANT            0 'verdadi'
     // 000007 +1    | OPCODE_PRINT
 
+    SourceCode source_out = {0}; 
+    if (Bytecode_search_source_code(bytecode, offset, &source_out)) {
+        Bytecode_print_source_code(source_out, bytecode->lines.items[offset]);
+    }
+    
     printf("%06d ", offset);
     if (offset > 0 && bytecode->lines.items[offset] == bytecode->lines.items[offset - 1])
         printf("   | ");

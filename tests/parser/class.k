@@ -1,7 +1,7 @@
-klasi Animal {}
-mimoria gatu = Animal();
-gatu.nomi = "Mimi";
-imprimi gatu.nomi;
+// klasi Animal {}
+// mimoria gatu = Animal();
+// gatu.nomi = "Mimi";
+// imprimi gatu.nomi;
 
 funson Forma_2D() {
     klasi Forma {}
@@ -9,5 +9,4 @@ funson Forma_2D() {
     circulo.raio = 5;
     imprimi circulo.raio; 
 }
-
-// offset == index of 'instrucions' and 'lines'
+Forma_2D();

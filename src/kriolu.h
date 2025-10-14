@@ -328,11 +328,24 @@ void ArrayValue_free(ArrayValue* values);
 // Bytecode is a series of instructions. Eventually, we'll store
 // some other data along with instructions, so ...
 //
-typedef struct
-{
+
+typedef struct {
+    const char* source_start;
+    size_t      source_length;
+    int         instruction_start_offset;
+} SourceCode;
+
+typedef struct {
+    size_t      capacity;
+    size_t      count;
+    SourceCode *items; 
+} ArraySourceCode;
+
+typedef struct {
     ArrayInstruction instructions;
     ArrayValue       values;
     ArrayLineNumber  lines;
+    ArraySourceCode  source_code;
 } Bytecode;
 
 #define Compiler_CompileInstruction_1Byte(bytecode, opcode, line) Bytecode_insert_instruction_1byte(bytecode, opcode, line, DEBUG_TRACE_INSTRUCTION)
