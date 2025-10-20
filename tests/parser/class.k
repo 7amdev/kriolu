@@ -1,4 +1,7 @@
-// klasi Animal {}
+// klasi Animal {
+//     jump() {}
+//     walk(distance, speed) {}
+// }
 // mimoria gatu = Animal();
 // gatu.nomi = "Mimi";
 // imprimi gatu.nomi;

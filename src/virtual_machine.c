@@ -225,6 +225,15 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
             stack_value_push(&vm->stack_value, klass_value);
             break;
         }
+        case OpCode_Method: 
+        {
+            ObjectString* method_name = READ_STRING();
+            Value method = stack_value_peek(&vm->stack_value, 0);
+            ObjectClass* klass = value_as_class(stack_value_peek(&vm->stack_value, 1));
+            hash_table_set_value(&klass->methods, method_name, method);
+            stack_value_pop(&vm->stack_value);
+            break;
+        }
         case OpCode_Object_Get_Property:
         {
             if (!value_is_instance(stack_value_peek(&vm->stack_value, 0))) {

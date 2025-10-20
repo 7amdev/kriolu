@@ -189,7 +189,7 @@ static void Memory_mark_hashtable_gray(HashTable* table) {
 }
 
 static void Memory_blacken_objects() {
-//  A Black Object is any object whose 'is_maked' field 
+//  A Black Object is any object whose 'is_marked' field 
 //  is set to 'true' or 'Gray' and that is no longer in 'Gray' Stack.
 
     for (;;) {
@@ -221,6 +221,7 @@ static void Memory_blacken_objects() {
         case ObjectKind_Class: {
             ObjectClass* klass = (ObjectClass*)object;
             Memory_mark_object_gray((Object*)klass->name);
+            Memory_mark_hashtable_gray(&klass->methods);
         } break;
         case ObjectKind_Instance: {
             ObjectInstance* instance = (ObjectInstance*)object;

@@ -20,7 +20,10 @@ static Statement* parser_instruction_return(Parser* parser);
 static Statement* parser_parse_declaration_class(Parser* parser);
 static Statement* parser_parse_declaration_function(Parser* parser);
 static Statement* parser_parse_declaration_variable(Parser* parser);
-static int parser_parse_identifier(Parser* parser, const char* error_message);
+static int parser_find_identifier_location(Parser* parser, Token token, int* out_identifier_location, Local* out_local);
+static void parser_load_identifier_value_to_stack(Parser* parser, int identifier_location, int identifier_location_index);
+static ObjectString* parser_intern_token(Token token, Object** object_head, HashTable* string_database);
+static int parser_save_identifier_into_bytecode(Bytecode* bytecode, ObjectString* identifier);
 static void parser_initialize_local_identifier(Parser* parser);
 static ObjectFunction* parser_parse_function_paramenters_and_body(Parser* parser, FunctionKind function_kind);
 static Statement* parser_parse_statement_expression(Parser* parser); // TODO: rename to ???
@@ -36,12 +39,13 @@ static void parser_compile_return(Parser* parser);
 static bool parser_is_operator_arithmetic(Parser* parser);
 static bool parser_is_operator_logical(Parser* parser);
 static bool parser_is_operator_relational(Parser* parser);
+static bool parser_is_operator_assignment(Token operator);
 static bool parser_check_locals_duplicates(Parser* parser, Token* identifier);
 static void parser_end_parsing(Parser* parser);
 static void parser_begin_scope(Parser* parser);
 static void parser_end_scope(Parser* parser);
 
-static void parser_init_function(Parser* parser, Function* function, FunctionKind function_kind, ObjectString* function_name);
+static void parser_init_function(Parser* parser, Function* function, FunctionKind function_kind);
 static ObjectFunction* parser_end_function(Parser* parser, Function* function);
 
 void parser_init(Parser* parser, const char* source_code, ParserInitParams params) {
@@ -82,7 +86,7 @@ ObjectFunction* parser_parse(Parser* parser, ArrayStatement** return_statements,
     ArrayStatement* statements = array_statement_allocate();
 
     parser_advance(parser);
-    parser_init_function(parser, &function, FunctionKind_Script, NULL);
+    parser_init_function(parser, &function, FunctionKind_Script);
 
     for (;;) {
         if (parser->token_current.kind == Token_Eof) break;
@@ -714,8 +718,6 @@ static Statement* parser_instruction_return(Parser* parser) {
     return statement_allocate(statement);
 }
 
-// TODO: rename to 'Parser_parse_identifier'
-// 
 // static parser_convert_identifier_to_value(Parser* parser) {
 //     int value_index = -1;
 //     String source_string = string_make(parser->token_previous.start, parser->token_previous.length);
@@ -746,59 +748,93 @@ static Statement* parser_instruction_return(Parser* parser) {
 //     return value_index;
 // }
 
-// TODO: rename to 'Parser_parse_identifier_by_scope'
-//
-static int parser_parse_identifier(Parser* parser, const char* error_message) {
-    int value_index = 0;
+static ObjectString* parser_intern_token(Token token, Object** object_head, HashTable* string_database) {
+    String source_string            = string_make(token.start, token.length);
+    uint32_t source_string_hash     = string_hash(source_string);
+    ObjectString* identifier_string = ObjectString_Allocate(
+        .task = (
+            AllocateTask_Check_If_Interned  |
+            AllocateTask_Copy_String        |
+            AllocateTask_Initialize         |
+            AllocateTask_Intern
+        ),
+        .string = source_string,
+        .hash   = source_string_hash,
+        .first  = object_head,
+        .table  = string_database
+    );
 
-    parser_consume(parser, Token_Identifier, error_message);
+    return identifier_string;
+}
 
-    if (parser->function->depth == 0) { // Parse Global Function Name 
-        String source_string = string_make(parser->token_previous.start, parser->token_previous.length);
-        uint32_t source_hash = string_hash(source_string);
-        ObjectString* identifier_string = ObjectString_Allocate(
-            .task = (
-                AllocateTask_Check_If_Interned  |
-                AllocateTask_Copy_String        |
-                AllocateTask_Initialize         |
-                AllocateTask_Intern
-            ),
-            .string = source_string,
-            .hash   = source_hash,
-            .first  = parser->object_head,    // .first = &parser->objects,
-            .table  = parser->string_database
-        );
-
-        Value value_string = value_make_object_string(identifier_string);
-        Memory_transaction_push(value_string);
-        {
-            value_index = Compiler_CompileValue(
-                parser_get_current_bytecode(parser), 
-                value_string
-            );
-
-            if (value_index > UINT8_MAX)
-                parser_error(parser, &parser->token_current, "Too many constants.");
-        }
-        Memory_transaction_pop();
-    } else {  // Parse Local  
-        if (StackLocal_is_full(&parser->function->locals)) {
-            parser_error(parser, &parser->token_previous, "Too many local variables in a scope.");
-        }
-
-        if (parser_check_locals_duplicates(parser, &parser->token_previous)) {
-            parser_error(parser, &parser->token_previous, "Already a variable with this name in this scope.");
-        }
-
-        StackLocal_push(
-            &parser->function->locals,
-            parser->token_previous,
-            -1, // Mark as Uninitialized
-            LocalAction_Default
-        );
-    }
+static int parser_save_identifier_into_bytecode(Bytecode* bytecode, ObjectString* identifier) {
+    Value value_string = value_make_object_string(identifier);
+    Memory_transaction_push(value_string);
+// {
+    int value_index = ArrayValue_insert(&bytecode->values, value_string);
+// }
+    Memory_transaction_pop();
+    
+    if (value_index > UINT8_MAX) 
+        return -1; 
 
     return value_index;
+}
+
+// [Return]                  Identifier Location Index
+// [out_identifier_location] Where the identifier is located
+//
+static int parser_find_identifier_location(Parser* parser, Token token, int* out_identifier_location, Local* out_local) {
+//  In the Locals (Current function's Value Stack)
+    int local_index = StackLocal_get_local_index_by_token(&parser->function->locals, &token, &out_local);
+    if (local_index != -1) {
+        *out_identifier_location = 1;       
+        return local_index;
+    } 
+
+//  Walks the Function Linked-List and search for the variable in the function's locals
+//
+//  In the parent function's locals; Closure Variable
+    int parent_fn_local_index = parser_resolve_variable_dependencies(parser->function, &token, &out_local);
+    if (parent_fn_local_index != -1) {
+        *out_identifier_location = 2;       
+        return parent_fn_local_index;
+    } 
+
+//  In Bytecode Array of Values
+    ObjectString* identifier = parser_intern_token(token, parser->object_head, parser->string_database);
+    int value_index = parser_save_identifier_into_bytecode(parser_get_current_bytecode(parser), identifier);
+    *out_identifier_location = 3;           
+
+    return value_index;
+}
+
+static void parser_load_identifier_value_to_stack(Parser* parser, int identifier_location, int identifier_location_index) {
+    if (identifier_location == 1) {
+//      Its a Local Variable
+        Compiler_CompileInstruction_2Bytes(
+            parser_get_current_bytecode(parser),
+            OpCode_Stack_Copy_From_idx_To_Top,
+            identifier_location_index,
+            parser->token_previous.line_number
+        );
+    } else if (identifier_location == 2) {
+//      Its a Closure Variable
+        Compiler_CompileInstruction_2Bytes(
+            parser_get_current_bytecode(parser),
+            OpCode_Copy_From_Heap_To_Stack,
+            identifier_location_index,
+            parser->token_previous.line_number
+        );
+    } else {
+//      Its a Global Variable
+        Compiler_CompileInstruction_2Bytes(
+            parser_get_current_bytecode(parser),
+            OpCode_Read_Global,
+            identifier_location_index,
+            parser->token_previous.line_number
+        );
+    }
 }
 
 static void parser_initialize_local_identifier(Parser* parser) {
@@ -810,40 +846,44 @@ static void parser_initialize_local_identifier(Parser* parser) {
 
 static Statement* parser_parse_declaration_class(Parser* parser) {
     SourceCode source_code = { 
-        .source_start               =  parser->token_previous.start,
+        .source_start               = parser->token_previous.start,
         .source_length              = 0,
         .instruction_start_offset   = -1
     };
 
     parser_consume(parser, Token_Identifier, "Expected a class name.");
+    Token class_name = parser->token_previous;
 
     // Register Identifier into Bytecode Values Array
     //
-    String source_string = string_make(parser->token_previous.start, parser->token_previous.length);
-    uint32_t source_hash = string_hash(source_string);
-    ObjectString* identifier_string = ObjectString_Allocate(
-        .task = (
-            AllocateTask_Check_If_Interned  |
-            AllocateTask_Copy_String        |
-            AllocateTask_Initialize         |
-            AllocateTask_Intern
-        ),
-        .string = source_string,
-        .hash   = source_hash,
-        .first  = parser->object_head,
-        .table  = parser->string_database
-    );
+    Bytecode* bytecode       = parser_get_current_bytecode(parser);
+    ObjectString* os_class_name = parser_intern_token(parser->token_previous, parser->object_head, parser->string_database);
+    int class_name_index     = parser_save_identifier_into_bytecode(bytecode, os_class_name);
+    // String source_string = string_make(parser->token_previous.start, parser->token_previous.length);
+    // uint32_t source_hash = string_hash(source_string);
+    // ObjectString* identifier_string = ObjectString_Allocate(
+    //     .task = (
+    //         AllocateTask_Check_If_Interned  |
+    //         AllocateTask_Copy_String        |
+    //         AllocateTask_Initialize         |
+    //         AllocateTask_Intern
+    //     ),
+    //     .string = source_string,
+    //     .hash   = source_hash,
+    //     .first  = parser->object_head,
+    //     .table  = parser->string_database
+    // );
 
-    Value value_string = value_make_object_string(identifier_string);
-    int class_name_index = -1;
-    Memory_transaction_push(value_string);
-    {
-        class_name_index = Compiler_CompileValue(
-            parser_get_current_bytecode(parser), 
-            value_string
-        );
-    }
-    Memory_transaction_pop();
+    // Value value_string = value_make_object_string(identifier_string);
+    // int class_name_index = -1;
+    // Memory_transaction_push(value_string);
+    // {
+    //     class_name_index = Compiler_CompileValue(
+    //         parser_get_current_bytecode(parser), 
+    //         value_string
+    //     );
+    // }
+    // Memory_transaction_pop();
 
     // Register the Identifier in the Value Stack as Uninitialized, if 
     // we are not in a global scope.
@@ -893,8 +933,55 @@ static Statement* parser_parse_declaration_class(Parser* parser) {
         parser_initialize_local_identifier(parser);
     }
 
+    int identifier_location       = -1;
+    int identifier_location_index = parser_find_identifier_location(
+        parser, 
+        class_name, 
+        &identifier_location, 
+        NULL
+    );
+
+    parser_load_identifier_value_to_stack(
+        parser, 
+        identifier_location, 
+        identifier_location_index
+    );
+
     parser_consume(parser, Token_Left_Brace,  "Expected '{' before class body.");
+    for (;;) {
+        if (parser->token_current.kind == Token_Right_Brace) break;
+        if (parser->token_current.kind == Token_Eof)         break;
+    
+        //
+        // Parse Method Declaration
+        //
+        
+        parser_consume(parser, Token_Identifier, "Expect method name.");
+        Bytecode* bytecode       = parser_get_current_bytecode(parser);
+        ObjectString* identifier = parser_intern_token(parser->token_previous, parser->object_head, parser->string_database);
+        uint8_t identifier_index = parser_save_identifier_into_bytecode(bytecode, identifier);
+        if (identifier_index == -1) 
+            parser_error(parser, &parser->token_current, "Too many constants.");
+
+        parser_parse_function_paramenters_and_body(parser, FunctionKind_Function);
+
+        // Tells the VM to attach method into the class method's hash table
+        //
+        Compiler_CompileInstruction_2Bytes(
+            parser_get_current_bytecode(parser),
+            OpCode_Method,
+            identifier_index,
+            parser->token_previous.line_number
+        );
+
+    }
     parser_consume(parser, Token_Right_Brace, "Expected '}' after class body.");
+
+    Compiler_CompileInstruction_1Byte(
+        parser_get_current_bytecode(parser),
+        OpCode_Stack_Pop,
+        parser->token_previous.line_number
+    );
 
     // TODO: #ifdef DEBUG_SHOW_CODE
     // 
@@ -903,7 +990,6 @@ static Statement* parser_parse_declaration_class(Parser* parser) {
         &parser_get_current_bytecode(parser)->source_code, 
         source_code
     );
-
     
     return NULL;
 }
@@ -912,22 +998,40 @@ static Statement* parser_parse_declaration_function(Parser* parser) {
     Statement statement = { 0 };
     statement.kind = StatementKind_Funson;
 
-    int function_name_index = parser_parse_identifier(parser, "Expect function name identifier.");
-    parser_initialize_local_identifier(parser);
+    parser_consume(parser, Token_Identifier, "Expect function name identifier.");
 
-    ObjectFunction* parsed_function = parser_parse_function_paramenters_and_body(
-        parser, 
-        FunctionKind_Function
-    );
+    if (parser->function->depth == 0) { 
+        ObjectString* identifier = parser_intern_token(parser->token_previous, parser->object_head, parser->string_database);
+        Bytecode* bytecode = parser_get_current_bytecode(parser);
+        int function_name_index = parser_save_identifier_into_bytecode(bytecode, identifier);
+        if (function_name_index == -1) parser_error(parser, &parser->token_current, "Too many constants.");
 
-    // Define Function Identifier
-    //
-    if (parser->function->depth == 0) {
+        parser_parse_function_paramenters_and_body(parser, FunctionKind_Function);
         Compiler_CompileInstruction_2Bytes(
             parser_get_current_bytecode(parser),
             OpCode_Define_Global,
             function_name_index,
             parser->token_previous.line_number
+        );
+    } else {  
+        if (StackLocal_is_full(&parser->function->locals)) {
+            parser_error(parser, &parser->token_previous, "Too many local variables in a scope.");
+        }
+
+        if (parser_check_locals_duplicates(parser, &parser->token_previous)) {
+            parser_error(parser, &parser->token_previous, "Already a variable with this name in this scope.");
+        }
+
+        StackLocal_push(
+            &parser->function->locals,
+            parser->token_previous,
+            parser->function->depth, // Mark as Initialized
+            LocalAction_Default
+        );
+
+        parser_parse_function_paramenters_and_body(
+            parser, 
+            FunctionKind_Function
         );
     }
 
@@ -935,79 +1039,50 @@ static Statement* parser_parse_declaration_function(Parser* parser) {
 }
 
 static Statement* parser_parse_method_declaration(Parser* parser) {
-    // int method_name_index = parser_parse_identifier(parser, "Expect Method name identifier.");
-
-    // FunctionKind function_kind = FunctionKind_Method;
-    // if (parser.previous.length == 4 && memcmp(parser.previous.start, "init", 4) == 0)
-    //     function_kind = FunctionKind_Initializer;
-    // ObjectFunction* function = parser_parse_function_paramenters_and_body(parser, function_kind);
-
-    // Value value = value_make_object(function);
-    // Compiler_CompileInstruction_Constant(
-    //     parser_get_current_bytecode(parser),
-    //     value,
-    //     parser->token_previous.line_number
-    // );
-    // 
-    // Loop for every upvalue_count
-    //     Compiler_CompileInstruction_2Bytes(is_local, index);
-
-    // Define Method 
-    //
-    // Compiler_CompileInstruction_2Bytes(
-    //     parser_get_current_bytecode(parser),
-    //     OpCode_Define_Method,
-    //     method_name_index,
-    //     parser->token_previous.line_number
-    // );
     return NULL;
 }
 
 static ObjectFunction* parser_parse_function_paramenters_and_body(Parser* parser, FunctionKind function_kind) {
-    String source_string = string_make(parser->token_previous.start, parser->token_previous.length);
-    uint32_t source_hash = string_hash(source_string);
-    ObjectString* function_name = ObjectString_Allocate(
-        .task = (
-            AllocateTask_Check_If_Interned |
-            AllocateTask_Copy_String       |
-            AllocateTask_Initialize        |
-            AllocateTask_Intern
-        ),
-        .string = source_string,
-        .hash   = source_hash,
-        .first  = parser->object_head,   // .first = &parser->objects,
-        .table  = parser->string_database
-    );
-
     Function function;
-    Memory_transaction_push(value_make_object_string(function_name));
-    {
-        parser_init_function(parser, &function, function_kind, function_name);
-    }
-    Memory_transaction_pop();
+    parser_init_function(parser, &function, function_kind);
 
     parser_begin_scope(parser);
 
     parser_consume(parser, Token_Left_Parenthesis, "Expect a '(' after the function name.");
     if (!(parser->token_current.kind == Token_Right_Parenthesis)) {
         do {
+            parser_consume(parser, Token_Identifier, "Expect parameter name.");
+
             parser->function->object->arity += 1;
-            if (parser->function->object->arity > 255)
-                parser_error(parser, &parser->token_current, "Can't have more than 255 parameters.");
+            if (parser->function->object->arity > 255) parser_error(parser, &parser->token_current, "Can't have more than 255 parameters.");
 
-            uint8_t indentifier_index = parser_parse_identifier(parser, "Expect parameter name.");
+            if (parser->function->depth == 0) { 
+                ObjectString* identifier = parser_intern_token(parser->token_previous, parser->object_head, parser->string_database);
+                Bytecode* bytecode = parser_get_current_bytecode(parser);
+                int indentifier_index = parser_save_identifier_into_bytecode(bytecode, identifier);
+                if (indentifier_index == -1) parser_error(parser, &parser->token_current, "Too many constants.");
 
-            // Define Identifier
-            //  
-            if (parser->function->depth == 0) {
                 Compiler_CompileInstruction_2Bytes(
                     parser_get_current_bytecode(parser),
                     OpCode_Define_Global,
                     indentifier_index,
                     parser->token_previous.line_number
                 );
-            } else {
-                parser_initialize_local_identifier(parser);
+            } else {  
+                if (StackLocal_is_full(&parser->function->locals)) {
+                    parser_error(parser, &parser->token_previous, "Too many local variables in a scope.");
+                }
+
+                if (parser_check_locals_duplicates(parser, &parser->token_previous)) {
+                    parser_error(parser, &parser->token_previous, "Already a variable with this name in this scope.");
+                }
+
+                StackLocal_push(
+                    &parser->function->locals,
+                    parser->token_previous,
+                    parser->function->depth, // Mark as Initialized
+                    LocalAction_Default
+                );
             }
         } while (parser_match_then_advance(parser, Token_Comma));
     }
@@ -1111,7 +1186,6 @@ static Statement* parser_parse_declaration_variable(Parser* parser) {
 
             statement.variable_declaration.rhs = expression_allocate(expression_make_nil());
         }
-
 
         parser_consume(parser, Token_Semicolon, "Expected ';' after expression.");
 
@@ -1312,6 +1386,27 @@ static Expression* parser_parse_expression(Parser* parser, OperatorPrecedence op
 
     bool can_assign        = (operator_precedence_previous <= OperatorPrecedence_Assignment);
     Expression* expression = parser_parse_unary_literals_and_identifier(parser, can_assign);
+    // Should i save the parser->token_previous and then use it in the infix section
+    //
+    // if (parser_is_identifier(parser->token_previous)) {
+    //     if (parser_is_assignment(parser->token_current)) {
+    //         Token token_identifier = parser->token_previous;
+    //     } else {
+    //         int identifier_location = -1;
+    //         int identifier_location_index = parser_find_identifier_location(parser, parser->token_previous, &identifier_location, NULL);
+    //         parser_load_identifier_value_to_stack(parser, identifier_location, identifier_location_index);
+    //     }
+    // }
+    //
+    // OR --
+    //
+    // if (parser_is_identifier(parser.token_previous)) {
+    //     int identifier_location = -1;
+    //     int location_index = parser_resolve_identifier_by_scope(parser, identifier, &identifier_location, local_found);
+    //     if (!parser_is_assignment(parser->token_current)) {
+    //         Compiler_compileInstruction2Bytes();
+    //     }
+    // }
 
     TokenKind operator_kind_current   = parser->token_current.kind;
     OperatorMetadata operator_current = parser_get_operator_metadata(operator_kind_current);
@@ -1342,6 +1437,17 @@ static Expression* parser_parse_expression(Parser* parser, OperatorPrecedence op
         } else if (parser->token_previous.kind == Token_Dot) {
             expression = parser_parse_operator_object_getter_and_setter(parser, expression, can_assign);
         }
+//      else if (parser_is_operator_assignment(parser.token_previous)) {
+//          if (can_assign) {
+//              // parser_parse_assignment(parser, token_identifier, can_assign);
+//              int identifier_location = -1;
+//              int identifier_location_index = parser_find_identifier_location(parser, identifier_token, &identifier_location, NULL);
+//              parser_parse_operator_assignment(identifier_location, identifier_location_index);
+//          }
+//          else {
+//              parser_error(parser, &parser->token_current, "Invalid assignment target.");
+//          }
+//      }
 
         operator_current = parser_get_operator_metadata(parser->token_current.kind);
     }
@@ -1476,6 +1582,8 @@ static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bo
             parser_error(parser, &parser->token_previous, "Missing closing '}' in interpolation template.");
 
         parser->interpolation_count_value_pushed += 1;
+        // TODO: use a Temporary Stack to process recursive calls
+        // 
         parser_parse_unary_literals_and_identifier(parser, can_assign);
 
         if (parser->interpolation_count_nesting == 0) {
@@ -1521,34 +1629,18 @@ static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bo
     // Identifier
     //
     if (parser->token_previous.kind == Token_Identifier) {
+        // TODO: Move this Body into a function called 'parser_parse_identifier(...)'
+        //
         uint8_t opcode_assign = OpCode_Invalid;
-        uint8_t opcode_read = OpCode_Invalid;
-        Local* local_found = NULL;
-        int operand = -1;
+        uint8_t opcode_read   = OpCode_Invalid;
+        Local* local_found    = NULL;
 
-        String source_string = string_make(parser->token_previous.start, parser->token_previous.length);
-        uint32_t source_hash = string_hash(source_string);
-        ObjectString* variable_name = ObjectString_Allocate(
-            .task = (
-                AllocateTask_Check_If_Interned |
-                AllocateTask_Copy_String       |
-                AllocateTask_Initialize        |
-                AllocateTask_Intern 
-            ),
-            .string = source_string,
-            .hash   = source_hash,
-            .first  = parser->object_head,   // .first = &parser->objects,
-            .table  = parser->string_database
-        );
-
-        operand = StackLocal_get_local_index_by_token(&parser->function->locals, &parser->token_previous, &local_found);
+        int operand = StackLocal_get_local_index_by_token(&parser->function->locals, &parser->token_previous, &local_found);
         if (operand != -1) {
             // If is a Local, then:
             //
             opcode_assign = OpCode_Stack_Copy_Top_To_Idx;
             opcode_read   = OpCode_Stack_Copy_From_idx_To_Top;
-
-            // } else if ((operand = Function_resolve_variable_dependencies(parser->function, &parser->token_previous, &local_found)) != -1) {
         } else if ((operand = parser_resolve_variable_dependencies(parser->function, &parser->token_previous, &local_found)) != -1) {
             // If is a closure's variable, then: 
             //
@@ -1557,26 +1649,13 @@ static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bo
         } else {
             // Otherwise is a Global
             //
+            ObjectString* identifier = parser_intern_token(parser->token_previous, parser->object_head, parser->string_database);
+            Bytecode* bytecode = parser_get_current_bytecode(parser);
+            operand = parser_save_identifier_into_bytecode(bytecode, identifier);
+            if (operand == -1) parser_error(parser, &parser->token_current, "Too many constants.");
+
             opcode_assign = OpCode_Assign_Global;
             opcode_read   = OpCode_Read_Global;
-
-            Value value_string = value_make_object_string(variable_name);
-            Memory_transaction_push(value_string);
-            {
-                int value_index = Compiler_CompileValue(
-                    parser_get_current_bytecode(parser),
-                    value_string
-                );
-
-                // TODO: Support for more than 256 value in a Scope
-                if (value_index <= UINT8_MAX) {
-                    operand = value_index;
-                } else {
-                    parser_error(parser, &parser->token_current, "Too many constants.");
-                    operand = 0;
-                }
-            }
-            Memory_transaction_pop();
         }
 
         if (local_found && local_found->scope_depth == -1)
@@ -1585,16 +1664,18 @@ static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bo
         // Assignment / Variable Initialization 
         //
         if (can_assign && parser_match_then_advance(parser, Token_Equal)) {
-            Expression* right_hand_side = parser_parse_expression(parser, OperatorPrecedence_Assignment);
-            Expression expression = expression_make_assignment(variable_name, right_hand_side);
+            parser_parse_expression(parser, OperatorPrecedence_Assignment);
             Compiler_CompileInstruction_2Bytes(
                 parser_get_current_bytecode(parser),
                 opcode_assign,
                 operand,
                 parser->token_previous.line_number
             );
-
-            return expression_allocate(expression);
+            
+            // Expression* right_hand_side = parser_parse_expression(parser, OperatorPrecedence_Assignment);
+            // Expression expression = expression_make_assignment(variable_name, right_hand_side);
+            // return expression_allocate(expression);
+            return NULL;
         }
 
         // Get variable value
@@ -1606,8 +1687,9 @@ static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bo
             parser->token_previous.line_number
         );
 
-        Expression expression = expression_make_variable(variable_name);
-        return expression_allocate(expression);
+        // Expression expression = expression_make_variable(variable_name);
+        // return expression_allocate(expression);
+        return NULL;
     }
 
     // TODO: log token name
@@ -1642,6 +1724,10 @@ static bool parser_is_operator_relational(Parser* parser) {
         token_kind == Token_Greater       || 
         token_kind == Token_Greater_Equal
     );
+}
+
+static bool parser_is_operator_assignment(Token operator) {
+    return (operator.kind == Token_Equal);
 }
 
 static Expression* parser_parse_operators_logical(Parser* parser, Expression* left_operand) {
@@ -1903,16 +1989,23 @@ static void parser_end_scope(Parser* parser) {
     }
 }
 
-static void parser_init_function(Parser* parser, Function* function, FunctionKind function_kind, ObjectString* function_name) {
-    // ObjectFunction* object_fn = ObjectFunction_allocate(function_name, &parser->objects);
-    ObjectFunction* object_fn = ObjectFunction_allocate(function_name, parser->object_head);
+static void parser_init_function(Parser* parser, Function* function, FunctionKind function_kind) {
+    ObjectFunction* object_fn = ObjectFunction_allocate(parser->object_head);
+    if (function_kind != FunctionKind_Script) 
+        object_fn->name = parser_intern_token(parser->token_previous, parser->object_head, parser->string_database);
 
     function->function_kind = function_kind;
     function->object        = NULL;
     function->object        = object_fn;
     function->depth         = 0;
     StackLocal_init(&function->locals);
-    StackLocal_push(&function->locals, (Token) { 0 }, 0, LocalAction_Default); ArrayLocalMetadata_init(&function->variable_dependencies, 0);
+    StackLocal_push(
+        &function->locals, 
+        (Token) { 0 }, 
+        0, 
+        LocalAction_Default
+    ); 
+    ArrayLocalMetadata_init(&function->variable_dependencies, 0);
     LinkedList_push(parser->function, function);
 }
 

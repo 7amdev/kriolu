@@ -10,6 +10,10 @@ void Bytecode_init(Bytecode* bytecode) {
     array_instruction_init(&bytecode->instructions);
     ArrayValue_init(&bytecode->values);
     array_line_init(&bytecode->lines);
+    
+    bytecode->source_code.items    = NULL;
+    bytecode->source_code.count    = 0;
+    bytecode->source_code.capacity = 0;
 }
 
 int Bytecode_insert_instruction_1byte(Bytecode* bytecode, OpCode opcode, int line_number, bool debug_trace_on) {
@@ -377,6 +381,8 @@ int Bytecode_disassemble_instruction(Bytecode* bytecode, int offset)
         return Bytecode_debug_instruction_2bytes(bytecode, "OPCODE_READ_GLOBAL", (offset + 2));
     if (opcode == OpCode_Class)
         return Bytecode_debug_instruction_2bytes(bytecode, "OPCODE_CLASS", (offset + 2));
+    if (opcode == OpCode_Method)
+        return Bytecode_debug_instruction_2bytes(bytecode, "OPCODE_METHOD", (offset + 2));
     if (opcode == OpCode_Object_Get_Property)
         return Bytecode_debug_instruction_2bytes(bytecode, "OPCODE_OBJ_GET_PROPERTY", (offset + 2));
     if (opcode == OpCode_Object_Set_Property)

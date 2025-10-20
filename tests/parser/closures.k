@@ -38,6 +38,8 @@ funson Vetor2(x, y) {
 mimoria a = Vetor2(1, 2);
 mimoria b = Vetor2(3, 4);
 mimoria c = a("soma")(b);
+mimoria d;
+d = 69;
 
 imprimi a("x");
 imprimi a("y");
@@ -46,6 +48,7 @@ imprimi c("y");
 
 imprimi "Hello " + "World";
 imprimi rilogio();
+imprimi d;
 
 // Test::2
 //

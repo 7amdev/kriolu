@@ -69,12 +69,12 @@ ObjectString* ObjectString_allocate(AllocateParams params) {
     return object_st;
 }
 
-ObjectFunction* ObjectFunction_allocate(ObjectString* function_name, Object** object_head) {
+ObjectFunction* ObjectFunction_allocate(Object** object_head) {
     ObjectFunction* object_fn = Object_Allocate(ObjectFunction, ObjectKind_Function, object_head);
     assert(object_fn);
 
     object_fn->arity = 0;
-    object_fn->name = function_name;
+    object_fn->name = NULL;
     object_fn->variable_dependencies_count = 0;
     Bytecode_init(&object_fn->bytecode);
 
@@ -127,6 +127,7 @@ ObjectClass* ObjectClass_alocate(ObjectString* name, Object** object_head) {
     ObjectClass* klass = Object_Allocate(ObjectClass, ObjectKind_Class, object_head);
     assert(klass);
     klass->name = name;
+    hash_table_init(&klass->methods);
 
     return klass;
 }
@@ -232,7 +233,9 @@ void Object_free(Object* object) {
         object = NULL;
     } break;
     case ObjectKind_Class: {
+        ObjectClass* klass = (ObjectClass*)object;
         Memory_Free(ObjectClass, object);
+        hash_table_free(&klass->methods);
         object = NULL;
     } break;
     case ObjectKind_Instance: {

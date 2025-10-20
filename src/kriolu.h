@@ -208,6 +208,7 @@ enum {
     OpCode_Loop,
     OpCode_Call_Function,
     OpCode_Class,
+    OpCode_Method,
     OpCode_Object_Set_Property,
     OpCode_Object_Get_Property,
 
@@ -497,6 +498,7 @@ typedef struct {
 typedef struct {
     Object object;
     ObjectString* name;
+    HashTable methods;
 } ObjectClass;
 
 typedef struct {
@@ -533,7 +535,7 @@ inline bool Object_check_value_kind(Value value, ObjectKind object_kind) {
 
 #define ObjectString_Allocate(...) ObjectString_allocate((AllocateParams){__VA_ARGS__})
 ObjectString* ObjectString_allocate(AllocateParams params);
-ObjectFunction* ObjectFunction_allocate(ObjectString* function_name, Object** object_head);
+ObjectFunction* ObjectFunction_allocate(Object** object_head);
 ObjectValue* ObjectValue_allocate(Object** object_head, Value* value_address);
 ObjectClosure* ObjectClosure_allocate(ObjectFunction* function, Object** object_head);
 ObjectFunctionNative* ObjectFunctionNative_allocate(FunctionNative* function, Object** object_head, int arity);
@@ -761,7 +763,11 @@ struct Function {
     FunctionKind function_kind;
     ObjectFunction* object;                     // NOTE: Runtime function data structure
     StackLocal locals;                          // NOTE: Variables declared inside a function; Emulates runtime StackValue 
+
+    // TODO: rename to 'varibles_in_parent_scope' ???
+    //
     ArrayLocalMetadata variable_dependencies;   // NOTE: Varibale accessed that belongs to a parent function
+    
     int depth;                                  // NOTE: Scope depth
 };
 
