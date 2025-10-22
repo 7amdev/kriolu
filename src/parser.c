@@ -1,7 +1,5 @@
 #include "kriolu.h"
 
-// TODO: [] parser destroy implementation
-
 static void parser_advance(Parser* parser);
 static void parser_consume(Parser* parser, TokenKind kind, const char* error_message);
 static bool parser_match_then_advance(Parser* parser, TokenKind kind);
@@ -28,18 +26,24 @@ static void parser_initialize_local_identifier(Parser* parser);
 static ObjectFunction* parser_parse_function_paramenters_and_body(Parser* parser, FunctionKind function_kind);
 static Statement* parser_parse_statement_expression(Parser* parser); // TODO: rename to ???
 static Expression* parser_parse_expression(Parser* parser, OperatorPrecedence operator_precedence_previous);
-static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bool can_assign);
+// TODO: delete code bellow
+// static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bool can_assign);
+static Expression* parser_parse_literals(Parser* parser, bool can_assign);
 static Expression* parser_parse_operator_function_call(Parser* parser, Expression* left_operand);
 static Expression* parser_parse_operator_object_getter_and_setter(Parser* parser, Expression* left_expression, bool can_assign);
+static void parser_parse_operator_assignment(Parser* parser, int identifier_location, int identifier_location_index);
+static Expression* parser_parse_operators_unary(Parser* parser);
 static Expression* parser_parse_operators_logical(Parser* parser, Expression* left_operand);
 static Expression* parser_parse_operators_arithmetic(Parser* parser, Expression* left_operand);
 static Expression* parser_parse_operators_relational(Parser* parser, Expression* left_operand);
 // TODO: rename to Function_find_local_by_token(Function* function, Token* name, Local** out);
 static void parser_compile_return(Parser* parser);
-static bool parser_is_operator_arithmetic(Parser* parser);
-static bool parser_is_operator_logical(Parser* parser);
-static bool parser_is_operator_relational(Parser* parser);
-static bool parser_is_operator_assignment(Token operator);
+static bool parser_is_operator_arithmetic(Token token);
+static bool parser_is_operator_logical(Token token);
+static bool parser_is_operator_relational(Token token);
+static bool parser_is_operator_assignment(Token token);
+static bool parser_is_operator_unary(Token token);
+static bool parser_is_literals(Token token);
 static bool parser_check_locals_duplicates(Parser* parser, Token* identifier);
 static void parser_end_parsing(Parser* parser);
 static void parser_begin_scope(Parser* parser);
@@ -277,16 +281,17 @@ static Statement* parser_parse_instruction_print(Parser* parser) {
     Expression* expression = parser_parse_expression(parser, OperatorPrecedence_Assignment);
     parser_consume(parser, Token_Semicolon, "Expect ';' after expression.");
 
-    source_code.source_length = (int)(parser->token_current.start - source_code.source_start);
-    DynamicArray_append(
-        &parser_get_current_bytecode(parser)->source_code, 
-        source_code
-    );
 
     Compiler_CompileInstruction_1Byte(
         parser_get_current_bytecode(parser), 
         OpCode_Print, 
         parser->token_previous.line_number
+    );
+
+    source_code.source_length = (int)(parser->token_current.start - source_code.source_start);
+    DynamicArray_append(
+        &parser_get_current_bytecode(parser)->source_code, 
+        source_code
     );
 
     Statement statement = { 0 };
@@ -718,36 +723,6 @@ static Statement* parser_instruction_return(Parser* parser) {
     return statement_allocate(statement);
 }
 
-// static parser_convert_identifier_to_value(Parser* parser) {
-//     int value_index = -1;
-//     String source_string = string_make(parser->token_previous.start, parser->token_previous.length);
-//     uint32_t source_hash = string_hash(source_string);
-//     ObjectString* identifier_string = ObjectString_Allocate(
-//         .task = (
-//             AllocateTask_Check_If_Interned  |
-//             AllocateTask_Copy_String        |
-//             AllocateTask_Initialize         |
-//             AllocateTask_Intern
-//         ),
-//         .string = source_string,
-//         .hash   = source_hash,
-//         .first  = parser->object_head,
-//         .table  = parser->string_database
-//     );
-
-//     Value value_string = value_make_object_string(identifier_string);
-//     Memory_transaction_push(value_string);
-//     {
-//         value_index = Compiler_CompileValue(
-//             parser_get_current_bytecode(parser), 
-//             value_string
-//         );
-//     }
-//     Memory_transaction_pop();
-
-//     return value_index;
-// }
-
 static ObjectString* parser_intern_token(Token token, Object** object_head, HashTable* string_database) {
     String source_string            = string_make(token.start, token.length);
     uint32_t source_string_hash     = string_hash(source_string);
@@ -837,6 +812,34 @@ static void parser_load_identifier_value_to_stack(Parser* parser, int identifier
     }
 }
 
+static void parser_parse_operator_assignment(Parser* parser, int identifier_location, int identifier_location_index) {
+    parser_parse_expression(parser, OperatorPrecedence_Assignment);
+    if (identifier_location == 1) {
+//      Its a Local Variable
+        Compiler_CompileInstruction_2Bytes(
+            parser_get_current_bytecode(parser),
+            OpCode_Stack_Copy_Top_To_Idx,
+            identifier_location_index,
+            parser->token_previous.line_number
+        );
+    } else if (identifier_location == 2) {
+//      Its a Closure Variable
+        Compiler_CompileInstruction_2Bytes(
+            parser_get_current_bytecode(parser),
+            OpCode_Copy_From_Stack_To_Heap,
+            identifier_location_index,
+            parser->token_previous.line_number
+        );
+    } else {
+//      Its a Global Variable
+        Compiler_CompileInstruction_2Bytes(
+            parser_get_current_bytecode(parser),
+            OpCode_Assign_Global,
+            identifier_location_index,
+            parser->token_previous.line_number
+        );
+    }
+}
 static void parser_initialize_local_identifier(Parser* parser) {
     if (parser->function->depth == 0) return;
 
@@ -859,31 +862,6 @@ static Statement* parser_parse_declaration_class(Parser* parser) {
     Bytecode* bytecode       = parser_get_current_bytecode(parser);
     ObjectString* os_class_name = parser_intern_token(parser->token_previous, parser->object_head, parser->string_database);
     int class_name_index     = parser_save_identifier_into_bytecode(bytecode, os_class_name);
-    // String source_string = string_make(parser->token_previous.start, parser->token_previous.length);
-    // uint32_t source_hash = string_hash(source_string);
-    // ObjectString* identifier_string = ObjectString_Allocate(
-    //     .task = (
-    //         AllocateTask_Check_If_Interned  |
-    //         AllocateTask_Copy_String        |
-    //         AllocateTask_Initialize         |
-    //         AllocateTask_Intern
-    //     ),
-    //     .string = source_string,
-    //     .hash   = source_hash,
-    //     .first  = parser->object_head,
-    //     .table  = parser->string_database
-    // );
-
-    // Value value_string = value_make_object_string(identifier_string);
-    // int class_name_index = -1;
-    // Memory_transaction_push(value_string);
-    // {
-    //     class_name_index = Compiler_CompileValue(
-    //         parser_get_current_bytecode(parser), 
-    //         value_string
-    //     );
-    // }
-    // Memory_transaction_pop();
 
     // Register the Identifier in the Value Stack as Uninitialized, if 
     // we are not in a global scope.
@@ -965,7 +943,7 @@ static Statement* parser_parse_declaration_class(Parser* parser) {
 
         parser_parse_function_paramenters_and_body(parser, FunctionKind_Function);
 
-        // Tells the VM to attach method into the class method's hash table
+        // Tells the VM to attach method into the class method's hash-table
         //
         Compiler_CompileInstruction_2Bytes(
             parser_get_current_bytecode(parser),
@@ -1295,12 +1273,12 @@ static OperatorMetadata parser_get_operator_metadata(TokenKind kind)
         return operator_metadata;
     }
     case Token_Ou: {
-        // NOTE: Since its a bytecode interpreter, we use right-associativity when parsing 
-        //       and emitting instructions to make jumps-instructions efficient, beacuse 
-        //       we now the end of the statement while preserving left-associativity when 
-        //       interpreting the code. 
-        //       Otherwise if we were to use a AST interpreter, we would use left-associativity 
-        //       when parsing to ensure that the interpretation will occour from left-to-right;
+//      NOTE: Since its a bytecode interpreter, we use right-associativity when parsing 
+//            and emitting instructions to make jumps-instructions efficient, beacuse 
+//            we now the end of the statement while preserving left-associativity when 
+//            interpreting the code. 
+//            Otherwise if we were to use a AST interpreter, we would use left-associativity 
+//            when parsing to ensure that the interpretation will occour from left-to-right;
         OperatorMetadata operator_metadata = { 0 };
         operator_metadata.precedence = OperatorPrecedence_Or;
         operator_metadata.is_left_associative = false;
@@ -1308,12 +1286,12 @@ static OperatorMetadata parser_get_operator_metadata(TokenKind kind)
         return operator_metadata;
     }
     case Token_E: {
-        // NOTE: Since its a bytecode interpreter, we use right-associativity when parsing 
-        //       and emitting instructions to make jumps-instructions efficient, beacuse 
-        //       we now the end of the statement while preserving left-associativity when 
-        //       interpreting the code. 
-        //       Otherwise if we were to use a AST interpreter, we would use left-associativity 
-        //       when parsing to ensure that the interpretation will occour from left-to-right;
+//      NOTE: Since its a bytecode interpreter, we use right-associativity when parsing 
+//            and emitting instructions to make jumps-instructions efficient, beacuse 
+//            we now the end of the statement while preserving left-associativity when 
+//            interpreting the code. 
+//            Otherwise if we were to use a AST interpreter, we would use left-associativity 
+//            when parsing to ensure that the interpretation will occour from left-to-right;
         OperatorMetadata operator_metadata = { 0 };
         operator_metadata.precedence = OperatorPrecedence_And;
         operator_metadata.is_left_associative = false;
@@ -1384,91 +1362,80 @@ static OperatorMetadata parser_get_operator_metadata(TokenKind kind)
 static Expression* parser_parse_expression(Parser* parser, OperatorPrecedence operator_precedence_previous) {
     parser_advance(parser);
 
-    bool can_assign        = (operator_precedence_previous <= OperatorPrecedence_Assignment);
-    Expression* expression = parser_parse_unary_literals_and_identifier(parser, can_assign);
-    // Should i save the parser->token_previous and then use it in the infix section
-    //
-    // if (parser_is_identifier(parser->token_previous)) {
-    //     if (parser_is_assignment(parser->token_current)) {
-    //         Token token_identifier = parser->token_previous;
-    //     } else {
-    //         int identifier_location = -1;
-    //         int identifier_location_index = parser_find_identifier_location(parser, parser->token_previous, &identifier_location, NULL);
-    //         parser_load_identifier_value_to_stack(parser, identifier_location, identifier_location_index);
-    //     }
-    // }
-    //
-    // OR --
-    //
-    // if (parser_is_identifier(parser.token_previous)) {
-    //     int identifier_location = -1;
-    //     int location_index = parser_resolve_identifier_by_scope(parser, identifier, &identifier_location, local_found);
-    //     if (!parser_is_assignment(parser->token_current)) {
-    //         Compiler_compileInstruction2Bytes();
-    //     }
-    // }
+    bool can_assign               = (operator_precedence_previous <= OperatorPrecedence_Assignment);
+    Expression* expression        = NULL;
+    int identifier_location       = -1;
+    int identifier_location_index = -1;
 
-    TokenKind operator_kind_current   = parser->token_current.kind;
-    OperatorMetadata operator_current = parser_get_operator_metadata(operator_kind_current);
+//  Parsing Operands Section
+    if (parser_is_literals(parser->token_previous))
+        expression = parser_parse_literals(parser, can_assign); 
+    else if (parser_is_operator_unary(parser->token_previous))
+        expression = parser_parse_operators_unary(parser); 
+    else if (parser->token_previous.kind == Token_Identifier)  {
+        identifier_location_index = parser_find_identifier_location(parser, parser->token_previous, &identifier_location, NULL);
+//      If there is no assignment, then compile the Identifier as a Variable.
+        if (parser->token_current.kind != Token_Equal) 
+            parser_load_identifier_value_to_stack(parser, identifier_location, identifier_location_index);
+    }
 
+//  Parsing Operators Section
+    OperatorMetadata operator_current = parser_get_operator_metadata(parser->token_current.kind);
     for (;;) {
-        if (
-            operator_current.is_left_associative && 
-            operator_current.precedence <= operator_precedence_previous
-        ) break;
-        if (
-            operator_current.is_right_associative && 
-            operator_current.precedence < operator_precedence_previous
-        ) break;
-        if (
-            parser->token_current.kind == Token_Equal
-        ) break;
+        if (operator_current.is_left_associative)
+        if (operator_current.precedence <= operator_precedence_previous) 
+            break;
+
+        if (operator_current.is_right_associative)
+        if (operator_current.precedence < operator_precedence_previous)
+            break;
 
         parser_advance(parser);
 
-        if (parser_is_operator_arithmetic(parser)) {
+        if (parser_is_operator_arithmetic(parser->token_previous)) {
             expression = parser_parse_operators_arithmetic(parser, expression);
-        } else if (parser_is_operator_logical(parser)) {
+        } else if (parser_is_operator_logical(parser->token_previous)) {
             expression = parser_parse_operators_logical(parser, expression);
-        } else if (parser_is_operator_relational(parser)) {
+        } else if (parser_is_operator_relational(parser->token_previous)) {
             expression = parser_parse_operators_relational(parser, expression);
         } else if (parser->token_previous.kind == Token_Left_Parenthesis) {
             expression = parser_parse_operator_function_call(parser, expression);
         } else if (parser->token_previous.kind == Token_Dot) {
             expression = parser_parse_operator_object_getter_and_setter(parser, expression, can_assign);
+        } else if (parser->token_previous.kind == Token_Equal) {
+            do {
+                if (identifier_location_index == -1) break;
+                if (!can_assign)                     break;
+
+                parser_parse_operator_assignment(parser, identifier_location, identifier_location_index);
+            } while (0);
+
+//          If-Else Error Section
+            if (identifier_location_index == -1) parser_error(parser, &parser->token_previous, "Undefined identifier.");    else 
+            if (!can_assign)                     parser_error(parser, &parser->token_current, "Invalid assignment target.");
         }
-//      else if (parser_is_operator_assignment(parser.token_previous)) {
-//          if (can_assign) {
-//              // parser_parse_assignment(parser, token_identifier, can_assign);
-//              int identifier_location = -1;
-//              int identifier_location_index = parser_find_identifier_location(parser, identifier_token, &identifier_location, NULL);
-//              parser_parse_operator_assignment(identifier_location, identifier_location_index);
-//          }
-//          else {
-//              parser_error(parser, &parser->token_current, "Invalid assignment target.");
-//          }
-//      }
 
         operator_current = parser_get_operator_metadata(parser->token_current.kind);
     }
 
-    if (can_assign && parser_match_then_advance(parser, Token_Equal)) {
-        parser_error(parser, &parser->token_current, "Invalid assignment target.");
+    if (parser->token_current.kind == Token_Equal && operator_current.precedence < operator_precedence_previous) {
+        parser_error(parser, &parser->token_current, "Invalid placement of Assignment");
     }
 
     return expression;
 }
 
-static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bool can_assign)
-{
-    // Literals
-    //
+static Expression* parser_parse_literals(Parser* parser, bool can_assign) {
     if (parser->token_previous.kind == Token_Number) {
         double value = strtod(parser->token_previous.start, NULL);
         Value number = value_make_number(value);
         Expression e_number = expression_make_number(value);
 
-        Compiler_CompileInstruction_Constant(parser_get_current_bytecode(parser), number, parser->token_previous.line_number);
+        Compiler_CompileInstruction_Constant(
+            parser_get_current_bytecode(parser), 
+            number, 
+            parser->token_previous.line_number
+        );
 
         return expression_allocate(e_number);
     }
@@ -1476,48 +1443,42 @@ static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bo
     if (parser->token_previous.kind == Token_Verdadi) {
         Expression e_true = expression_make_boolean(true);
 
-        Compiler_CompileInstruction_1Byte(parser_get_current_bytecode(parser), OpCode_Stack_Push_Literal_True, parser->token_previous.line_number);
+        Compiler_CompileInstruction_1Byte(
+            parser_get_current_bytecode(parser), 
+            OpCode_Stack_Push_Literal_True, 
+            parser->token_previous.line_number
+        );
+
         return expression_allocate(e_true);
     }
 
     if (parser->token_previous.kind == Token_Falsu) {
         Expression e_false = expression_make_boolean(false);
 
-        Compiler_CompileInstruction_1Byte(parser_get_current_bytecode(parser), OpCode_Stack_Push_Literal_False, parser->token_previous.line_number);
+        Compiler_CompileInstruction_1Byte(
+            parser_get_current_bytecode(parser), 
+            OpCode_Stack_Push_Literal_False, 
+            parser->token_previous.line_number
+        );
+
         return expression_allocate(e_false);
     }
 
     if (parser->token_previous.kind == Token_Nulo) {
         Expression nil = expression_make_nil();
 
-        Compiler_CompileInstruction_1Byte(parser_get_current_bytecode(parser), OpCode_Stack_Push_Literal_Nil, parser->token_previous.line_number);
+        Compiler_CompileInstruction_1Byte(
+            parser_get_current_bytecode(parser), 
+            OpCode_Stack_Push_Literal_Nil, 
+            parser->token_previous.line_number
+        );
+
         return expression_allocate(nil);
     }
 
     if (parser->token_previous.kind == Token_String) {
-        // Check if the source_string already exists in the global string
-        // database in the virtual machine. If it does, reuse it, if not
-        // allocate a new one and store it in the global string database for
-        // future reference.
-        //
-        String source_string = string_make(parser->token_previous.start + 1, parser->token_previous.length - 2);
-        uint32_t source_hash = string_hash(source_string);
-        ObjectString* string = ObjectString_Allocate(
-            .task = (
-                AllocateTask_Check_If_Interned |
-                AllocateTask_Copy_String       |
-                AllocateTask_Initialize        |
-                AllocateTask_Intern),
-            .string = source_string,
-            .hash = source_hash,
-            // .first = &parser->objects,
-            .first = parser->object_head,
-            .table = parser->string_database
-        );
-
+        ObjectString* string = parser_intern_token(parser->token_previous, parser->object_head, parser->string_database);
         Value v_string = value_make_object(string);
-        Expression e_string = expression_make_string(string);
-
         Memory_transaction_push(v_string);
         {
             Compiler_CompileInstruction_Constant(
@@ -1528,6 +1489,7 @@ static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bo
         }
         Memory_transaction_pop();
 
+        Expression e_string = expression_make_string(string);
         return expression_allocate(e_string);
     }
 
@@ -1537,37 +1499,19 @@ static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bo
             if (parser->token_previous.kind != Token_String_Interpolation)
                 break;
 
-            String source_string = string_make(parser->token_previous.start + 1, parser->token_previous.length - 2);
-            uint32_t source_hash = string_hash(source_string);
-            ObjectString* string = ObjectString_Allocate(
-                .task = (
-                    AllocateTask_Check_If_Interned |
-                    AllocateTask_Copy_String       |
-                    AllocateTask_Initialize        |
-                    AllocateTask_Intern),
-                .string = source_string,
-                .hash = source_hash,
-                // .first = &parser->objects,
-                .first = parser->object_head,
-                .table = parser->string_database
-            );
-
+            ObjectString* string = parser_intern_token(parser->token_previous, parser->object_head, parser->string_database);
             Value v_string = value_make_object(string);
-            Expression e_string = expression_make_string(string);
-
-            // Tracks on many values have it pushed to the stack on runtime.
-            //
-            parser->interpolation_count_value_pushed += 1;
             Memory_transaction_push(v_string);
             {
                 Compiler_CompileInstruction_Constant(
-                    parser_get_current_bytecode(parser), 
-                    v_string, 
+                    parser_get_current_bytecode(parser),
+                    v_string,
                     parser->token_previous.line_number
                 );
             }
             Memory_transaction_pop();
 
+            parser->interpolation_count_value_pushed += 1;
             parser->interpolation_count_nesting += 1;
             if (parser->token_current.kind != Token_String_Interpolation)
                 parser->interpolation_count_value_pushed += 1;
@@ -1584,7 +1528,7 @@ static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bo
         parser->interpolation_count_value_pushed += 1;
         // TODO: use a Temporary Stack to process recursive calls
         // 
-        parser_parse_unary_literals_and_identifier(parser, can_assign);
+        // _parser_parse_unary_literals_and_identifier(parser, can_assign);
 
         if (parser->interpolation_count_nesting == 0) {
             Compiler_CompileInstruction_2Bytes(
@@ -1600,13 +1544,261 @@ static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bo
         return NULL;
     }
 
-    // Unary
-    //
+    return NULL;
+}
+
+// TODO: delete code bellow
+//
+// static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bool can_assign)
+// {
+//     // Literals
+//     //
+//     if (parser->token_previous.kind == Token_Number) {
+//         double value = strtod(parser->token_previous.start, NULL);
+//         Value number = value_make_number(value);
+//         Expression e_number = expression_make_number(value);
+//
+//         Compiler_CompileInstruction_Constant(parser_get_current_bytecode(parser), number, parser->token_previous.line_number);
+//
+//         return expression_allocate(e_number);
+//     }
+//
+//     if (parser->token_previous.kind == Token_Verdadi) {
+//         Expression e_true = expression_make_boolean(true);
+//
+//         Compiler_CompileInstruction_1Byte(parser_get_current_bytecode(parser), OpCode_Stack_Push_Literal_True, parser->token_previous.line_number);
+//         return expression_allocate(e_true);
+//     }
+//
+//     if (parser->token_previous.kind == Token_Falsu) {
+//         Expression e_false = expression_make_boolean(false);
+//
+//         Compiler_CompileInstruction_1Byte(parser_get_current_bytecode(parser), OpCode_Stack_Push_Literal_False, parser->token_previous.line_number);
+//         return expression_allocate(e_false);
+//     }
+//
+//     if (parser->token_previous.kind == Token_Nulo) {
+//         Expression nil = expression_make_nil();
+//
+//         Compiler_CompileInstruction_1Byte(parser_get_current_bytecode(parser), OpCode_Stack_Push_Literal_Nil, parser->token_previous.line_number);
+//         return expression_allocate(nil);
+//     }
+//
+//     if (parser->token_previous.kind == Token_String) {
+//         // Check if the source_string already exists in the global string
+//         // database in the virtual machine. If it does, reuse it, if not
+//         // allocate a new one and store it in the global string database for
+//         // future reference.
+//         //
+//         String source_string = string_make(parser->token_previous.start + 1, parser->token_previous.length - 2);
+//         uint32_t source_hash = string_hash(source_string);
+//         ObjectString* string = ObjectString_Allocate(
+//             .task = (
+//                 AllocateTask_Check_If_Interned |
+//                 AllocateTask_Copy_String       |
+//                 AllocateTask_Initialize        |
+//                 AllocateTask_Intern),
+//             .string = source_string,
+//             .hash = source_hash,
+//             // .first = &parser->objects,
+//             .first = parser->object_head,
+//             .table = parser->string_database
+//         );
+//
+//         Value v_string = value_make_object(string);
+//         Expression e_string = expression_make_string(string);
+//
+//         Memory_transaction_push(v_string);
+//         {
+//             Compiler_CompileInstruction_Constant(
+//                 parser_get_current_bytecode(parser),
+//                 v_string,
+//                 parser->token_previous.line_number
+//             );
+//         }
+//         Memory_transaction_pop();
+//
+//         return expression_allocate(e_string);
+//     }
+//
+//     if (parser->token_previous.kind == Token_String_Interpolation) {
+//         for (;;)
+//         {
+//             if (parser->token_previous.kind != Token_String_Interpolation)
+//                 break;
+//
+//             String source_string = string_make(parser->token_previous.start + 1, parser->token_previous.length - 2);
+//             uint32_t source_hash = string_hash(source_string);
+//             ObjectString* string = ObjectString_Allocate(
+//                 .task = (
+//                     AllocateTask_Check_If_Interned |
+//                     AllocateTask_Copy_String       |
+//                     AllocateTask_Initialize        |
+//                     AllocateTask_Intern),
+//                 .string = source_string,
+//                 .hash = source_hash,
+//                 // .first = &parser->objects,
+//                 .first = parser->object_head,
+//                 .table = parser->string_database
+//             );
+//
+//             Value v_string = value_make_object(string);
+//             Expression e_string = expression_make_string(string);
+//
+//             // Tracks on many values have it pushed to the stack on runtime.
+//             //
+//             parser->interpolation_count_value_pushed += 1;
+//             Memory_transaction_push(v_string);
+//             {
+//                 Compiler_CompileInstruction_Constant(
+//                     parser_get_current_bytecode(parser), 
+//                     v_string, 
+//                     parser->token_previous.line_number
+//                 );
+//             }
+//             Memory_transaction_pop();
+//
+//             parser->interpolation_count_nesting += 1;
+//             if (parser->token_current.kind != Token_String_Interpolation)
+//                 parser->interpolation_count_value_pushed += 1;
+//
+//             parser_parse_expression(parser, OperatorPrecedence_Assignment);
+//             parser->interpolation_count_nesting -= 1;
+//
+//             parser_advance(parser);
+//         }
+//
+//         if (*parser->token_previous.start != '}')
+//             parser_error(parser, &parser->token_previous, "Missing closing '}' in interpolation template.");
+//
+//         parser->interpolation_count_value_pushed += 1;
+//         // TODO: use a Temporary Stack to process recursive calls
+//         // 
+//         parser_parse_unary_literals_and_identifier(parser, can_assign);
+//
+//         if (parser->interpolation_count_nesting == 0) {
+//             Compiler_CompileInstruction_2Bytes(
+//                 parser_get_current_bytecode(parser),
+//                 OpCode_Interpolation,
+//                 (uint8_t)parser->interpolation_count_value_pushed,
+//                 parser->token_previous.line_number
+//             );
+//         }
+//
+//         // TODO: implement string interpolation Ast-Node and return it
+//         //
+//         return NULL;
+//     }
+//
+//     // Unary
+//     //
+//     if (parser->token_previous.kind == Token_Minus) {
+//         Expression* expression = parser_parse_expression(parser, OperatorPrecedence_Negate);
+//         Expression negation = expression_make_negation(expression);
+//
+//         Compiler_CompileInstruction_1Byte(parser_get_current_bytecode(parser), OpCode_Negation, parser->token_previous.line_number);
+//         return expression_allocate(negation);
+//     }
+//
+//     if (parser->token_previous.kind == Token_Ka) {
+//         Expression* expression = parser_parse_expression(parser, OperatorPrecedence_Not);
+//         Expression not = expression_make_not(expression);
+//
+//         Compiler_CompileInstruction_1Byte(parser_get_current_bytecode(parser), OpCode_Not, parser->token_previous.line_number);
+//         return expression_allocate(not);
+//     }
+//
+//     if (parser->token_previous.kind == Token_Left_Parenthesis) {
+//         Expression* expression = parser_parse_expression(parser, OperatorPrecedence_Assignment);
+//         Expression grouping = expression_make_grouping(expression);
+//
+//         parser_consume(parser, Token_Right_Parenthesis, "Expected ')' after expression.");
+//         return expression_allocate(grouping);
+//     }
+//
+//     // Identifier
+//     //
+//     if (parser->token_previous.kind == Token_Identifier) {
+//         // TODO: Move this Body into a function called 'parser_parse_identifier(...)'
+//         //
+//         uint8_t opcode_assign = OpCode_Invalid;
+//         uint8_t opcode_read   = OpCode_Invalid;
+//         Local* local_found    = NULL;
+//
+//         int operand = StackLocal_get_local_index_by_token(&parser->function->locals, &parser->token_previous, &local_found);
+//         if (operand != -1) {
+//             // If is a Local, then:
+//             //
+//             opcode_assign = OpCode_Stack_Copy_Top_To_Idx;
+//             opcode_read   = OpCode_Stack_Copy_From_idx_To_Top;
+//         } else if ((operand = parser_resolve_variable_dependencies(parser->function, &parser->token_previous, &local_found)) != -1) {
+//             // If is a closure's variable, then: 
+//             //
+//             opcode_assign = OpCode_Copy_From_Stack_To_Heap;
+//             opcode_read   = OpCode_Copy_From_Heap_To_Stack;
+//         } else {
+//             // Otherwise is a Global
+//             //
+//             ObjectString* identifier = parser_intern_token(parser->token_previous, parser->object_head, parser->string_database);
+//             Bytecode* bytecode = parser_get_current_bytecode(parser);
+//             operand = parser_save_identifier_into_bytecode(bytecode, identifier);
+//             if (operand == -1) parser_error(parser, &parser->token_current, "Too many constants.");
+//
+//             opcode_assign = OpCode_Assign_Global;
+//             opcode_read   = OpCode_Read_Global;
+//         }
+//
+//         if (local_found && local_found->scope_depth == -1)
+//             parser_error(parser, &parser->token_previous, "Can't read local variable in its own initializer.");
+//
+//         // Assignment / Variable Initialization 
+//         //
+//         if (can_assign && parser_match_then_advance(parser, Token_Equal)) {
+//             parser_parse_expression(parser, OperatorPrecedence_Assignment);
+//             Compiler_CompileInstruction_2Bytes(
+//                 parser_get_current_bytecode(parser),
+//                 opcode_assign,
+//                 operand,
+//                 parser->token_previous.line_number
+//             );
+//           
+//             // Expression* right_hand_side = parser_parse_expression(parser, OperatorPrecedence_Assignment);
+//             // Expression expression = expression_make_assignment(variable_name, right_hand_side);
+//             // return expression_allocate(expression);
+//             return NULL;
+//         }
+//
+//         // Get variable value
+//         //
+//         Compiler_CompileInstruction_2Bytes(
+//             parser_get_current_bytecode(parser),
+//             opcode_read,
+//             operand,
+//             parser->token_previous.line_number
+//         );
+//
+//         // Expression expression = expression_make_variable(variable_name);
+//         // return expression_allocate(expression);
+//         return NULL;
+//     }
+//
+//     // TODO: log token name
+//     assert(false && "Unhandled token...");
+//
+//     return NULL;
+// }
+
+static Expression* parser_parse_operators_unary(Parser* parser) {
     if (parser->token_previous.kind == Token_Minus) {
         Expression* expression = parser_parse_expression(parser, OperatorPrecedence_Negate);
         Expression negation = expression_make_negation(expression);
 
-        Compiler_CompileInstruction_1Byte(parser_get_current_bytecode(parser), OpCode_Negation, parser->token_previous.line_number);
+        Compiler_CompileInstruction_1Byte(
+            parser_get_current_bytecode(parser), 
+            OpCode_Negation, 
+            parser->token_previous.line_number
+        );
+
         return expression_allocate(negation);
     }
 
@@ -1614,7 +1806,12 @@ static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bo
         Expression* expression = parser_parse_expression(parser, OperatorPrecedence_Not);
         Expression not = expression_make_not(expression);
 
-        Compiler_CompileInstruction_1Byte(parser_get_current_bytecode(parser), OpCode_Not, parser->token_previous.line_number);
+        Compiler_CompileInstruction_1Byte(
+            parser_get_current_bytecode(parser), 
+            OpCode_Not, 
+            parser->token_previous.line_number
+        );
+
         return expression_allocate(not);
     }
 
@@ -1626,108 +1823,59 @@ static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bo
         return expression_allocate(grouping);
     }
 
-    // Identifier
-    //
-    if (parser->token_previous.kind == Token_Identifier) {
-        // TODO: Move this Body into a function called 'parser_parse_identifier(...)'
-        //
-        uint8_t opcode_assign = OpCode_Invalid;
-        uint8_t opcode_read   = OpCode_Invalid;
-        Local* local_found    = NULL;
-
-        int operand = StackLocal_get_local_index_by_token(&parser->function->locals, &parser->token_previous, &local_found);
-        if (operand != -1) {
-            // If is a Local, then:
-            //
-            opcode_assign = OpCode_Stack_Copy_Top_To_Idx;
-            opcode_read   = OpCode_Stack_Copy_From_idx_To_Top;
-        } else if ((operand = parser_resolve_variable_dependencies(parser->function, &parser->token_previous, &local_found)) != -1) {
-            // If is a closure's variable, then: 
-            //
-            opcode_assign = OpCode_Copy_From_Stack_To_Heap;
-            opcode_read   = OpCode_Copy_From_Heap_To_Stack;
-        } else {
-            // Otherwise is a Global
-            //
-            ObjectString* identifier = parser_intern_token(parser->token_previous, parser->object_head, parser->string_database);
-            Bytecode* bytecode = parser_get_current_bytecode(parser);
-            operand = parser_save_identifier_into_bytecode(bytecode, identifier);
-            if (operand == -1) parser_error(parser, &parser->token_current, "Too many constants.");
-
-            opcode_assign = OpCode_Assign_Global;
-            opcode_read   = OpCode_Read_Global;
-        }
-
-        if (local_found && local_found->scope_depth == -1)
-            parser_error(parser, &parser->token_previous, "Can't read local variable in its own initializer.");
-
-        // Assignment / Variable Initialization 
-        //
-        if (can_assign && parser_match_then_advance(parser, Token_Equal)) {
-            parser_parse_expression(parser, OperatorPrecedence_Assignment);
-            Compiler_CompileInstruction_2Bytes(
-                parser_get_current_bytecode(parser),
-                opcode_assign,
-                operand,
-                parser->token_previous.line_number
-            );
-            
-            // Expression* right_hand_side = parser_parse_expression(parser, OperatorPrecedence_Assignment);
-            // Expression expression = expression_make_assignment(variable_name, right_hand_side);
-            // return expression_allocate(expression);
-            return NULL;
-        }
-
-        // Get variable value
-        //
-        Compiler_CompileInstruction_2Bytes(
-            parser_get_current_bytecode(parser),
-            opcode_read,
-            operand,
-            parser->token_previous.line_number
-        );
-
-        // Expression expression = expression_make_variable(variable_name);
-        // return expression_allocate(expression);
-        return NULL;
-    }
-
-    // TODO: log token name
-    assert(false && "Unhandled token...");
-
     return NULL;
 }
 
-static bool parser_is_operator_arithmetic(Parser* parser) {
-    TokenKind token_kind = parser->token_previous.kind;
-    return (
-         token_kind == Token_Plus     ||
-         token_kind == Token_Minus    ||
-         token_kind == Token_Asterisk ||
-         token_kind == Token_Slash    ||
-         token_kind == Token_Caret
-    );
+static bool parser_is_operator_arithmetic(Token token) {
+    if (token.kind == Token_Plus)     return true;
+    if (token.kind == Token_Minus)    return true;
+    if (token.kind == Token_Asterisk) return true;
+    if (token.kind == Token_Slash)    return true;
+    if (token.kind == Token_Caret)    return true;
+
+    return false;
 }
 
-static bool parser_is_operator_logical(Parser* parser) {
-    TokenKind token_kind = parser->token_previous.kind;
-    return (token_kind == Token_E || token_kind == Token_Ou || token_kind == Token_Ka);
+static bool parser_is_operator_logical(Token token) {
+    if (token.kind == Token_E)  return true;
+    if (token.kind == Token_Ou) return true;
+    if (token.kind == Token_Ka) return true;
+
+    return false;
 }
 
-static bool parser_is_operator_relational(Parser* parser) {
-    TokenKind token_kind = parser->token_previous.kind;
-    return (
-        token_kind == Token_Equal_Equal   || 
-        token_kind == Token_Not_Equal     || 
-        token_kind == Token_Less          || 
-        token_kind == Token_Less_Equal    || 
-        token_kind == Token_Greater       || 
-        token_kind == Token_Greater_Equal
-    );
+static bool parser_is_operator_relational(Token token) {
+    if (token.kind == Token_Equal_Equal)    return true;
+    if (token.kind == Token_Not_Equal)      return true;
+    if (token.kind == Token_Less)           return true;
+    if (token.kind == Token_Less_Equal)     return true;
+    if (token.kind == Token_Greater)        return true;
+    if (token.kind == Token_Greater_Equal)  return true;
+
+    return false;
 }
 
-static bool parser_is_operator_assignment(Token operator) {
-    return (operator.kind == Token_Equal);
+static bool parser_is_operator_assignment(Token token) {
+    return (token.kind == Token_Equal);
+}
+
+static bool parser_is_operator_unary(Token token) {
+    if (token.kind == Token_Minus)            return true;
+    if (token.kind == Token_Ka)               return true;
+    if (token.kind == Token_Left_Parenthesis) return true;
+
+    return false;
+}
+
+static bool parser_is_literals(Token token) {
+    if (token.kind == Token_Number)                 return true;
+    if (token.kind == Token_Verdadi)                return true;
+    if (token.kind == Token_Falsu)                  return true;
+    if (token.kind == Token_Nulo)                   return true;
+    if (token.kind == Token_String)                 return true;
+    if (token.kind == Token_String_Interpolation)   return true;
+
+    return false;
 }
 
 static Expression* parser_parse_operators_logical(Parser* parser, Expression* left_operand) {
