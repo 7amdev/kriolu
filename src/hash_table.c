@@ -65,7 +65,7 @@ bool hash_table_get_value(HashTable* table, ObjectString* key, Value* value_out)
         return false;
 
     Entry* entry = hash_table_find_entry_by_key(table->items, key, table->capacity);
-    if (entry == NULL) return false;
+    if (entry == NULL)      return false;
     if (entry->key == NULL) return false;
 
     *value_out = entry->value;

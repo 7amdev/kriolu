@@ -141,6 +141,15 @@ ObjectInstance* ObjectInstance_allocate(ObjectClass *klass, Object** object_head
     return instance;
 }
 
+ObjectMethod* ObjectMethod_allocate(Value instance, ObjectClosure* method, Object** object_head) {
+    ObjectMethod* obj_method = Object_Allocate(ObjectMethod, ObjectKind_Method, object_head);
+    assert(obj_method);
+    obj_method->instance = instance;
+    obj_method->method = method;
+
+    return obj_method;
+}
+
 void Object_print_function(ObjectFunction* function) {
     if (function->name == NULL) {
         printf("<script>");
@@ -180,6 +189,13 @@ void Object_print(Object* object) {
     } break;
     case ObjectKind_Instance: {
         printf("<instance of '%s'>", ((ObjectInstance*)object)->klass->name->characters);
+    } break;
+    case ObjectKind_Method: {
+        printf(
+            "<method '%s' of class '%s'>", 
+            ((ObjectMethod*)object)->method->function->name->characters,
+            value_as_instance(((ObjectMethod*)object)->instance)->klass->name->characters
+        );
     } break;
     }
 }
@@ -242,6 +258,10 @@ void Object_free(Object* object) {
         ObjectInstance* instance = (ObjectInstance*)object;
         hash_table_free(&instance->fields);
         Memory_Free(ObjectInstance, instance);
+    } break;
+    case ObjectKind_Method: {
+        ObjectMethod* obj_method = (ObjectMethod*)object;
+        Memory_Free(ObjectMethod, obj_method);
     } break;
     }
 }

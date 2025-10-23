@@ -260,12 +260,13 @@ typedef struct {
     int capacity;
 } ArrayValue;
 
-#define value_make_Runtime_Error()      ((Value){.kind = Value_Runtime_Error, .as = {.number = 0}})
-#define value_make_boolean(value)       ((Value){.kind = Value_Boolean, .as = {.boolean = value}})
-#define value_make_number(value)        ((Value){.kind = Value_Number, .as = {.number = value}})
-#define value_make_object(value)        ((Value){.kind = Value_Object, .as = {.object = (Object *)value}})
-#define value_make_object_string(value) ((Value){.kind = Value_Object, .as = {.object = (Object *)value}})
-#define value_make_nil()                ((Value){.kind = Value_Nil, .as = {.number = 0}})
+#define value_make_Runtime_Error()           ((Value){.kind = Value_Runtime_Error, .as = {.number = 0}})
+#define value_make_boolean(value)            ((Value){.kind = Value_Boolean, .as = {.boolean = value}})
+#define value_make_number(value)             ((Value){.kind = Value_Number, .as = {.number = value}})
+#define value_make_object(obj)               ((Value){.kind = Value_Object, .as = {.object = (Object *)obj}})
+#define value_make_object_string(obj_string) ((Value){.kind = Value_Object, .as = {.object = (Object *)obj_string}})
+#define value_make_object_method(obj_method) ((Value){.kind = Value_Object, .as = {.object = (Object *)obj_method}})
+#define value_make_nil()                     ((Value){.kind = Value_Nil, .as = {.number = 0}})
 
 #define value_as_boolean(value)         ((value).as.boolean)
 #define value_as_number(value)          ((value).as.number)
@@ -277,6 +278,7 @@ typedef struct {
 #define value_as_closure(value)         ((ObjectClosure*)value_as_object(value))
 #define value_as_class(value)           ((ObjectClass*)value_as_object(value))
 #define value_as_instance(value)        ((ObjectInstance*)value_as_object(value))
+#define value_as_method(value)          ((ObjectMethod*)value_as_object(value))
 
 #define value_is_runtime_error(value)   ((value).kind == Value_Runtime_Error)
 #define value_is_boolean(value)         ((value).kind == Value_Boolean)
@@ -289,6 +291,7 @@ typedef struct {
 #define value_is_closure(value)         Object_check_value_kind(value, ObjectKind_Closure)
 #define value_is_class(value)           Object_check_value_kind((value), ObjectKind_Class)
 #define value_is_instance(value)        Object_check_value_kind((value), ObjectKind_Instance)
+#define value_is_method(value)          Object_check_value_kind((value), ObjectKind_Method)
 
 #define value_get_object_type(value) value_as_object(value)->kind
 #define value_get_string_chars(value) (value_as_string(value)->characters)
@@ -304,30 +307,6 @@ void ArrayValue_free(ArrayValue* values);
 
 //
 // Bytecode
-//
-// TODO: VM debugging mode shows the source code responsable to
-//       for the instructions bellow.
-//
-// #define DEBUG_VM_SHOW_SOURCE_CODE
-//
-// typedef struct {
-//     const char* source_start;
-//     size_t      source_length;
-//     size_t      instruction_start_offset;
-// } SourceCode; 
-// 
-// typedef struct {
-//     SourceCode* items;
-//     int         count;
-//     int         capacity;
-//} DArraySourceCode;
-// 
-// SourceCode ArraySourceCode_search_by_instruction_offset(int instruction_offset) {
-//     // TODO: Binary search implementation... 
-// }
-//
-// Bytecode is a series of instructions. Eventually, we'll store
-// some other data along with instructions, so ...
 //
 
 typedef struct {
@@ -428,6 +407,7 @@ typedef enum {
     ObjectKind_Class,
     ObjectKind_Instance,
     ObjectKind_Heap_Value,
+    ObjectKind_Method,
 
     ObjectKind_Count
 } ObjectKind;
@@ -507,6 +487,12 @@ typedef struct {
     HashTable fields;
 } ObjectInstance;
 
+typedef struct {
+    Object object;
+    Value instance;
+    ObjectClosure* method;
+} ObjectMethod;
+
 typedef enum {
     AllocateTask_Initialize         = (1 << 0),     
     AllocateTask_Intern             = (1 << 1),       
@@ -541,6 +527,7 @@ ObjectClosure* ObjectClosure_allocate(ObjectFunction* function, Object** object_
 ObjectFunctionNative* ObjectFunctionNative_allocate(FunctionNative* function, Object** object_head, int arity);
 ObjectClass* ObjectClass_alocate(ObjectString* name, Object** object_head);
 ObjectInstance* ObjectInstance_allocate(ObjectClass *klass, Object** object_head);
+ObjectMethod* ObjectMethod_allocate(Value instance, ObjectClosure* method, Object** object_head);
 
 //
 // Abstract Syntax Tree
@@ -767,7 +754,7 @@ struct Function {
     // TODO: rename to 'varibles_in_parent_scope' ???
     //
     ArrayLocalMetadata variable_dependencies;   // NOTE: Varibale accessed that belongs to a parent function
-    
+
     int depth;                                  // NOTE: Scope depth
 };
 
@@ -976,7 +963,7 @@ typedef struct {
 } StackFunctionCall;
 
 void StackFunctionCall_reset(StackFunctionCall* function_calls);
-FunctionCall* StackFunctionCall_push(StackFunctionCall* function_calls, ObjectClosure* closure, uint8_t* ip, Value* stack_value_top, int argument_count);
+FunctionCall* StackFunctionCall_push(StackFunctionCall* function_calls, ObjectClosure* closure, Value* stack_value_top, int argument_count);
 FunctionCall* StackFunctionCall_pop(StackFunctionCall* function_calls);
 FunctionCall* StackFunctionCall_peek(StackFunctionCall* function_calls, int offset);
 bool StackFunctionCall_is_empty(StackFunctionCall* function_calls);

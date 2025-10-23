@@ -934,6 +934,9 @@ static Statement* parser_parse_declaration_class(Parser* parser) {
         // Parse Method Declaration
         //
         
+        if (parser->token_current.kind == Token_Salta)
+            parser_error(parser, &parser->token_previous, "Identifier 'salta' is a Token used by the Language.");
+       
         parser_consume(parser, Token_Identifier, "Expect method name.");
         Bytecode* bytecode       = parser_get_current_bytecode(parser);
         ObjectString* identifier = parser_intern_token(parser->token_previous, parser->object_head, parser->string_database);

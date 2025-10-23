@@ -4,7 +4,7 @@ void StackFunctionCall_reset(StackFunctionCall* function_calls) {
     function_calls->top = 0;
 }
 
-FunctionCall* StackFunctionCall_push(StackFunctionCall* function_calls, ObjectClosure* closure, uint8_t* ip, Value* stack_value_top, int argument_count) {
+FunctionCall* StackFunctionCall_push(StackFunctionCall* function_calls, ObjectClosure* closure, Value* stack_value_top, int argument_count) {
     assert(function_calls->top < FRAME_STACK_MAX);
     if (function_calls->top == FRAME_STACK_MAX) return NULL;
 
@@ -12,7 +12,9 @@ FunctionCall* StackFunctionCall_push(StackFunctionCall* function_calls, ObjectCl
 
     new_function_call->closure = closure;
     new_function_call->frame_start = stack_value_top - argument_count - 1;
-    new_function_call->ip = ip;
+    new_function_call->ip = closure->function->bytecode.instructions.items,
+
+    // new_function_call->ip = ip;
 
     function_calls->top += 1;
     return &function_calls->items[function_calls->top - 1];

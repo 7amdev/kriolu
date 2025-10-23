@@ -33,7 +33,6 @@ DynamincArrayGray  M_Greys          = {0};
 
 static void Memory_collect_garbage();
 static void Memory_mark_roots();
-static void Memory_mark_object_black(Object *object);       // TODO: delete function
 static void Memory_mark_values_gray(ArrayValue *values);
 static void Memory_mark_hashtable_gray(HashTable* table);
 static void Memory_blacken_objects();
@@ -131,15 +130,6 @@ static void Memory_mark_roots() {
     //
     Memory_mark_hashtable_gray(&M_vm->global_database);
 
-    // TODO: delete code bellow. Its been replaced by 
-    //       the function 'Memory_mark_hashtable_gray'
-    //
-    // for (int i = 0; i < M_vm->global_database.capacity; i++) {
-    //     Entry *entry = &M_vm->global_database.items[i];
-    //     Memory_mark_object_gray((Object*)entry->key);
-    //     Memory_mark_value_gray(entry->value);
-    // }
-
     // Mark FunctionCalls
     //
     for (int i = 0; i < M_vm->function_calls.top; i++) {
@@ -228,6 +218,11 @@ static void Memory_blacken_objects() {
             Memory_mark_object_gray((Object*)instance->klass);
             Memory_mark_hashtable_gray(&instance->fields);
         } break;
+        case ObjectKind_Method: {
+            ObjectMethod* obj_method = (ObjectMethod*)object;
+            Memory_mark_value_gray(obj_method->instance);
+            Memory_mark_object_gray((Object*)obj_method->method);
+        } break;
         case ObjectKind_Function_Native: 
         case ObjectKind_String: 
             break;
@@ -277,35 +272,6 @@ static void Memory_sweep() {
     //     if (previous == NULL) M_vm->objects = current->next;
     //     else previous->next = current->next;
     // }
-}
-
-// TODO: delete function
-//
-static void Memory_mark_object_black(Object *object) {
-//  A Black Object is any object whose 'is_maked' field 
-//  is set to 'true' and that is no longer in 'Gray' stack.
-
-    switch (object->kind)
-    {
-    case ObjectKind_Closure: {
-        ObjectClosure *closure = (ObjectClosure*)object;
-        Memory_mark_object_gray((Object*)closure->function);
-        for (int i = 0; i < closure->heap_values.count; i++) {
-            Memory_mark_object_gray((Object*)closure->heap_values.items[i]);
-        }
-    } break;
-    case ObjectKind_Function: {
-        ObjectFunction *function = (ObjectFunction*)object;
-        Memory_mark_object_gray((Object*)function->name);
-        Memory_mark_values_gray(&function->bytecode.values); 
-    } break;
-    case ObjectKind_Heap_Value: {
-        Memory_mark_value_gray(((ObjectValue*)object)->value);
-    } break;
-    case ObjectKind_Function_Native: 
-    case ObjectKind_String: 
-        break;
-    }
 }
 
 static void Memory_mark_values_gray(ArrayValue *values) {
