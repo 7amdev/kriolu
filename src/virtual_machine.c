@@ -678,35 +678,6 @@ static bool VirtualMachine_call_value(VirtualMachine* vm, Value value, int argum
         {
         case ObjectKind_Closure: {
             return VirtualMachine_call_closure(vm, value_as_closure(value), argument_count);
-
-// TODO: delete code bellow
-//
-//             ObjectFunction* function = value_as_closure(value)->function;
-//             if (argument_count != function->arity) {
-//                 VirtualMachine_runtime_error(vm, "Expected %d arguments but got %d.", function->arity, argument_count);
-//                 return false;
-//             }
-//
-//             if (StackFunctionCall_is_full(&vm->function_calls)) {
-//                 VirtualMachine_runtime_error(vm, "Function Call Stack Overflow.");
-//                 return false;
-//             }
-//
-//             StackFunctionCall_push(
-//                 &vm->function_calls,
-//                 value_as_closure(value),
-//                 vm->stack_value.top,
-//                 argument_count
-//             );
-//
-// #ifdef DEBUG_TRACE_EXECUTION
-//             ObjectString* function_name = function->name;
-//             char* title = function_name == NULL ? "Script" : function_name->characters;
-//             printf("\n");
-//             Bytecode_disassemble_header(title);
-// #endif 
-//
-//             return true;
         }
         case ObjectKind_Function_Native: {
             ObjectFunctionNative* function_native = value_as_function_native(value);

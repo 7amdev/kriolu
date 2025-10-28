@@ -7,14 +7,16 @@ void StackLocal_init(StackLocal* locals) {
     locals->capacity = UINT8_COUNT;
 }
 
-Local StackLocal_push(StackLocal* locals, Token token, int scope_depth, LocalAction action) {
+Local StackLocal_push(StackLocal* locals, Local new_local) {
     assert(locals->top < locals->capacity && "Error: StackLocal Overflow.");
 
-    locals->items[locals->top] = (Local){ 
-        .token       = token, 
-        .scope_depth = scope_depth, 
-        .action      = action 
-    };
+    // locals->items[locals->top] = (Local){ 
+    //     .token       = token, 
+    //     .scope_depth = scope_depth, 
+    //     .action      = action 
+    // };
+
+    locals->items[locals->top] = new_local; 
     locals->top += 1;
 
     return locals->items[locals->top - 1];

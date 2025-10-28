@@ -29,7 +29,9 @@
 //
 
 typedef enum {
-    Token_Error, // TODO: change to token_invalid
+    Token_Nil, 
+
+    Token_Error, // TODO: change to token_Nil
     Token_Eof,
 
     Token_Left_Parenthesis,  // (
@@ -708,7 +710,7 @@ typedef struct {
 } StackLocal;
 
 void   StackLocal_init(StackLocal* locals);
-Local  StackLocal_push(StackLocal* locals, Token token, int scope_depth, LocalAction action);
+Local  StackLocal_push(StackLocal* locals, Local new_local);
 Local  StackLocal_pop(StackLocal* locals);
 Local* StackLocal_peek(StackLocal* locals, int offset);
 int    StackLocal_get_local_index_by_token(StackLocal* locals, Token* token, Local** local_out);
@@ -722,7 +724,8 @@ bool   StackLocal_initialize_local(StackLocal* locals, int depth, int offset);
 
 typedef enum {
     FunctionKind_Script,
-    FunctionKind_Function
+    FunctionKind_Function,
+    FunctionKind_Method
 } FunctionKind;
 
 typedef enum {
@@ -852,11 +855,17 @@ bool StackBlock_is_empty(StackBlock* blocks);
 bool StackBlock_is_full(StackBlock* blocks);
 int StackBlock_get_top_item_index(StackBlock* blocks);
 
+typedef struct ClassDeclaration ClassDeclaration;
+struct ClassDeclaration {
+    LinkedList(ClassDeclaration) next;
+};
+
 typedef struct {
     Token token_current;
     Token token_previous;
     Lexer* lexer;
-    LinkedList(Function) function;
+    LinkedList(Function) function;  // TODO: rename to 'first_function_declaration'
+    LinkedList(ClassDeclaration) first_class_declaration; 
     HashTable* string_database;
     HashTable table_strings;
 

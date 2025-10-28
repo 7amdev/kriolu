@@ -64,6 +64,7 @@ void parser_init(Parser* parser, const char* source_code, ParserInitParams param
         lexer_init(parser->lexer, source_code);
     }
     parser->function = NULL;
+    parser->first_class_declaration = NULL;
     parser->interpolation_count_nesting = 0;
     parser->interpolation_count_value_pushed = 0;
     parser->continue_jump_to = -1;
@@ -571,7 +572,11 @@ static Statement* parser_instruction_for(Parser* parser) {
         // Create a new local variable
         // '-1' Mark as Uninitialized
         //
-        StackLocal_push(&parser->function->locals, variable_name, -1, LocalAction_Default);
+        StackLocal_push(&parser->function->locals, (Local) {
+            .token = variable_name,
+            .scope_depth = -1,
+            .action = LocalAction_Default
+        });
         StackLocal_initialize_local(&parser->function->locals, parser->function->depth, 0);
         new_variable_idx = parser->function->locals.top - 1;
     }
@@ -778,7 +783,10 @@ static int parser_find_identifier_location(Parser* parser, Token token, int* out
 
 //  In Bytecode Array of Values
     ObjectString* identifier = parser_intern_token(token, parser->object_head, parser->string_database);
-    int value_index = parser_save_identifier_into_bytecode(parser_get_current_bytecode(parser), identifier);
+    int value_index = parser_save_identifier_into_bytecode(
+        parser_get_current_bytecode(parser), 
+        identifier
+    );
     *out_identifier_location = 3;           
 
     return value_index;
@@ -814,6 +822,7 @@ static void parser_load_identifier_value_to_stack(Parser* parser, int identifier
 
 static void parser_parse_operator_assignment(Parser* parser, int identifier_location, int identifier_location_index) {
     parser_parse_expression(parser, OperatorPrecedence_Assignment);
+
     if (identifier_location == 1) {
 //      Its a Local Variable
         Compiler_CompileInstruction_2Bytes(
@@ -863,6 +872,9 @@ static Statement* parser_parse_declaration_class(Parser* parser) {
     ObjectString* os_class_name = parser_intern_token(parser->token_previous, parser->object_head, parser->string_database);
     int class_name_index     = parser_save_identifier_into_bytecode(bytecode, os_class_name);
 
+    ClassDeclaration new_class = {0};
+    LinkedList_push(parser->first_class_declaration, &new_class);
+
     // Register the Identifier in the Value Stack as Uninitialized, if 
     // we are not in a global scope.
     // 
@@ -874,13 +886,12 @@ static Statement* parser_parse_declaration_class(Parser* parser) {
         if (parser_check_locals_duplicates(parser, &parser->token_previous)) {
             parser_error(parser, &parser->token_previous, "Already a variable with this name in this scope.");
         }
-
-        StackLocal_push(
-            &parser->function->locals,
-            parser->token_previous,
-            -1, // Mark as Uninitialized
-            LocalAction_Default
-        );
+        
+        StackLocal_push(&parser->function->locals, (Local) {
+            .token = parser->token_previous,
+            .scope_depth = -1,
+            .action = LocalAction_Default
+        });
     }
 
     source_code.instruction_start_offset = parser_get_current_bytecode(parser)->instructions.count;
@@ -944,7 +955,7 @@ static Statement* parser_parse_declaration_class(Parser* parser) {
         if (identifier_index == -1) 
             parser_error(parser, &parser->token_current, "Too many constants.");
 
-        parser_parse_function_paramenters_and_body(parser, FunctionKind_Function);
+        parser_parse_function_paramenters_and_body(parser, FunctionKind_Method);
 
         // Tells the VM to attach method into the class method's hash-table
         //
@@ -963,6 +974,9 @@ static Statement* parser_parse_declaration_class(Parser* parser) {
         OpCode_Stack_Pop,
         parser->token_previous.line_number
     );
+
+    ClassDeclaration class_popped = {0};
+    LinkedList_pop(parser->first_class_declaration, &class_popped);
 
     // TODO: #ifdef DEBUG_SHOW_CODE
     // 
@@ -1002,13 +1016,12 @@ static Statement* parser_parse_declaration_function(Parser* parser) {
         if (parser_check_locals_duplicates(parser, &parser->token_previous)) {
             parser_error(parser, &parser->token_previous, "Already a variable with this name in this scope.");
         }
-
-        StackLocal_push(
-            &parser->function->locals,
-            parser->token_previous,
-            parser->function->depth, // Mark as Initialized
-            LocalAction_Default
-        );
+       
+        StackLocal_push(&parser->function->locals, (Local) {
+            .token = parser->token_previous,
+            .scope_depth = parser->function->depth,
+            .action = LocalAction_Default
+        });
 
         parser_parse_function_paramenters_and_body(
             parser, 
@@ -1057,13 +1070,12 @@ static ObjectFunction* parser_parse_function_paramenters_and_body(Parser* parser
                 if (parser_check_locals_duplicates(parser, &parser->token_previous)) {
                     parser_error(parser, &parser->token_previous, "Already a variable with this name in this scope.");
                 }
-
-                StackLocal_push(
-                    &parser->function->locals,
-                    parser->token_previous,
-                    parser->function->depth, // Mark as Initialized
-                    LocalAction_Default
-                );
+                
+                StackLocal_push(&parser->function->locals, (Local) {
+                    .token = parser->token_previous,
+                    .scope_depth = parser->function->depth,
+                    .action = LocalAction_Default
+                });
             }
         } while (parser_match_then_advance(parser, Token_Comma));
     }
@@ -1132,13 +1144,12 @@ static Statement* parser_parse_declaration_variable(Parser* parser) {
             parser_error(parser, &parser->token_previous, "Already a variable with this name in this scope.");
             return statement_allocate(statement);
         }
-
-        StackLocal_push(
-            &parser->function->locals,
-            parser->token_previous,
-            -1, // Mark Local as Uninitialized 
-            LocalAction_Default
-        );
+        
+        StackLocal_push(&parser->function->locals, (Local) {
+            .token = parser->token_previous,
+            .scope_depth = -1,
+            .action = LocalAction_Default
+        });
 
         String source_string = string_make(parser->token_previous.start, parser->token_previous.length);
         uint32_t source_hash = string_hash(source_string);
@@ -1371,15 +1382,27 @@ static Expression* parser_parse_expression(Parser* parser, OperatorPrecedence op
     int identifier_location_index = -1;
 
 //  Parsing Operands Section
-    if (parser_is_literals(parser->token_previous))
+    if (parser_is_literals(parser->token_previous)) {
         expression = parser_parse_literals(parser, can_assign); 
-    else if (parser_is_operator_unary(parser->token_previous))
+    }
+    else if (parser_is_operator_unary(parser->token_previous)) {
         expression = parser_parse_operators_unary(parser); 
+    }
     else if (parser->token_previous.kind == Token_Identifier)  {
         identifier_location_index = parser_find_identifier_location(parser, parser->token_previous, &identifier_location, NULL);
 //      If there is no assignment, then compile the Identifier as a Variable.
         if (parser->token_current.kind != Token_Equal) 
             parser_load_identifier_value_to_stack(parser, identifier_location, identifier_location_index);
+    } 
+    else if (parser->token_previous.kind == Token_Keli) {
+        if (parser->first_class_declaration == NULL) {
+            parser_error(parser, &parser->token_previous, "Can't use 'keli' outside of a class.");
+            // return;
+        } else {
+            identifier_location_index = parser_find_identifier_location(parser, parser->token_previous, &identifier_location, NULL);
+            if (parser->token_current.kind != Token_Equal) 
+                parser_load_identifier_value_to_stack(parser, identifier_location, identifier_location_index); 
+        }
     }
 
 //  Parsing Operators Section
@@ -1397,15 +1420,20 @@ static Expression* parser_parse_expression(Parser* parser, OperatorPrecedence op
 
         if (parser_is_operator_arithmetic(parser->token_previous)) {
             expression = parser_parse_operators_arithmetic(parser, expression);
-        } else if (parser_is_operator_logical(parser->token_previous)) {
+        } 
+        else if (parser_is_operator_logical(parser->token_previous)) {
             expression = parser_parse_operators_logical(parser, expression);
-        } else if (parser_is_operator_relational(parser->token_previous)) {
+        } 
+        else if (parser_is_operator_relational(parser->token_previous)) {
             expression = parser_parse_operators_relational(parser, expression);
-        } else if (parser->token_previous.kind == Token_Left_Parenthesis) {
+        } 
+        else if (parser->token_previous.kind == Token_Left_Parenthesis) {
             expression = parser_parse_operator_function_call(parser, expression);
-        } else if (parser->token_previous.kind == Token_Dot) {
+        } 
+        else if (parser->token_previous.kind == Token_Dot) {
             expression = parser_parse_operator_object_getter_and_setter(parser, expression, can_assign);
-        } else if (parser->token_previous.kind == Token_Equal) {
+        } 
+        else if (parser->token_previous.kind == Token_Equal) {
             do {
                 if (identifier_location_index == -1) break;
                 if (!can_assign)                     break;
@@ -2145,17 +2173,23 @@ static void parser_init_function(Parser* parser, Function* function, FunctionKin
     if (function_kind != FunctionKind_Script) 
         object_fn->name = parser_intern_token(parser->token_previous, parser->object_head, parser->string_database);
 
+    Local local       = {0};
+    local.token.start = "";
+    local.scope_depth = 0;
+    local.action      = LocalAction_Default;
+//  TODO: test 'Keli' keyword for a Script function
+    if (function_kind != FunctionKind_Function) {
+        local.token.kind   = Token_Keli;
+        local.token.start  = "keli";
+        local.token.length = 4;
+    }
+
     function->function_kind = function_kind;
     function->object        = NULL;
     function->object        = object_fn;
     function->depth         = 0;
     StackLocal_init(&function->locals);
-    StackLocal_push(
-        &function->locals, 
-        (Token) { 0 }, 
-        0, 
-        LocalAction_Default
-    ); 
+    StackLocal_push(&function->locals, local);
     ArrayLocalMetadata_init(&function->variable_dependencies, 0);
     LinkedList_push(parser->function, function);
 }

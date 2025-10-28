@@ -13,8 +13,8 @@ Token token_make(TokenKind kind, const char* start, int length, int line_number)
 }
 
 bool token_is_identifier_equal(Token* a, Token* b) {
-    if (a->kind != Token_Identifier) return false;
-    if (b->kind != Token_Identifier) return false;
+    // if (a->kind != Token_Identifier) return false;
+    // if (b->kind != Token_Identifier) return false;
     if (a->length != b->length)      return false;
     if (a->kind != b->kind)          return false;
 
