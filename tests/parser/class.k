@@ -1,20 +1,25 @@
 
 klasi Animal {
+    konstrutor(velocidade, distancia) {
+        keli.vel = velocidade;
+        keli.dis = distancia;
+    }
     bua() {}
     anda(distance, speed) {
         imprimi distance * speed;
     }
-    imprimi_velovidade() {
-        imprimi "velocidade: " + keli.velocidade;
+    dan_velocidade() {
+        imprimi "vel = " + keli.vel;
     }
 }
 
-mimoria gatu = Animal();
-gatu.velocidade = "10";
-gatu.nomi = "Mimi";
-imprimi gatu.nomi;
-gatu.anda(10, 4);
-gatu.imprimi_velovidade();
+mimoria gatu = Animal("69", 10);
+gatu.dan_velocidade();
+// gatu.velocidade = "10";
+// gatu.nomi = "Mimi";
+// imprimi gatu.nomi;
+// gatu.anda(10, 4);
+// gatu.imprimi_velovidade();
 
 // funson Forma_2D() {
 //     klasi Forma {}

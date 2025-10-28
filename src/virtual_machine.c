@@ -24,11 +24,30 @@ static Value FunctionNative_clock(VirtualMachine* vm, int argument_count, Value*
 //
 // Function Declarations
 //
+static ObjectString* VirtualMachine_intern_string(VirtualMachine* vm, String string) {
+    uint32_t hash = string_hash(string);
+    ObjectString* result = ObjectString_Allocate(
+        .task = (
+            AllocateTask_Check_If_Interned  |
+            AllocateTask_Copy_String        |
+            AllocateTask_Initialize         |
+            AllocateTask_Intern
+        ),
+        .string = string,
+        .hash   = hash,
+        .first  = &vm->objects,
+        .table  = &vm->string_database
+    );
+
+    return result;
+}
 
 void VirtualMachine_init(VirtualMachine* vm) {
-    vm->objects     = NULL;
-    vm->heap_values = NULL;
+    String konstrutor      = string_make("konstrutor", 10);
 
+    vm->objects            = NULL;
+    vm->heap_values        = NULL;
+    vm->object_init_text   = "konstrutor";
     stack_value_reset(&vm->stack_value);
     StackFunctionCall_reset(&vm->function_calls);
     hash_table_init(&vm->global_database);
@@ -36,6 +55,7 @@ void VirtualMachine_init(VirtualMachine* vm) {
 
     Memory_register(NULL, vm, NULL);
 
+    vm->object_init_string = VirtualMachine_intern_string(vm, konstrutor);
     VirtualMachine_define_function_native(vm, "rilogio", &FunctionNative_clock, 0);
 }
 
@@ -605,6 +625,7 @@ void VirtualMachine_free(VirtualMachine* vm)
 
     hash_table_free(&vm->global_database);
     hash_table_free(&vm->string_database);
+    vm->object_init_string = NULL;
 }
 
 static void VirtualMachine_define_function_native(VirtualMachine* vm, const char* function_name, FunctionNative* function, int arity) {
@@ -699,6 +720,15 @@ static bool VirtualMachine_call_value(VirtualMachine* vm, Value value, int argum
             ObjectClass* klass = value_as_class(value);
             ObjectInstance* instance = ObjectInstance_allocate(klass, &vm->objects);
             vm->stack_value.top[-argument_count - 1] = value_make_object(instance);
+
+            Value konstrutor_method = {0};
+            if (hash_table_get_value(&klass->methods, vm->object_init_string, &konstrutor_method)) {
+                return VirtualMachine_call_value(vm, konstrutor_method, argument_count);
+            } 
+            else if (argument_count != 0) {
+                VirtualMachine_runtime_error(vm, "Expected 0 arguments but got %d.", argument_count);
+                return false;
+            }
 
             return true;
         } 

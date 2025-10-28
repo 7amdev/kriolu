@@ -725,7 +725,8 @@ bool   StackLocal_initialize_local(StackLocal* locals, int depth, int offset);
 typedef enum {
     FunctionKind_Script,
     FunctionKind_Function,
-    FunctionKind_Method
+    FunctionKind_Method,
+    FunctionKind_Method_Initializer // Konstrutor
 } FunctionKind;
 
 typedef enum {
@@ -997,7 +998,8 @@ struct VirtualMachine {
     //
     HashTable string_database;
 
-    // TODO: add a varible to track total bytes allocated
+    const char* object_init_text;
+    ObjectString* object_init_string;
 };
 
 void VirtualMachine_init(VirtualMachine* vm);

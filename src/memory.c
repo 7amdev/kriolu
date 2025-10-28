@@ -149,6 +149,8 @@ static void Memory_mark_roots() {
             Memory_mark_object_gray((Object*)function.curr->object);
         }
     }
+
+    Memory_mark_object_gray((Object*)M_vm->object_init_string);
 }
 
 static void Memory_mark_object_gray(Object* object) {

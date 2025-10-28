@@ -26,8 +26,6 @@ static void parser_initialize_local_identifier(Parser* parser);
 static ObjectFunction* parser_parse_function_paramenters_and_body(Parser* parser, FunctionKind function_kind);
 static Statement* parser_parse_statement_expression(Parser* parser); // TODO: rename to ???
 static Expression* parser_parse_expression(Parser* parser, OperatorPrecedence operator_precedence_previous);
-// TODO: delete code bellow
-// static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bool can_assign);
 static Expression* parser_parse_literals(Parser* parser, bool can_assign);
 static Expression* parser_parse_operator_function_call(Parser* parser, Expression* left_operand);
 static Expression* parser_parse_operator_object_getter_and_setter(Parser* parser, Expression* left_expression, bool can_assign);
@@ -694,11 +692,20 @@ static Statement* parser_instruction_continue(Parser* parser) {
 }
 
 static void parser_compile_return(Parser* parser) {
-    Compiler_CompileInstruction_1Byte(
-        parser_get_current_bytecode(parser),
-        OpCode_Stack_Push_Literal_Nil,
-        parser->token_current.line_number
-    );
+    if (parser->function->function_kind == FunctionKind_Method_Initializer) {
+        Compiler_CompileInstruction_2Bytes(
+            parser_get_current_bytecode(parser),
+            OpCode_Stack_Copy_From_idx_To_Top,
+            0,
+            parser->token_previous.line_number
+        );
+    } else {
+        Compiler_CompileInstruction_1Byte(
+            parser_get_current_bytecode(parser),
+            OpCode_Stack_Push_Literal_Nil,
+            parser->token_current.line_number
+        );
+    }
 
     Compiler_CompileInstruction_1Byte(
         parser_get_current_bytecode(parser),
@@ -714,6 +721,10 @@ static Statement* parser_instruction_return(Parser* parser) {
     if (parser->token_current.kind == Token_Semicolon) {
         parser_compile_return(parser);
     } else {
+        if (parser->function->function_kind == FunctionKind_Method_Initializer) {
+            parser_error(parser, &parser->token_previous, "Can't return a value from a 'Konstrutor'");
+        }
+
         Expression* expression = parser_parse_expression(parser, OperatorPrecedence_Assignment);
         parser_consume(parser, Token_Semicolon, "Expect ';' after expression.");
         Compiler_CompileInstruction_1Byte(
@@ -945,6 +956,8 @@ static Statement* parser_parse_declaration_class(Parser* parser) {
         // Parse Method Declaration
         //
         
+        // Note: Check if any method name is a reserved Token
+        //
         if (parser->token_current.kind == Token_Salta)
             parser_error(parser, &parser->token_previous, "Identifier 'salta' is a Token used by the Language.");
        
@@ -955,7 +968,14 @@ static Statement* parser_parse_declaration_class(Parser* parser) {
         if (identifier_index == -1) 
             parser_error(parser, &parser->token_current, "Too many constants.");
 
-        parser_parse_function_paramenters_and_body(parser, FunctionKind_Method);
+        FunctionKind function_kind = FunctionKind_Method;
+        if (parser->token_previous.length == 10) 
+        if(memcmp(parser->token_previous.start, "konstrutor", 10) == 0)
+        {
+            function_kind = FunctionKind_Method_Initializer;
+        } 
+        
+        parser_parse_function_paramenters_and_body(parser, function_kind);
 
         // Tells the VM to attach method into the class method's hash-table
         //
@@ -1508,6 +1528,8 @@ static Expression* parser_parse_literals(Parser* parser, bool can_assign) {
     }
 
     if (parser->token_previous.kind == Token_String) {
+        parser->token_previous.start  += 1;
+        parser->token_previous.length -= 2;
         ObjectString* string = parser_intern_token(parser->token_previous, parser->object_head, parser->string_database);
         Value v_string = value_make_object(string);
         Memory_transaction_push(v_string);
@@ -1557,6 +1579,7 @@ static Expression* parser_parse_literals(Parser* parser, bool can_assign) {
             parser_error(parser, &parser->token_previous, "Missing closing '}' in interpolation template.");
 
         parser->interpolation_count_value_pushed += 1;
+        
         // TODO: use a Temporary Stack to process recursive calls
         // 
         // _parser_parse_unary_literals_and_identifier(parser, can_assign);
@@ -1577,247 +1600,6 @@ static Expression* parser_parse_literals(Parser* parser, bool can_assign) {
 
     return NULL;
 }
-
-// TODO: delete code bellow
-//
-// static Expression* parser_parse_unary_literals_and_identifier(Parser* parser, bool can_assign)
-// {
-//     // Literals
-//     //
-//     if (parser->token_previous.kind == Token_Number) {
-//         double value = strtod(parser->token_previous.start, NULL);
-//         Value number = value_make_number(value);
-//         Expression e_number = expression_make_number(value);
-//
-//         Compiler_CompileInstruction_Constant(parser_get_current_bytecode(parser), number, parser->token_previous.line_number);
-//
-//         return expression_allocate(e_number);
-//     }
-//
-//     if (parser->token_previous.kind == Token_Verdadi) {
-//         Expression e_true = expression_make_boolean(true);
-//
-//         Compiler_CompileInstruction_1Byte(parser_get_current_bytecode(parser), OpCode_Stack_Push_Literal_True, parser->token_previous.line_number);
-//         return expression_allocate(e_true);
-//     }
-//
-//     if (parser->token_previous.kind == Token_Falsu) {
-//         Expression e_false = expression_make_boolean(false);
-//
-//         Compiler_CompileInstruction_1Byte(parser_get_current_bytecode(parser), OpCode_Stack_Push_Literal_False, parser->token_previous.line_number);
-//         return expression_allocate(e_false);
-//     }
-//
-//     if (parser->token_previous.kind == Token_Nulo) {
-//         Expression nil = expression_make_nil();
-//
-//         Compiler_CompileInstruction_1Byte(parser_get_current_bytecode(parser), OpCode_Stack_Push_Literal_Nil, parser->token_previous.line_number);
-//         return expression_allocate(nil);
-//     }
-//
-//     if (parser->token_previous.kind == Token_String) {
-//         // Check if the source_string already exists in the global string
-//         // database in the virtual machine. If it does, reuse it, if not
-//         // allocate a new one and store it in the global string database for
-//         // future reference.
-//         //
-//         String source_string = string_make(parser->token_previous.start + 1, parser->token_previous.length - 2);
-//         uint32_t source_hash = string_hash(source_string);
-//         ObjectString* string = ObjectString_Allocate(
-//             .task = (
-//                 AllocateTask_Check_If_Interned |
-//                 AllocateTask_Copy_String       |
-//                 AllocateTask_Initialize        |
-//                 AllocateTask_Intern),
-//             .string = source_string,
-//             .hash = source_hash,
-//             // .first = &parser->objects,
-//             .first = parser->object_head,
-//             .table = parser->string_database
-//         );
-//
-//         Value v_string = value_make_object(string);
-//         Expression e_string = expression_make_string(string);
-//
-//         Memory_transaction_push(v_string);
-//         {
-//             Compiler_CompileInstruction_Constant(
-//                 parser_get_current_bytecode(parser),
-//                 v_string,
-//                 parser->token_previous.line_number
-//             );
-//         }
-//         Memory_transaction_pop();
-//
-//         return expression_allocate(e_string);
-//     }
-//
-//     if (parser->token_previous.kind == Token_String_Interpolation) {
-//         for (;;)
-//         {
-//             if (parser->token_previous.kind != Token_String_Interpolation)
-//                 break;
-//
-//             String source_string = string_make(parser->token_previous.start + 1, parser->token_previous.length - 2);
-//             uint32_t source_hash = string_hash(source_string);
-//             ObjectString* string = ObjectString_Allocate(
-//                 .task = (
-//                     AllocateTask_Check_If_Interned |
-//                     AllocateTask_Copy_String       |
-//                     AllocateTask_Initialize        |
-//                     AllocateTask_Intern),
-//                 .string = source_string,
-//                 .hash = source_hash,
-//                 // .first = &parser->objects,
-//                 .first = parser->object_head,
-//                 .table = parser->string_database
-//             );
-//
-//             Value v_string = value_make_object(string);
-//             Expression e_string = expression_make_string(string);
-//
-//             // Tracks on many values have it pushed to the stack on runtime.
-//             //
-//             parser->interpolation_count_value_pushed += 1;
-//             Memory_transaction_push(v_string);
-//             {
-//                 Compiler_CompileInstruction_Constant(
-//                     parser_get_current_bytecode(parser), 
-//                     v_string, 
-//                     parser->token_previous.line_number
-//                 );
-//             }
-//             Memory_transaction_pop();
-//
-//             parser->interpolation_count_nesting += 1;
-//             if (parser->token_current.kind != Token_String_Interpolation)
-//                 parser->interpolation_count_value_pushed += 1;
-//
-//             parser_parse_expression(parser, OperatorPrecedence_Assignment);
-//             parser->interpolation_count_nesting -= 1;
-//
-//             parser_advance(parser);
-//         }
-//
-//         if (*parser->token_previous.start != '}')
-//             parser_error(parser, &parser->token_previous, "Missing closing '}' in interpolation template.");
-//
-//         parser->interpolation_count_value_pushed += 1;
-//         // TODO: use a Temporary Stack to process recursive calls
-//         // 
-//         parser_parse_unary_literals_and_identifier(parser, can_assign);
-//
-//         if (parser->interpolation_count_nesting == 0) {
-//             Compiler_CompileInstruction_2Bytes(
-//                 parser_get_current_bytecode(parser),
-//                 OpCode_Interpolation,
-//                 (uint8_t)parser->interpolation_count_value_pushed,
-//                 parser->token_previous.line_number
-//             );
-//         }
-//
-//         // TODO: implement string interpolation Ast-Node and return it
-//         //
-//         return NULL;
-//     }
-//
-//     // Unary
-//     //
-//     if (parser->token_previous.kind == Token_Minus) {
-//         Expression* expression = parser_parse_expression(parser, OperatorPrecedence_Negate);
-//         Expression negation = expression_make_negation(expression);
-//
-//         Compiler_CompileInstruction_1Byte(parser_get_current_bytecode(parser), OpCode_Negation, parser->token_previous.line_number);
-//         return expression_allocate(negation);
-//     }
-//
-//     if (parser->token_previous.kind == Token_Ka) {
-//         Expression* expression = parser_parse_expression(parser, OperatorPrecedence_Not);
-//         Expression not = expression_make_not(expression);
-//
-//         Compiler_CompileInstruction_1Byte(parser_get_current_bytecode(parser), OpCode_Not, parser->token_previous.line_number);
-//         return expression_allocate(not);
-//     }
-//
-//     if (parser->token_previous.kind == Token_Left_Parenthesis) {
-//         Expression* expression = parser_parse_expression(parser, OperatorPrecedence_Assignment);
-//         Expression grouping = expression_make_grouping(expression);
-//
-//         parser_consume(parser, Token_Right_Parenthesis, "Expected ')' after expression.");
-//         return expression_allocate(grouping);
-//     }
-//
-//     // Identifier
-//     //
-//     if (parser->token_previous.kind == Token_Identifier) {
-//         // TODO: Move this Body into a function called 'parser_parse_identifier(...)'
-//         //
-//         uint8_t opcode_assign = OpCode_Invalid;
-//         uint8_t opcode_read   = OpCode_Invalid;
-//         Local* local_found    = NULL;
-//
-//         int operand = StackLocal_get_local_index_by_token(&parser->function->locals, &parser->token_previous, &local_found);
-//         if (operand != -1) {
-//             // If is a Local, then:
-//             //
-//             opcode_assign = OpCode_Stack_Copy_Top_To_Idx;
-//             opcode_read   = OpCode_Stack_Copy_From_idx_To_Top;
-//         } else if ((operand = parser_resolve_variable_dependencies(parser->function, &parser->token_previous, &local_found)) != -1) {
-//             // If is a closure's variable, then: 
-//             //
-//             opcode_assign = OpCode_Copy_From_Stack_To_Heap;
-//             opcode_read   = OpCode_Copy_From_Heap_To_Stack;
-//         } else {
-//             // Otherwise is a Global
-//             //
-//             ObjectString* identifier = parser_intern_token(parser->token_previous, parser->object_head, parser->string_database);
-//             Bytecode* bytecode = parser_get_current_bytecode(parser);
-//             operand = parser_save_identifier_into_bytecode(bytecode, identifier);
-//             if (operand == -1) parser_error(parser, &parser->token_current, "Too many constants.");
-//
-//             opcode_assign = OpCode_Assign_Global;
-//             opcode_read   = OpCode_Read_Global;
-//         }
-//
-//         if (local_found && local_found->scope_depth == -1)
-//             parser_error(parser, &parser->token_previous, "Can't read local variable in its own initializer.");
-//
-//         // Assignment / Variable Initialization 
-//         //
-//         if (can_assign && parser_match_then_advance(parser, Token_Equal)) {
-//             parser_parse_expression(parser, OperatorPrecedence_Assignment);
-//             Compiler_CompileInstruction_2Bytes(
-//                 parser_get_current_bytecode(parser),
-//                 opcode_assign,
-//                 operand,
-//                 parser->token_previous.line_number
-//             );
-//           
-//             // Expression* right_hand_side = parser_parse_expression(parser, OperatorPrecedence_Assignment);
-//             // Expression expression = expression_make_assignment(variable_name, right_hand_side);
-//             // return expression_allocate(expression);
-//             return NULL;
-//         }
-//
-//         // Get variable value
-//         //
-//         Compiler_CompileInstruction_2Bytes(
-//             parser_get_current_bytecode(parser),
-//             opcode_read,
-//             operand,
-//             parser->token_previous.line_number
-//         );
-//
-//         // Expression expression = expression_make_variable(variable_name);
-//         // return expression_allocate(expression);
-//         return NULL;
-//     }
-//
-//     // TODO: log token name
-//     assert(false && "Unhandled token...");
-//
-//     return NULL;
-// }
 
 static Expression* parser_parse_operators_unary(Parser* parser) {
     if (parser->token_previous.kind == Token_Minus) {
@@ -2197,17 +1979,19 @@ static void parser_init_function(Parser* parser, Function* function, FunctionKin
 static ObjectFunction* parser_end_function(Parser* parser, Function* function) {
     ObjectFunction* object_fn = parser->function->object;
 
-    Compiler_CompileInstruction_1Byte(
-        &object_fn->bytecode,
-        OpCode_Stack_Push_Literal_Nil,
-        parser->token_previous.line_number
-    );
+    parser_compile_return(parser);
 
-    Compiler_CompileInstruction_1Byte(
-        &object_fn->bytecode,
-        OpCode_Return,
-        parser->token_previous.line_number
-    );
+    // Compiler_CompileInstruction_1Byte(
+    //     &object_fn->bytecode,
+    //     OpCode_Stack_Push_Literal_Nil,
+    //     parser->token_previous.line_number
+    // );
+
+    // Compiler_CompileInstruction_1Byte(
+    //     &object_fn->bytecode,
+    //     OpCode_Return,
+    //     parser->token_previous.line_number
+    // );
 
     ///NOTE: I dont need to free(popped_function), because its a 
     //       stack value and it will be discaded by the caller function when returned.
