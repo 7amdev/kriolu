@@ -13,6 +13,8 @@ void VirtualMachine_runtime_error(VirtualMachine* vm, const char* format, ...);
 static void VirtualMachine_define_function_native(VirtualMachine* vm, const char* function_name, FunctionNative* function, int arity);
 static bool VirtualMachine_call_closure(VirtualMachine* vm, ObjectClosure* closure, int argument_count);
 static bool VirtualMachine_call_value(VirtualMachine* vm, Value function, int argument_count);
+static bool VirtualMachine_call_method(VirtualMachine* vm, ObjectString* name, int argument_count);
+static bool VirtualMachine_call_from_class(VirtualMachine* vm, ObjectClass* klass, ObjectString* method_name, int argument_count);
 static ObjectValue* VirtualMachine_create_heap_value(VirtualMachine* vm, Value* value_address);
 static void VirtualMachine_move_value_from_stack_to_heap(VirtualMachine* vm, Value* value_address);
 static Value FunctionNative_clock(VirtualMachine* vm, int argument_count, Value* arguments);
@@ -236,6 +238,16 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
             current_function_call = StackFunctionCall_peek(&vm->function_calls, 0);
             break;
         }
+        case OpCode_Call_Method: 
+        {
+            ObjectString* method_name = READ_STRING();
+            int argument_count = READ_BYTE_THEN_INCREMENT();
+            if (!VirtualMachine_call_method(vm, method_name, argument_count)) {
+                return Interpreter_Runtime_Error;
+            }
+            current_function_call = StackFunctionCall_peek(&vm->function_calls, 0);
+            break;
+        }
 //      TODO: rename to 'OpCode_Stack_Push_Class'
         case OpCode_Class:
         {
@@ -248,9 +260,9 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
         case OpCode_Method: 
         {
             ObjectString* method_name = READ_STRING();
-            Value method = stack_value_peek(&vm->stack_value, 0);
+            Value closure_method = stack_value_peek(&vm->stack_value, 0);
             ObjectClass* klass = value_as_class(stack_value_peek(&vm->stack_value, 1));
-            hash_table_set_value(&klass->methods, method_name, method);
+            hash_table_set_value(&klass->methods, method_name, closure_method);
             stack_value_pop(&vm->stack_value);
             break;
         }
@@ -274,13 +286,14 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
                 break;
             }
             
-            Value method;
-            if (hash_table_get_value(&obj_instance->klass->methods, property_name, &method)) {
+            Value closure_method;
+            if (hash_table_get_value(&obj_instance->klass->methods, property_name, &closure_method)) {
                 ObjectMethod* obj_method = ObjectMethod_allocate(
                     stack_value_peek(&vm->stack_value, 0), 
-                    value_as_closure(method),
+                    value_as_closure(closure_method),
                     &vm->objects
                 );
+
                 stack_value_pop(&vm->stack_value); // NOTE: Pop the Instance
                 stack_value_push(&vm->stack_value, value_make_object_method(obj_method));
                 break;
@@ -382,7 +395,8 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
                 Value value_sum = value_make_number(sum);
 
                 stack_value_push(&vm->stack_value, value_sum);
-            } else if (
+            } 
+            else if (
                 value_is_string(stack_value_peek(&vm->stack_value, 0)) &&
                 value_is_string(stack_value_peek(&vm->stack_value, 1))
             ) {
@@ -405,7 +419,8 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
                         .first  = &vm->objects,
                         .table  = &vm->string_database
                     );
-                } else {
+                } 
+                else {
                     string_free(&final);
                 }
 
@@ -691,6 +706,34 @@ static bool VirtualMachine_call_closure(VirtualMachine* vm, ObjectClosure* closu
 #endif 
 
     return true;
+}
+
+static bool VirtualMachine_call_method(VirtualMachine* vm, ObjectString* method_name, int argument_count) {
+    Value value_instance = stack_value_peek(&vm->stack_value, argument_count);
+    if (!value_is_instance(value_instance)) {
+        VirtualMachine_runtime_error(vm, "Only instances have methods.");
+        return false;
+    }
+
+    ObjectInstance* instance = value_as_instance(value_instance);
+
+    Value value = {0};
+    if (hash_table_get_value(&instance->fields, method_name, &value)) {
+        vm->stack_value.top[-argument_count - 1] = value;
+        return VirtualMachine_call_value(vm, value, argument_count);
+    }
+
+    return VirtualMachine_call_from_class(vm, instance->klass, method_name, argument_count);
+}
+
+static bool VirtualMachine_call_from_class(VirtualMachine* vm, ObjectClass* klass, ObjectString* method_name, int argument_count) {
+    Value closure_method = {0};
+    if (!hash_table_get_value(&klass->methods, method_name, &closure_method)) {
+        VirtualMachine_runtime_error(vm, "Undefined property '%s'.", method_name->characters);
+        return false;
+    }
+
+    return VirtualMachine_call_closure(vm, value_as_closure(closure_method), argument_count);
 }
 
 static bool VirtualMachine_call_value(VirtualMachine* vm, Value value, int argument_count) {

@@ -209,6 +209,7 @@ enum {
     OpCode_Copy_From_Stack_To_Heap,
     OpCode_Loop,
     OpCode_Call_Function,
+    OpCode_Call_Method,
     OpCode_Class,
     OpCode_Method,
     OpCode_Object_Set_Property,
@@ -332,6 +333,7 @@ typedef struct {
 
 #define Compiler_CompileInstruction_1Byte(bytecode, opcode, line) Bytecode_insert_instruction_1byte(bytecode, opcode, line, DEBUG_TRACE_INSTRUCTION)
 #define Compiler_CompileInstruction_2Bytes(bytecode, opcode, operand, line) Bytecode_insert_instruction_2bytes(bytecode, opcode, operand, line, DEBUG_TRACE_INSTRUCTION)
+#define Compiler_CompileInstruction_3Bytes(bytecode, opcode, op1, op2, line) Bytecode_insert_instruction_3bytes(bytecode, opcode, op1, op2, line, DEBUG_TRACE_INSTRUCTION)
 #define Compiler_CompileInstruction_Constant(bytecode, value, line) Bytecode_insert_instruction_constant(bytecode, value, line, DEBUG_TRACE_INSTRUCTION)
 #define Compiler_CompileInstruction_Closure(bytecode, value, line) Bytecode_insert_instruction_closure(bytecode, value, line, DEBUG_TRACE_INSTRUCTION)
 #define Compiler_CompileInstruction_Jump(bytecode, opcode, line) Bytecode_insert_instruction_jump(bytecode, opcode, line, DEBUG_TRACE_INSTRUCTION)
@@ -342,6 +344,7 @@ typedef struct {
 void Bytecode_init(Bytecode* bytecode);
 int  Bytecode_insert_instruction_1byte(Bytecode* bytecode, OpCode opcode, int line_number, bool debug_trace_on);
 int  Bytecode_insert_instruction_2bytes(Bytecode* bytecode, OpCode opcode, uint8_t operand, int line_number, bool debug_trace_on);
+int  Bytecode_insert_instruction_3bytes(Bytecode* bytecode, OpCode opcode, uint8_t operand_1, uint8_t operand_2, int line_number, bool debug_trace_on);
 int  Bytecode_insert_instruction_constant(Bytecode* bytecode, Value value, int line_number, bool debug_trace_on);
 void Bytecode_insert_instruction_closure(Bytecode* bytecode, Value value, int line_number, bool debug_trace_on);
 int  Bytecode_insert_instruction_jump(Bytecode* bytecode, OpCode opcode, int line, bool debug_trace_on);

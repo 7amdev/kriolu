@@ -45,6 +45,28 @@ int Bytecode_insert_instruction_2bytes(Bytecode* bytecode, OpCode opcode, uint8_
     return bytecode->instructions.count - 1;
 }
 
+int Bytecode_insert_instruction_3bytes(Bytecode* bytecode, OpCode opcode, uint8_t operand_1, uint8_t operand_2, int line_number, bool debug_trace_on) {
+    int opcode_index      = array_instruction_insert(&bytecode->instructions, opcode);
+    int line_opcode_index = array_line_insert(&bytecode->lines, line_number);
+
+    assert(opcode_index == line_opcode_index);
+
+    int operand_1_index      = array_instruction_insert(&bytecode->instructions, operand_1);
+    int line_operand_1_index = array_line_insert(&bytecode->lines, line_number);
+
+    assert(operand_1_index == line_operand_1_index);
+
+    int operand_2_index      = array_instruction_insert(&bytecode->instructions, operand_2);
+    int line_operand_2_index = array_line_insert(&bytecode->lines, line_number);
+
+    assert(operand_2_index == line_operand_2_index);
+    assert(operand_2_index == (bytecode->instructions.count - 1));
+
+    if (debug_trace_on) Bytecode_disassemble_instruction(bytecode, opcode_index);
+
+    return bytecode->instructions.count - 1;
+}
+
 static int Bytecode_insert_instruction_4bytes(Bytecode* bytecode, OpCode opcode, uint8_t byte1, uint8_t byte2, uint8_t byte3, int line_number, bool debug_trace_on) {
     int opcode_index = array_instruction_insert(&bytecode->instructions, opcode);
     int line_opcode_index = array_line_insert(&bytecode->lines, line_number);
@@ -188,6 +210,17 @@ static int Bytecode_debug_instruction_call(Bytecode* bytecode, const char* opcod
     uint8_t operand = bytecode->instructions.items[ret_offset_increment - 1];
     printf("%-45s argc: %d", opcode_text, operand);
     printf("\n");
+    return ret_offset_increment;
+}
+
+static int Bytecode_debug_instruction_call_method(Bytecode* bytecode, const char* opcode_text, int ret_offset_increment) {
+    uint8_t argument_count = bytecode->instructions.items[ret_offset_increment - 1];
+    uint8_t method_name_index = bytecode->instructions.items[ret_offset_increment - 2];
+    Value method = bytecode->values.items[method_name_index];
+    printf("%-45s (%d args) %4d '", opcode_text, argument_count, method_name_index);
+    value_print(method);
+    printf("'\n");
+
     return ret_offset_increment;
 }
 
@@ -397,6 +430,8 @@ int Bytecode_disassemble_instruction(Bytecode* bytecode, int offset)
         return Bytecode_debug_instruction_byte("OPCODE_MOVE_VALUE_TO_HEAP", (offset + 1));
     if (opcode == OpCode_Call_Function)
         return Bytecode_debug_instruction_call(bytecode, "OPCODE_CALL_FUNCTION", (offset + 2));
+    if (opcode == OpCode_Call_Method)
+        return Bytecode_debug_instruction_call_method(bytecode, "OPCODE_CALL_METHOD", (offset + 3));
     if (opcode == OpCode_Negation)
         return Bytecode_debug_instruction_byte("OPCODE_NEGATION", (offset + 1));
     if (opcode == OpCode_Not)

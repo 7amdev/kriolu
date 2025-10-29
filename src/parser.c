@@ -1579,7 +1579,7 @@ static Expression* parser_parse_literals(Parser* parser, bool can_assign) {
             parser_error(parser, &parser->token_previous, "Missing closing '}' in interpolation template.");
 
         parser->interpolation_count_value_pushed += 1;
-        
+
         // TODO: use a Temporary Stack to process recursive calls
         // 
         // _parser_parse_unary_literals_and_identifier(parser, can_assign);
@@ -1889,7 +1889,18 @@ static Expression* parser_parse_operator_object_getter_and_setter(Parser* parser
             property_name_index,                    // Operand
             parser->token_previous.line_number
         );
-    } else {
+    }
+    else if (parser_match_then_advance(parser, Token_Left_Parenthesis)) {
+        uint8_t argument_count = parser_parse_arguments(parser);
+        Compiler_CompileInstruction_3Bytes(
+            parser_get_current_bytecode(parser),
+            OpCode_Call_Method,  // OpCode
+            property_name_index, // Operand 1
+            argument_count,      // Operand 2
+            parser->token_previous.line_number
+        );
+    } 
+    else {
         Compiler_CompileInstruction_2Bytes(
             parser_get_current_bytecode(parser),
             OpCode_Object_Get_Property,             // OpCode
