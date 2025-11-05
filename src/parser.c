@@ -19,10 +19,11 @@ static Statement* parser_parse_declaration_class(Parser* parser);
 static Statement* parser_parse_declaration_function(Parser* parser);
 static Statement* parser_parse_declaration_variable(Parser* parser);
 static int parser_find_identifier_location(Parser* parser, Token token, int* out_identifier_location, Local* out_local);
-static void parser_load_identifier_value_to_stack(Parser* parser, int identifier_location, int identifier_location_index);
+static void Parser_compile_variable_value_to_stack(Parser* parser, int identifier_location, int identifier_location_index);
 static ObjectString* parser_intern_token(Token token, Object** object_head, HashTable* string_database);
 static int parser_save_identifier_into_bytecode(Bytecode* bytecode, ObjectString* identifier);
 static void parser_initialize_local_identifier(Parser* parser);
+static void parser_load_variable_value_to_stack(Parser* parser, Token variable_name);
 static ObjectFunction* parser_parse_function_paramenters_and_body(Parser* parser, FunctionKind function_kind);
 static Statement* parser_parse_statement_expression(Parser* parser); // TODO: rename to ???
 static Expression* parser_parse_expression(Parser* parser, OperatorPrecedence operator_precedence_previous);
@@ -34,6 +35,7 @@ static Expression* parser_parse_operators_unary(Parser* parser);
 static Expression* parser_parse_operators_logical(Parser* parser, Expression* left_operand);
 static Expression* parser_parse_operators_arithmetic(Parser* parser, Expression* left_operand);
 static Expression* parser_parse_operators_relational(Parser* parser, Expression* left_operand);
+static uint8_t parser_parse_arguments(Parser* parser);
 // TODO: rename to Function_find_local_by_token(Function* function, Token* name, Local** out);
 static void parser_compile_return(Parser* parser);
 static bool parser_is_operator_arithmetic(Token token);
@@ -803,7 +805,7 @@ static int parser_find_identifier_location(Parser* parser, Token token, int* out
     return value_index;
 }
 
-static void parser_load_identifier_value_to_stack(Parser* parser, int identifier_location, int identifier_location_index) {
+static void Parser_compile_variable_value_to_stack(Parser* parser, int identifier_location, int identifier_location_index) {
     if (identifier_location == 1) {
 //      Its a Local Variable
         Compiler_CompileInstruction_2Bytes(
@@ -816,7 +818,7 @@ static void parser_load_identifier_value_to_stack(Parser* parser, int identifier
 //      Its a Closure Variable
         Compiler_CompileInstruction_2Bytes(
             parser_get_current_bytecode(parser),
-            OpCode_Copy_From_Heap_To_Stack,
+            OpCode_Stack_Copy_From_Heap_To_Top,
             identifier_location_index,
             parser->token_previous.line_number
         );
@@ -846,7 +848,7 @@ static void parser_parse_operator_assignment(Parser* parser, int identifier_loca
 //      Its a Closure Variable
         Compiler_CompileInstruction_2Bytes(
             parser_get_current_bytecode(parser),
-            OpCode_Copy_From_Stack_To_Heap,
+            OpCode_Stack_Move_Top_To_Heap,
             identifier_location_index,
             parser->token_previous.line_number
         );
@@ -860,6 +862,25 @@ static void parser_parse_operator_assignment(Parser* parser, int identifier_loca
         );
     }
 }
+
+static void Parser_create_local_uninitialized(Parser* parser, Token identifier) {
+    if (parser->function->depth ==  0) return;
+    
+    if (StackLocal_is_full(&parser->function->locals)) {
+        parser_error(parser, &identifier,  "Too many local variables in a scope.");
+    }
+
+    if (parser_check_locals_duplicates(parser, &identifier)) {
+        parser_error(parser, &identifier, "Already a variable with this name in this scope.");
+    }
+    
+    StackLocal_push(&parser->function->locals, (Local) {
+        .token = identifier,
+        .scope_depth = -1,
+        .action = LocalAction_Default
+    });
+}
+
 static void parser_initialize_local_identifier(Parser* parser) {
     if (parser->function->depth == 0) return;
 
@@ -867,49 +888,35 @@ static void parser_initialize_local_identifier(Parser* parser) {
     local->scope_depth = parser->function->depth;
 }
 
+static void parser_load_variable_value_to_stack(Parser* parser, Token variable_name) {
+    int identifier_location = -1;
+    int identifier_location_index = parser_find_identifier_location(parser, variable_name, &identifier_location, NULL);
+    Parser_compile_variable_value_to_stack(parser, identifier_location, identifier_location_index);
+}
+
 static Statement* parser_parse_declaration_class(Parser* parser) {
+//  #ifdef DEBUG_SHOW_CODE
     SourceCode source_code = { 
-        .source_start               = parser->token_previous.start,
-        .source_length              = 0,
-        .instruction_start_offset   = -1
+        .source_start = parser->token_previous.start,
+        .source_length = 0,
+        .instruction_start_offset = -1
     };
+//  #endif
 
     parser_consume(parser, Token_Identifier, "Expected a class name.");
+
     Token class_name = parser->token_previous;
-
-    // Register Identifier into Bytecode Values Array
-    //
-    Bytecode* bytecode       = parser_get_current_bytecode(parser);
     ObjectString* os_class_name = parser_intern_token(parser->token_previous, parser->object_head, parser->string_database);
-    int class_name_index     = parser_save_identifier_into_bytecode(bytecode, os_class_name);
+    int class_name_index = parser_save_identifier_into_bytecode(parser_get_current_bytecode(parser), os_class_name);
 
-    ClassDeclaration new_class = {0};
-    LinkedList_push(parser->first_class_declaration, &new_class);
+    if (parser->function->depth > 0) 
+        Parser_create_local_uninitialized(parser, parser->token_previous);
 
-    // Register the Identifier in the Value Stack as Uninitialized, if 
-    // we are not in a global scope.
-    // 
-    if (parser->function->depth > 0) {
-        if (StackLocal_is_full(&parser->function->locals)) {
-            parser_error(parser, &parser->token_previous, "Too many local variables in a scope.");
-        }
-
-        if (parser_check_locals_duplicates(parser, &parser->token_previous)) {
-            parser_error(parser, &parser->token_previous, "Already a variable with this name in this scope.");
-        }
-        
-        StackLocal_push(&parser->function->locals, (Local) {
-            .token = parser->token_previous,
-            .scope_depth = -1,
-            .action = LocalAction_Default
-        });
-    }
-
-    source_code.instruction_start_offset = parser_get_current_bytecode(parser)->instructions.count;
-    
-    // Tells the VM to create a new instance of ObjectClass and 
-    // push it into the Value Stack.
-    // 
+//  #ifdef DEBUG_SHOW_CODE
+    source_code.instruction_start_offset = (
+        parser_get_current_bytecode(parser)->instructions.count
+    );
+//  #endif
     Compiler_CompileInstruction_2Bytes(
         parser_get_current_bytecode(parser),
         OpCode_Class,
@@ -917,12 +924,7 @@ static Statement* parser_parse_declaration_class(Parser* parser) {
         parser->token_previous.line_number
     );
 
-    // Define the Class
-    //
     if (parser->function->depth == 0) {
-        // Tells the VM to register Class name and the ObjectClass to 
-        // the Global HashTable.
-        //
         Compiler_CompileInstruction_2Bytes(
             parser_get_current_bytecode(parser),
             OpCode_Define_Global,
@@ -933,19 +935,43 @@ static Statement* parser_parse_declaration_class(Parser* parser) {
         parser_initialize_local_identifier(parser);
     }
 
-    int identifier_location       = -1;
-    int identifier_location_index = parser_find_identifier_location(
-        parser, 
-        class_name, 
-        &identifier_location, 
-        NULL
-    );
+    ClassDeclaration new_class = {0};
+    LinkedList_push(parser->first_class_declaration, &new_class);
 
-    parser_load_identifier_value_to_stack(
-        parser, 
-        identifier_location, 
-        identifier_location_index
-    );
+    if (parser_match_then_advance(parser, Token_Less)) {
+        parser_consume(parser, Token_Identifier, "Expect Superclass name.");
+        new_class.has_superclass = true;
+
+//      REVIEW: what if the superclass is not declared yet??
+        parser_load_variable_value_to_stack(parser, parser->token_previous);
+        if (token_is_identifier_equal(&parser->token_previous, &class_name)) 
+            parser_error(parser, &parser->token_previous, "A class cannot inherit from itself.");
+
+//      Note: Ensures that if there is 2(two) class declarations in the same scope, 
+//      each has a different local scope to prevent collition.
+        parser_begin_scope(parser);
+//      TODO: use 'parser->token_previous' instead of riba. This way
+//            the syntax to call a Superclass method will be 
+//            'Superclass.method_name();' 
+        Parser_create_local_uninitialized(parser, (Token) {
+            .kind   = Token_Riba,
+            .start  = "riba",
+            .length = 4
+        });
+        parser_initialize_local_identifier(parser);
+        
+        parser_load_variable_value_to_stack(parser, class_name);
+//      I dont create a new local to sync Parser dummy locals with
+//      the VM stack, because the instruction 'OpCode_Inheritance'
+//      will Pop the Class Value right after.
+        Compiler_CompileInstruction_1Byte(
+            parser_get_current_bytecode(parser),
+            OpCode_Inheritance,
+            parser->token_previous.line_number
+        );
+    }
+
+    parser_load_variable_value_to_stack(parser, class_name);
 
     parser_consume(parser, Token_Left_Brace,  "Expected '{' before class body.");
     for (;;) {
@@ -956,8 +982,7 @@ static Statement* parser_parse_declaration_class(Parser* parser) {
         // Parse Method Declaration
         //
         
-        // Note: Check if any method name is a reserved Token
-        //
+//      Note: Check if any method name is a reserved Token
         if (parser->token_current.kind == Token_Salta)
             parser_error(parser, &parser->token_previous, "Identifier 'salta' is a Token used by the Language.");
        
@@ -977,8 +1002,6 @@ static Statement* parser_parse_declaration_class(Parser* parser) {
         
         parser_parse_function_paramenters_and_body(parser, function_kind);
 
-        // Tells the VM to attach method into the class method's hash-table
-        //
         Compiler_CompileInstruction_2Bytes(
             parser_get_current_bytecode(parser),
             OpCode_Method,
@@ -995,16 +1018,20 @@ static Statement* parser_parse_declaration_class(Parser* parser) {
         parser->token_previous.line_number
     );
 
+    if (new_class.has_superclass) {
+        parser_end_scope(parser);
+    }
+
     ClassDeclaration class_popped = {0};
     LinkedList_pop(parser->first_class_declaration, &class_popped);
 
-    // TODO: #ifdef DEBUG_SHOW_CODE
-    // 
+//  #ifdef DEBUG_SHOW_CODE
     source_code.source_length = (int)(parser->token_current.start - source_code.source_start);
     DynamicArray_append(
         &parser_get_current_bytecode(parser)->source_code, 
         source_code
     );
+//  #endif
     
     return NULL;
 }
@@ -1178,7 +1205,8 @@ static Statement* parser_parse_declaration_variable(Parser* parser) {
                 AllocateTask_Check_If_Interned |
                 AllocateTask_Copy_String       |
                 AllocateTask_Initialize        |
-                AllocateTask_Intern),
+                AllocateTask_Intern
+            ),
             .string = source_string,
             .hash = source_hash,
             .first = parser->object_head,    // .first = &parser->objects,
@@ -1412,16 +1440,74 @@ static Expression* parser_parse_expression(Parser* parser, OperatorPrecedence op
         identifier_location_index = parser_find_identifier_location(parser, parser->token_previous, &identifier_location, NULL);
 //      If there is no assignment, then compile the Identifier as a Variable.
         if (parser->token_current.kind != Token_Equal) 
-            parser_load_identifier_value_to_stack(parser, identifier_location, identifier_location_index);
+            Parser_compile_variable_value_to_stack(parser, identifier_location, identifier_location_index);
+//      TODO: check if Identifier is a Superclass. To see if its a superclass, lookup 
+//            in the current function stack locals for a Token with the same name.
     } 
     else if (parser->token_previous.kind == Token_Keli) {
         if (parser->first_class_declaration == NULL) {
             parser_error(parser, &parser->token_previous, "Can't use 'keli' outside of a class.");
-            // return;
-        } else {
+        } 
+        else {
             identifier_location_index = parser_find_identifier_location(parser, parser->token_previous, &identifier_location, NULL);
             if (parser->token_current.kind != Token_Equal) 
-                parser_load_identifier_value_to_stack(parser, identifier_location, identifier_location_index); 
+                Parser_compile_variable_value_to_stack(parser, identifier_location, identifier_location_index); 
+        }
+    }
+    else if (parser->token_previous.kind == Token_Riba) {
+        if (parser->first_class_declaration == NULL) {
+            parser_error(parser, &parser->token_previous, "Can't use 'riba' outside of a class.");
+        }
+        else if (!parser->first_class_declaration->has_superclass) {
+            parser_error(parser, &parser->token_previous, "Can't use 'riba' in a class with no superclass.");
+        }
+
+        parser_consume(parser, Token_Dot, "Expect '.' after 'riba'.");
+        parser_consume(parser, Token_Identifier, "Expect superclass method name.");
+
+        int method_location = -1;
+        // TODO
+        // if location is on current Stack / Local -> print error 
+        // Identifier location index must be a method in a parent class
+        // TODO: rename to 'method_location_index'
+        int method_location_index = parser_find_identifier_location(parser, parser->token_previous, &method_location, NULL);
+        parser_load_variable_value_to_stack(parser, (Token) {
+            .kind = Token_Keli,
+            .start = "keli",
+            .length = 4
+        });
+
+        if (parser_match_then_advance(parser, Token_Left_Parenthesis)) {
+            uint8_t argument_count = parser_parse_arguments(parser);
+            parser_load_variable_value_to_stack(parser, (Token) { 
+                .kind = Token_Riba, 
+                .start = "riba", 
+                .length = 4
+            });
+            Compiler_CompileInstruction_2Bytes(
+                parser_get_current_bytecode(parser),
+                OpCode_Call_Super_Method,
+                method_location_index,
+                parser->token_previous.line_number
+            );
+            Compiler_CompileInstruction_1Byte(
+                parser_get_current_bytecode(parser),
+                argument_count,
+                parser->token_previous.line_number
+            );
+        }
+        else {
+            parser_load_variable_value_to_stack(parser, (Token) { 
+                .kind = Token_Riba, 
+                .start = "riba", 
+                .length = 4
+            });
+            Compiler_CompileInstruction_2Bytes(
+                parser_get_current_bytecode(parser),
+                OpCode_Get_Super,
+                method_location_index,
+                parser->token_previous.line_number
+            );
         }
     }
 
@@ -1946,10 +2032,11 @@ static void parser_end_scope(Parser* parser) {
         if (StackLocal_peek(locals, 0)->action == LocalAction_Move_Heap) {
             Compiler_CompileInstruction_1Byte(
                 parser_get_current_bytecode(parser),
-                OpCode_Move_Value_To_Heap,
+                OpCode_Stack_Move_Value_To_Heap,              // TODO: rename to 'OpCode_Stack_Move_Value_To_Heap'
                 parser->token_previous.line_number
             );
-        } else {
+        } 
+        else {
             Compiler_CompileInstruction_1Byte(
                 parser_get_current_bytecode(parser),
                 OpCode_Stack_Pop,
@@ -1992,18 +2079,6 @@ static ObjectFunction* parser_end_function(Parser* parser, Function* function) {
 
     parser_compile_return(parser);
 
-    // Compiler_CompileInstruction_1Byte(
-    //     &object_fn->bytecode,
-    //     OpCode_Stack_Push_Literal_Nil,
-    //     parser->token_previous.line_number
-    // );
-
-    // Compiler_CompileInstruction_1Byte(
-    //     &object_fn->bytecode,
-    //     OpCode_Return,
-    //     parser->token_previous.line_number
-    // );
-
     ///NOTE: I dont need to free(popped_function), because its a 
     //       stack value and it will be discaded by the caller function when returned.
     Function* popped_function = NULL;
@@ -2029,7 +2104,6 @@ static ObjectFunction* parser_end_function(Parser* parser, Function* function) {
 //       to go trough to find the variabe. 
 //
 int parser_resolve_variable_dependencies(Function* function, Token* name, Local** ret_local) {
-    // TODO: make it 'static', then clear on return
     StackFunction stack_function = { 0 };
     int local_found_idx = -1;
 
@@ -2057,33 +2131,58 @@ int parser_resolve_variable_dependencies(Function* function, Token* name, Local*
     current_function->locals.items[local_found_idx].action = LocalAction_Move_Heap;
     *ret_local = &current_function->locals.items[local_found_idx];
 
-    Function* top_function = StackFunction_pop(&stack_function);
-    int variable_dependency_idx = ArrayLocalMetadata_add(
-        &top_function->variable_dependencies,
-        (uint8_t)local_found_idx,
-        LocalLocation_In_Parent_Stack,
-        &top_function->object->variable_dependencies_count
-    );
-
-    if (StackFunction_is_empty(&stack_function)) return variable_dependency_idx;
-
-    int var_dependency_latest = variable_dependency_idx;
+    int parent_local_idx = local_found_idx;
+    bool is_top_item = true;
     for (;;) {
         if (StackFunction_is_empty(&stack_function)) break;
-        if (variable_dependency_idx == -1) break;
 
-        top_function = StackFunction_peek(&stack_function, 0);
-        var_dependency_latest = ArrayLocalMetadata_add(
-            &top_function->variable_dependencies,
-            (uint8_t)var_dependency_latest,
-            LocalLocation_In_Parent_Heap_Values,
-            &top_function->object->variable_dependencies_count
+        current_function = StackFunction_peek(&stack_function, 0);
+        parent_local_idx = ArrayLocalMetadata_add(
+            &current_function->variable_dependencies,
+            (uint8_t)parent_local_idx,
+            (is_top_item 
+                ? LocalLocation_In_Parent_Stack 
+                : LocalLocation_In_Parent_Heap_Values
+            ),
+            &current_function->object->variable_dependencies_count
         );
 
+        if (is_top_item) is_top_item = false;
         StackFunction_pop(&stack_function);
     }
 
-    return var_dependency_latest;
+    return parent_local_idx;
+
+
+//  TODO: delete code bellow ------------
+    // Function* top_function = StackFunction_pop(&stack_function);
+    // int variable_dependency_idx = ArrayLocalMetadata_add(
+    //     &top_function->variable_dependencies,
+    //     (uint8_t)local_found_idx,
+    //     LocalLocation_In_Parent_Stack,
+    //     &top_function->object->variable_dependencies_count
+    // );
+
+    // if (StackFunction_is_empty(&stack_function)) return variable_dependency_idx;
+
+    // int var_dependency_latest = variable_dependency_idx;
+    // for (;;) {
+    //     if (StackFunction_is_empty(&stack_function)) break;
+    //     if (variable_dependency_idx == -1) break;
+
+    //     top_function = StackFunction_peek(&stack_function, 0);
+    //     var_dependency_latest = ArrayLocalMetadata_add(
+    //         &top_function->variable_dependencies,
+    //         (uint8_t)var_dependency_latest,
+    //         LocalLocation_In_Parent_Heap_Values,
+    //         &top_function->object->variable_dependencies_count
+    //     );
+
+    //     StackFunction_pop(&stack_function);
+    // }
+
+
+    // return var_dependency_latest;
 }
 
 // todo: parser destroy implementation

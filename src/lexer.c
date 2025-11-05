@@ -247,9 +247,11 @@ Token lexer_scan(Lexer* lexer)
 
         if (*token.start == 'e') {
             token.kind = lexer_keyword_kind(token, "e", 0, Token_E);
-        } else if (*token.start == 'o') {
+        }
+        else if (*token.start == 'o') {
             token.kind = lexer_keyword_kind(token, "ou", 1, Token_Ou);
-        } else if (*token.start == 'k') {
+        }
+        else if (*token.start == 'k') {
             if (token.start[1] == 'a') {
                 token.kind = lexer_keyword_kind(token, "ka", 1, Token_Ka);
             } else if (token.start[1] == 'l') {
@@ -257,29 +259,36 @@ Token lexer_scan(Lexer* lexer)
             } else if (token.start[1] == 'e') {
                 token.kind = lexer_keyword_kind(token, "keli", 2, Token_Keli);
             }
-        } else if (*token.start == 's') {
+        }
+        else if (*token.start == 's') {
             if (token.start[1] == 'i') {
                 if (token.start[2] == 'n') {
                     token.kind = lexer_keyword_kind(token, "sinou", 2, Token_Sinou);
-                } else {
+                } 
+                else {
                     token.kind = lexer_keyword_kind(token, "si", 2, Token_Si);
                 }
-            } else if (token.start[1] == 'u') {
-                token.kind = lexer_keyword_kind(token, "super", 2, Token_Super);
-            } else if (token.start[1] == 'a') {
+            } 
+            // else if (token.start[1] == 'u') {
+            //     token.kind = lexer_keyword_kind(token, "super", 2, Token_Super);
+            // } 
+            else if (token.start[1] == 'a') {
                 if (token.start[2] == 'l') {
                     token.kind = lexer_keyword_kind(token, "salta", 3, Token_Salta);
-                } else if (token.start[2] == 'i') {
+                } 
+                else if (token.start[2] == 'i') {
                     token.kind = lexer_keyword_kind(token, "sai", 2, Token_Sai);
                 }
             }
-        } else if (*token.start == 'f') {
+        }
+        else if (*token.start == 'f') {
             if (token.start[1] == 'a') {
                 token.kind = lexer_keyword_kind(token, "falsu", 2, Token_Falsu);
             } else if (token.start[1] == 'u') {
                 token.kind = lexer_keyword_kind(token, "funson", 2, Token_Funson);
             }
-        } else if (*token.start == 'd') {
+        }
+        else if (*token.start == 'd') {
             if (token.start[1] == 'i') {
                 if (token.start[2] == 'v') {
                     token.kind = lexer_keyword_kind(token, "divolvi", 3, Token_Divolvi);
@@ -287,7 +296,8 @@ Token lexer_scan(Lexer* lexer)
                     token.kind = lexer_keyword_kind(token, "di", 2, Token_Di);
                 }
             }
-        } else if (*token.start == 't') {
+        }
+        else if (*token.start == 't') {
             if (token.start[1] == 'i') {
                 if (token.start[2] == 'm') {
                     token.kind = lexer_keyword_kind(token, "timenti", 3, Token_Timenti);
@@ -295,16 +305,24 @@ Token lexer_scan(Lexer* lexer)
                     token.kind = lexer_keyword_kind(token, "ti", 2, Token_Ti);
                 }
             }
-        } else if (*token.start == 'i') {
+        }
+        else if (*token.start == 'i') {
             token.kind = lexer_keyword_kind(token, "imprimi", 1, Token_Imprimi);
-        } else if (*token.start == 'v') {
+        }
+        else if (*token.start == 'v') {
             token.kind = lexer_keyword_kind(token, "verdadi", 1, Token_Verdadi);
-        } else if (*token.start == 'm') {
+        }
+        else if (*token.start == 'm') {
             token.kind = lexer_keyword_kind(token, "mimoria", 1, Token_Mimoria);
-        } else if (*token.start == 'n') {
+        } 
+        else if (*token.start == 'n') {
             token.kind = lexer_keyword_kind(token, "nulo", 1, Token_Nulo);
-        } else if (*token.start == 'p') {
+        } 
+        else if (*token.start == 'p') {
             token.kind = lexer_keyword_kind(token, "pa", 1, Token_Pa);
+        }
+        else if (*token.start == 'r') {
+            token.kind = lexer_keyword_kind(token, "riba", 1, Token_Riba);
         }
 
         return token;
@@ -503,11 +521,11 @@ void lexer_debug_print_token(Token token, const char* format)
         fprintf(stdout, format, "<divolvi>");
         break;
     }
-    case Token_Super:
-    {
-        fprintf(stdout, format, "<super>");
-        break;
-    }
+    // case Token_Super:
+    // {
+    //     fprintf(stdout, format, "<super>");
+    //     break;
+    // }
     case Token_Keli:
     {
         fprintf(stdout, format, "<keli>");

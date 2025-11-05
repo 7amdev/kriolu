@@ -64,6 +64,7 @@ typedef enum {
     Token_Ou, // LOGIC OPERATOR or
     Token_Ka, // LOGIC OPERATOR not
     Token_Klasi,
+    Token_Riba,
     Token_Si,
     Token_Sinou,
     Token_Falsu,
@@ -73,7 +74,7 @@ typedef enum {
     Token_Nulo,
     Token_Imprimi,
     Token_Divolvi,
-    Token_Super,
+    // Token_Super,
     Token_Sai,
     Token_Salta,
     Token_Keli,    // THIS
@@ -181,10 +182,12 @@ enum {
     OpCode_Stack_Push_Literal_False,
     OpCode_Stack_Push_Closure,
     OpCode_Stack_Push_Closure_Long,
-    OpCode_Stack_Pop,
     OpCode_Stack_Copy_From_idx_To_Top,
     OpCode_Stack_Copy_Top_To_Idx,
-    OpCode_Move_Value_To_Heap,
+    OpCode_Stack_Copy_From_Heap_To_Top,
+    OpCode_Stack_Move_Top_To_Heap, 
+    OpCode_Stack_Move_Value_To_Heap,
+    OpCode_Stack_Pop,
     OpCode_Interpolation,
     OpCode_Negation,
     OpCode_Not,
@@ -205,15 +208,16 @@ enum {
     OpCode_Read_Global,
     OpCode_Assign_Global,
 
-    OpCode_Copy_From_Heap_To_Stack,
-    OpCode_Copy_From_Stack_To_Heap,
     OpCode_Loop,
     OpCode_Call_Function,
     OpCode_Call_Method,
+    OpCode_Call_Super_Method,
     OpCode_Class,
     OpCode_Method,
+    OpCode_Inheritance, 
     OpCode_Object_Set_Property,
     OpCode_Object_Get_Property,
+    OpCode_Get_Super,
 
     OpCode_Return
 };
@@ -758,8 +762,7 @@ struct Function {
     ObjectFunction* object;                     // NOTE: Runtime function data structure
     StackLocal locals;                          // NOTE: Variables declared inside a function; Emulates runtime StackValue 
 
-    // TODO: rename to 'varibles_in_parent_scope' ???
-    //
+//  TODO: rename to 'varibles_in_parent_scope' ???
     ArrayLocalMetadata variable_dependencies;   // NOTE: Varibale accessed that belongs to a parent function
 
     int depth;                                  // NOTE: Scope depth
@@ -862,6 +865,7 @@ int StackBlock_get_top_item_index(StackBlock* blocks);
 typedef struct ClassDeclaration ClassDeclaration;
 struct ClassDeclaration {
     LinkedList(ClassDeclaration) next;
+    bool has_superclass;
 };
 
 typedef struct {

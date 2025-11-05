@@ -12,7 +12,7 @@ int ArrayLocalMetadata_add(ArrayLocalMetadata* local_metadata, uint8_t index, Lo
     int local_metadata_index = ArrayLocalMetadata_find_index(local_metadata, index, location);
     if (local_metadata_index != -1) return local_metadata_index;
 
-    if (local_metadata->count == UINT8_COUNT) return 0; /// Maybe -2??
+    if (local_metadata->count == UINT8_COUNT) return 0; 
 
     LocalMetadata* new_local_metadata = &local_metadata->items[local_metadata->count];
     new_local_metadata->index = index;

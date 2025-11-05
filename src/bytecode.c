@@ -404,6 +404,12 @@ int Bytecode_disassemble_instruction(Bytecode* bytecode, int offset)
         return Bytecode_debug_instruction_local(bytecode, "OPCODE_STACK_COPY_FROM_IDX_TO_TOP", (offset + 2));
     if (opcode == OpCode_Stack_Copy_Top_To_Idx)
         return Bytecode_debug_instruction_local(bytecode, "OPCODE_STACK_COPY_TOP_TO_IDX", (offset + 2));
+    if (opcode == OpCode_Stack_Copy_From_Heap_To_Top)
+        return Bytecode_debug_instruction_local(bytecode, "OPCODE_STACK_COPY_FROM_HEAP_TO_TOP", (offset + 2));
+    if (opcode == OpCode_Stack_Move_Top_To_Heap)
+        return Bytecode_debug_instruction_local(bytecode, "OPCODE_STACK_MOVE_TOP_TO_HEAP", (offset + 2));
+    if (opcode == OpCode_Stack_Move_Value_To_Heap)
+        return Bytecode_debug_instruction_byte("OPCODE_STACK_MOVE_VALUE_TO_HEAP", (offset + 1));
     if (opcode == OpCode_Interpolation)
         return Bytecode_debug_instruction_2bytes(bytecode, "OPCODE_INTERPOLATION", (offset + 2));
     if (opcode == OpCode_Stack_Pop)
@@ -416,22 +422,22 @@ int Bytecode_disassemble_instruction(Bytecode* bytecode, int offset)
         return Bytecode_debug_instruction_2bytes(bytecode, "OPCODE_CLASS", (offset + 2));
     if (opcode == OpCode_Method)
         return Bytecode_debug_instruction_2bytes(bytecode, "OPCODE_METHOD", (offset + 2));
+    if (opcode == OpCode_Inheritance)
+        return Bytecode_debug_instruction_byte("OPCODE_INHERITANCE", (offset + 1));
+    if (opcode == OpCode_Get_Super)
+        return Bytecode_debug_instruction_2bytes(bytecode, "OPCODE_GET_SUPER", (offset + 2));
     if (opcode == OpCode_Object_Get_Property)
         return Bytecode_debug_instruction_2bytes(bytecode, "OPCODE_OBJ_GET_PROPERTY", (offset + 2));
     if (opcode == OpCode_Object_Set_Property)
         return Bytecode_debug_instruction_2bytes(bytecode, "OPCODE_OBJ_SET_PROPERTY", (offset + 2));
     if (opcode == OpCode_Assign_Global)
         return Bytecode_debug_instruction_2bytes(bytecode, "OPCODE_ASSIGN_GLOBAL", (offset + 2));
-    if (opcode == OpCode_Copy_From_Stack_To_Heap)
-        return Bytecode_debug_instruction_local(bytecode, "OPCODE_COPY_FROM_STACK_TO_HEAP", (offset + 2));
-    if (opcode == OpCode_Copy_From_Heap_To_Stack)
-        return Bytecode_debug_instruction_local(bytecode, "OPCODE_COPY_FROM_HEAP_TO_STACK", (offset + 2));
-    if (opcode == OpCode_Move_Value_To_Heap)
-        return Bytecode_debug_instruction_byte("OPCODE_MOVE_VALUE_TO_HEAP", (offset + 1));
     if (opcode == OpCode_Call_Function)
         return Bytecode_debug_instruction_call(bytecode, "OPCODE_CALL_FUNCTION", (offset + 2));
     if (opcode == OpCode_Call_Method)
         return Bytecode_debug_instruction_call_method(bytecode, "OPCODE_CALL_METHOD", (offset + 3));
+    if (opcode == OpCode_Call_Super_Method)
+        return Bytecode_debug_instruction_call_method(bytecode, "OPCODE_CALL_SUPER_METHOD", (offset + 3));
     if (opcode == OpCode_Negation)
         return Bytecode_debug_instruction_byte("OPCODE_NEGATION", (offset + 1));
     if (opcode == OpCode_Not)
