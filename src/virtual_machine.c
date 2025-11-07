@@ -258,11 +258,32 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
         {
             int argument_count = READ_BYTE_THEN_INCREMENT();
             Value function = stack_value_peek(&vm->stack_value, argument_count);
+            if (value_as_object(function)->kind != ObjectKind_Closure) {
+                VirtualMachine_runtime_error(vm, "Expect a 'Funson' to call.\n-- Did you meant '%s{}'", value_as_class(function)->name->characters);
+                return Interpreter_Runtime_Error;
+            }
+
             if (!VirtualMachine_call_value(vm, function, argument_count)) {
                 return Interpreter_Runtime_Error;
             }
 
             current_function_call = StackFunctionCall_peek(&vm->function_calls, 0);
+            break;
+        }
+        case OpCode_Call_Class: {
+            int argument_count = READ_BYTE_THEN_INCREMENT();
+            Value function = stack_value_peek(&vm->stack_value, argument_count);
+            if (value_as_object(function)->kind != ObjectKind_Class) {
+                VirtualMachine_runtime_error(vm, "Expect a Class to call the 'konstrutor'.");
+                return Interpreter_Runtime_Error;
+            }
+
+            if (!VirtualMachine_call_value(vm, function, argument_count)) {
+                return Interpreter_Runtime_Error;
+            }
+
+            current_function_call = StackFunctionCall_peek(&vm->function_calls, 0);
+            break;
             break;
         }
         case OpCode_Call_Method: 
@@ -632,6 +653,7 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
                 return Interpreter_Ok;
             }
 
+//          Note: Clears or Pops all the locals declared in the current function 
             vm->stack_value.top = returned_function_call->frame_start;
             stack_value_push(&vm->stack_value, returned_value);
             current_function_call = StackFunctionCall_peek(&vm->function_calls, 0);
@@ -657,6 +679,9 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
 }
 
 void VirtualMachine_runtime_error(VirtualMachine* vm, const char* format, ...) {
+//  TODO: script:21:10: error: expected a funson to call
+//        init():8:12: info: expected ';' before 'return'
+
     va_list args;
     va_start(args, format);
     vfprintf(stderr, format, args);

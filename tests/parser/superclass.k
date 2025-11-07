@@ -1,20 +1,25 @@
-mimoria nomi = "Alfredo";
 klasi Forma {
-    muda_posison(x, dx) {
-        imprimi x + dx;
-    }
+  muda_posison(x, dx) {
+    imprimi x + dx;
+  }
 }
 
 klasi Circulo < Forma {
-    konstrutor(x) {
-        keli.x = x;
-    }
-    altera_posison(dx) {
-        riba.muda_posison(keli.x, dx);
-    }
+  konstrutor(x, y) {
+    keli.x = x;
+    keli.y = y;
+  }
+  altera_posison(dx) {
+    riba.muda_posison(keli.x, dx);
+  }
 }
 
-mimoria circ = Circulo(5);
+funson init() {
+    mimoria Circulo = 0;
+}
+
+mimoria circ = Circulo{5, 15};
+init();
 circ.altera_posison(10);
 imprimi circ.x;
 

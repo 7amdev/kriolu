@@ -434,6 +434,8 @@ int Bytecode_disassemble_instruction(Bytecode* bytecode, int offset)
         return Bytecode_debug_instruction_2bytes(bytecode, "OPCODE_ASSIGN_GLOBAL", (offset + 2));
     if (opcode == OpCode_Call_Function)
         return Bytecode_debug_instruction_call(bytecode, "OPCODE_CALL_FUNCTION", (offset + 2));
+    if (opcode == OpCode_Call_Class)
+        return Bytecode_debug_instruction_call(bytecode, "OPCODE_CALL_CLASS", (offset + 2));
     if (opcode == OpCode_Call_Method)
         return Bytecode_debug_instruction_call_method(bytecode, "OPCODE_CALL_METHOD", (offset + 3));
     if (opcode == OpCode_Call_Super_Method)

@@ -35,7 +35,7 @@ static Expression* parser_parse_operators_unary(Parser* parser);
 static Expression* parser_parse_operators_logical(Parser* parser, Expression* left_operand);
 static Expression* parser_parse_operators_arithmetic(Parser* parser, Expression* left_operand);
 static Expression* parser_parse_operators_relational(Parser* parser, Expression* left_operand);
-static uint8_t parser_parse_arguments(Parser* parser);
+static uint8_t parser_parse_arguments(Parser* parser, TokenKind token_kind);
 // TODO: rename to Function_find_local_by_token(Function* function, Token* name, Local** out);
 static void parser_compile_return(Parser* parser);
 static bool parser_is_operator_arithmetic(Token token);
@@ -1087,6 +1087,9 @@ static ObjectFunction* parser_parse_function_paramenters_and_body(Parser* parser
     Function function;
     parser_init_function(parser, &function, function_kind);
 
+//  NOTE: Parsing function doesnt explecitly close the Scope 'parser_end_scope()', because
+//        in the 'Parser_end_function' will emit the Return instruction which at runtime will
+//        do the exact task parser_end_scope would do and some more. 
     parser_begin_scope(parser);
 
     parser_consume(parser, Token_Left_Parenthesis, "Expect a '(' after the function name.");
@@ -1410,7 +1413,8 @@ static OperatorMetadata parser_get_operator_metadata(TokenKind kind)
         return operator_metadata;
     }
     case Token_Dot:
-    case Token_Left_Parenthesis: {
+    case Token_Left_Parenthesis:
+    case Token_Left_Brace: {
         // TODO: case Token_Left_Bracket: -- Array Subscript
         OperatorMetadata operator_metadata = { 0 };
         operator_metadata.precedence = OperatorPrecedence_Subcript_Call_ObjectGettersSetters_Grouping;
@@ -1478,7 +1482,7 @@ static Expression* parser_parse_expression(Parser* parser, OperatorPrecedence op
         });
 
         if (parser_match_then_advance(parser, Token_Left_Parenthesis)) {
-            uint8_t argument_count = parser_parse_arguments(parser);
+            uint8_t argument_count = parser_parse_arguments(parser, Token_Left_Parenthesis);
             parser_load_variable_value_to_stack(parser, (Token) { 
                 .kind = Token_Riba, 
                 .start = "riba", 
@@ -1536,6 +1540,9 @@ static Expression* parser_parse_expression(Parser* parser, OperatorPrecedence op
         else if (parser->token_previous.kind == Token_Left_Parenthesis) {
             expression = parser_parse_operator_function_call(parser, expression);
         } 
+        else if (parser->token_previous.kind == Token_Left_Brace) {
+            expression = parser_parse_operator_function_call(parser, expression);
+        }
         else if (parser->token_previous.kind == Token_Dot) {
             expression = parser_parse_operator_object_getter_and_setter(parser, expression, can_assign);
         } 
@@ -1910,9 +1917,15 @@ static Expression* parser_parse_operators_relational(Parser* parser, Expression*
     return NULL;
 }
 
-static uint8_t parser_parse_arguments(Parser* parser) {
+// TODO: static uint8_t parser_parse_arguments(Parser* parser, TokenKind kind)
+static uint8_t parser_parse_arguments(Parser* parser, TokenKind token_kind) {
     uint8_t argument_count = 0;
-    if (parser->token_current.kind != Token_Right_Parenthesis) {
+    TokenKind closing_pair = (
+        token_kind == Token_Left_Brace 
+        ? Token_Right_Brace
+        : Token_Right_Parenthesis
+    );
+    if (parser->token_current.kind != closing_pair) {
         do {
             Expression* expression = parser_parse_expression(parser, OperatorPrecedence_Assignment);
             if (argument_count == 255) {
@@ -1921,16 +1934,26 @@ static uint8_t parser_parse_arguments(Parser* parser) {
             argument_count += 1;
         } while (parser_match_then_advance(parser, Token_Comma));
     }
-    parser_consume(parser, Token_Right_Parenthesis, "Expect ')' after arguments");
+
+    parser_consume(parser, closing_pair,"Expect '}' after arguments");
+
     return argument_count;
 }
 
 static Expression* parser_parse_operator_function_call(Parser* parser, Expression* left_operand) {
-    uint8_t argument_count = parser_parse_arguments(parser);
+    Token token_call = parser->token_previous;
+    uint8_t argument_count = parser_parse_arguments(parser, parser->token_previous.kind);
+    OpCode opcode = 0;
+    if (token_call.kind == Token_Left_Brace) {
+        opcode = OpCode_Call_Class;
+    }
+    else {
+        opcode = OpCode_Call_Function;
+    }
     Compiler_CompileInstruction_2Bytes(
         parser_get_current_bytecode(parser),
-        OpCode_Call_Function, // OpCode
-        argument_count,       // Operand
+        opcode,         // OpCode
+        argument_count, // Operand
         parser->token_previous.line_number
     );
     return NULL;
@@ -1977,7 +2000,7 @@ static Expression* parser_parse_operator_object_getter_and_setter(Parser* parser
         );
     }
     else if (parser_match_then_advance(parser, Token_Left_Parenthesis)) {
-        uint8_t argument_count = parser_parse_arguments(parser);
+        uint8_t argument_count = parser_parse_arguments(parser, Token_Left_Parenthesis);
         Compiler_CompileInstruction_3Bytes(
             parser_get_current_bytecode(parser),
             OpCode_Call_Method,  // OpCode
@@ -2152,37 +2175,6 @@ int parser_resolve_variable_dependencies(Function* function, Token* name, Local*
     }
 
     return parent_local_idx;
-
-
-//  TODO: delete code bellow ------------
-    // Function* top_function = StackFunction_pop(&stack_function);
-    // int variable_dependency_idx = ArrayLocalMetadata_add(
-    //     &top_function->variable_dependencies,
-    //     (uint8_t)local_found_idx,
-    //     LocalLocation_In_Parent_Stack,
-    //     &top_function->object->variable_dependencies_count
-    // );
-
-    // if (StackFunction_is_empty(&stack_function)) return variable_dependency_idx;
-
-    // int var_dependency_latest = variable_dependency_idx;
-    // for (;;) {
-    //     if (StackFunction_is_empty(&stack_function)) break;
-    //     if (variable_dependency_idx == -1) break;
-
-    //     top_function = StackFunction_peek(&stack_function, 0);
-    //     var_dependency_latest = ArrayLocalMetadata_add(
-    //         &top_function->variable_dependencies,
-    //         (uint8_t)var_dependency_latest,
-    //         LocalLocation_In_Parent_Heap_Values,
-    //         &top_function->object->variable_dependencies_count
-    //     );
-
-    //     StackFunction_pop(&stack_function);
-    // }
-
-
-    // return var_dependency_latest;
 }
 
 // todo: parser destroy implementation
