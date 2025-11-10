@@ -1476,21 +1476,14 @@ static void parser_parse_superclass_method_call(Parser* parser) {
 
     if (parser_match_then_advance(parser, Token_Left_Parenthesis)) {
         uint8_t argument_count = parser_parse_arguments(parser, Token_Left_Parenthesis);
+//      TODO: if identifier_location_index and identifier_location is provided,
+//            then 'Parser_compile_variable_value_to_stack(parser, identifier_location, identifier_location_index);'
         parser_load_variable_value_to_stack(parser, superclass);
-        // TODO: delete code bellow
-        // parser_load_variable_value_to_stack(parser, (Token) { 
-        //     .kind = Token_Riba, 
-        //     .start = "riba", 
-        //     .length = 4
-        // });
-        Compiler_CompileInstruction_2Bytes(
+
+        Compiler_CompileInstruction_3Bytes(
             parser_get_current_bytecode(parser),
             OpCode_Call_Super_Method,
             method_location_index,
-            parser->token_previous.line_number
-        );
-        Compiler_CompileInstruction_1Byte(
-            parser_get_current_bytecode(parser),
             argument_count,
             parser->token_previous.line_number
         );
@@ -1532,27 +1525,13 @@ static Expression* parser_parse_expression(Parser* parser, OperatorPrecedence op
         if (parser->token_current.kind != Token_Equal) {
 //          TODO: pass argument parser->function->depth
             if (parser_is_identifier_a_superclass(parser->function, parser->token_previous)) {
+//              TODO: pass as arguments identifier_location_index & identifier_location
                 parser_parse_superclass_method_call(parser);
             }
             else {
                 Parser_compile_variable_value_to_stack(parser, identifier_location, identifier_location_index);
             }
         }
-
-        // do {
-        //     if (parser->token_current.kind == Token_Equal) break;
-        //
-        //     if (parser_is_identifier_a_superclass(parser->function, parser->token_previous)) {
-        //         parser_parse_superclass_method_call(parser);
-        //     }
-        //     else {
-        //         Parser_compile_variable_value_to_stack(parser, identifier_location, identifier_location_index);
-        //     }
-        // } while(0);
-        
-//      If there is no assignment, then compile the Identifier as a Variable.
-//      if (parser->token_current.kind != Token_Equal) 
-//          Parser_compile_variable_value_to_stack(parser, identifier_location, identifier_location_index);
     } 
     else if (parser->token_previous.kind == Token_Keli) {
         if (parser->first_class_declaration == NULL) {
