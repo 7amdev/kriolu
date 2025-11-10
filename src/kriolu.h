@@ -65,6 +65,7 @@ typedef enum {
     Token_Ka, // LOGIC OPERATOR not
     Token_Klasi,
     Token_Riba,
+    Token_Super_Class,
     Token_Si,
     Token_Sinou,
     Token_Falsu,

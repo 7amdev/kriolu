@@ -5,12 +5,25 @@ klasi Forma {
 }
 
 klasi Circulo < Forma {
-  konstrutor(x, y) {
+  konstrutor(x, y, raiu) {
     keli.x = x;
     keli.y = y;
+    keli.raiu = raiu;
   }
   altera_posison(dx) {
-    riba.muda_posison(keli.x, dx);
+    Forma.muda_posison(keli.x, dx);
+  }
+}
+
+klasi kuadrilateru < Forma {
+  konstrutor(x, y, largura, altura) {
+    keli.x       = x;
+    keli.y       = y;
+    keli.largura = largura;
+    keli.altura  = altura;
+  }
+  area() {
+    divolvi keli.largura * keli.altura;
   }
 }
 

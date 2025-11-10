@@ -258,7 +258,7 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
         {
             int argument_count = READ_BYTE_THEN_INCREMENT();
             Value function = stack_value_peek(&vm->stack_value, argument_count);
-            if (value_as_object(function)->kind != ObjectKind_Closure) {
+            if (value_as_object(function)->kind == ObjectKind_Class) {
                 VirtualMachine_runtime_error(vm, "Expect a 'Funson' to call.\n-- Did you meant '%s{}'", value_as_class(function)->name->characters);
                 return Interpreter_Runtime_Error;
             }

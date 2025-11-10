@@ -1,10 +1,10 @@
 #include "kriolu.h"
 
 static void parser_advance(Parser* parser);
-static void parser_consume(Parser* parser, TokenKind kind, const char* error_message);
+static void parser_consume(Parser* parser, TokenKind kind, const char* error_message, ...);
 static bool parser_match_then_advance(Parser* parser, TokenKind kind);
 static void parser_synchronize(Parser* parser);
-static void parser_error(Parser* parser, Token* token, const char* message);
+static void parser_error(Parser* parser, Token* token, const char* message, ...);
 static Bytecode* parser_get_current_bytecode(Parser* parser);
 static Statement* parser_parse_statement(Parser* parser, BlockType block_type);
 static Statement* parser_parse_instruction_print(Parser* parser);
@@ -44,6 +44,7 @@ static bool parser_is_operator_relational(Token token);
 static bool parser_is_operator_assignment(Token token);
 static bool parser_is_operator_unary(Token token);
 static bool parser_is_literals(Token token);
+static bool parser_is_identifier_a_superclass(Function* first_function, Token identifier);
 static bool parser_check_locals_duplicates(Parser* parser, Token* identifier);
 static void parser_end_parsing(Parser* parser);
 static void parser_begin_scope(Parser* parser);
@@ -141,14 +142,17 @@ static bool parser_match_then_advance(Parser* parser, TokenKind kind)
     return true;
 }
 
-static void parser_consume(Parser* parser, TokenKind kind, const char* error_message)
-{
+static void parser_consume(Parser* parser, TokenKind kind, const char* error_message, ...) {
+    va_list args;
+    va_start(args, error_message);
+
     if (parser->token_current.kind == kind) {
         parser_advance(parser);
         return;
     }
 
-    parser_error(parser, &parser->token_previous, error_message);
+    parser_error(parser, &parser->token_previous, error_message, args);
+    va_end(args);
 }
 
 static void parser_synchronize(Parser* parser)
@@ -179,9 +183,11 @@ static void parser_synchronize(Parser* parser)
     }
 }
 
-static void parser_error(Parser* parser, Token* token, const char* message)
-{
+// TODO: make it a variadic function
+static void parser_error(Parser* parser, Token* token, const char* message, ...) {
     if (parser->panic_mode) return;
+    va_list args;
+    va_start(args, message);
 
     FILE* error_output = stdout;
 
@@ -191,12 +197,20 @@ static void parser_error(Parser* parser, Token* token, const char* message)
     fprintf(error_output, "[line %d] Error", token->line_number);
     if (token->kind == Token_Eof) {
         fprintf(error_output, " at end");
-    } else if (token->kind == Token_Error) {
-        fprintf(error_output, " at %.*s\n", token->length, token->start);
-    } else {
-        fprintf(error_output, " at '%.*s'", token->length, token->start);
-        fprintf(error_output, " : '%s'\n", message);
     }
+    else if (token->kind == Token_Error) {
+        fprintf(error_output, " at %.*s\n", token->length, token->start);
+    }
+    else {
+        fprintf(error_output, " at '%.*s'", token->length, token->start);
+        fprintf(error_output, " : '");
+        fprintf(error_output, message, args);
+        fprintf(error_output, "'\n");
+
+        // fprintf(error_output, " : '%s'\n", message);
+    }
+
+    va_end(args);
 }
 
 static Bytecode* parser_get_current_bytecode(Parser* parser) {
@@ -864,7 +878,7 @@ static void parser_parse_operator_assignment(Parser* parser, int identifier_loca
 }
 
 static void Parser_create_local_uninitialized(Parser* parser, Token identifier) {
-    if (parser->function->depth ==  0) return;
+    if (parser->function->depth == 0) return;
     
     if (StackLocal_is_full(&parser->function->locals)) {
         parser_error(parser, &identifier,  "Too many local variables in a scope.");
@@ -942,25 +956,20 @@ static Statement* parser_parse_declaration_class(Parser* parser) {
         parser_consume(parser, Token_Identifier, "Expect Superclass name.");
         new_class.has_superclass = true;
 
-//      REVIEW: what if the superclass is not declared yet??
+//      { 
         parser_load_variable_value_to_stack(parser, parser->token_previous);
-        if (token_is_identifier_equal(&parser->token_previous, &class_name)) 
-            parser_error(parser, &parser->token_previous, "A class cannot inherit from itself.");
-
-//      Note: Ensures that if there is 2(two) class declarations in the same scope, 
-//      each has a different local scope to prevent collition.
-        parser_begin_scope(parser);
-//      TODO: use 'parser->token_previous' instead of riba. This way
-//            the syntax to call a Superclass method will be 
-//            'Superclass.method_name();' 
+        if (token_is_identifier_equal(&parser->token_previous, &class_name)) parser_error(parser, &parser->token_previous, "A class cannot inherit from itself.");
+        parser_begin_scope(parser); // Ensures there is no collition for multiple class inheriting the same superclass
         Parser_create_local_uninitialized(parser, (Token) {
-            .kind   = Token_Riba,
-            .start  = "riba",
-            .length = 4
+            .kind   = Token_Super_Class,
+            .start  = parser->token_previous.start,
+            .length = parser->token_previous.length
         });
         parser_initialize_local_identifier(parser);
-        
+//      }         
+
         parser_load_variable_value_to_stack(parser, class_name);
+
 //      I dont create a new local to sync Parser dummy locals with
 //      the VM stack, because the instruction 'OpCode_Inheritance'
 //      will Pop the Class Value right after.
@@ -1425,6 +1434,83 @@ static OperatorMetadata parser_get_operator_metadata(TokenKind kind)
     }
 }
 
+static bool parser_is_identifier_a_superclass(Function* first_function, Token identifier) {
+//  TODO: Include scope depth to equality comparision
+    LinkedList_foreach(Function, first_function, it) {
+        Function fn = *it.curr;
+        for (int i = fn.locals.top - 1; i >= 0 ; i--) {
+            Local local = {0};
+            Stack_peek(&fn.locals, &local, i);
+            bool is_equal = (memcmp(identifier.start, local.token.start, identifier.length) == 0);
+            if (is_equal && local.token.kind == Token_Super_Class) 
+                return true;
+        }
+    }
+
+    return false;
+}
+
+static void parser_parse_superclass_method_call(Parser* parser) {
+    Token superclass = parser->token_previous;
+
+    if (parser->first_class_declaration == NULL) {
+        parser_error(parser, &parser->token_previous, "Can't use '%.*s' outside of a class.", superclass.length, superclass.start);
+    }
+    else if (!parser->first_class_declaration->has_superclass) {
+        parser_error(parser, &parser->token_previous, "Can't use '%.*s' in a class with no superclass.", superclass.length, superclass.start);
+    }
+
+    parser_consume(parser, Token_Dot, "Expect '.' after '%.*s'.", superclass.length, superclass.start);
+    parser_consume(parser, Token_Identifier, "Expect superclass method name.");
+
+    int method_location = -1;
+    // TODO
+    // if location is on current Stack / Local -> print error 
+    // Identifier location index must be a method in a parent class
+    int method_location_index = parser_find_identifier_location(parser, parser->token_previous, &method_location, NULL);
+    parser_load_variable_value_to_stack(parser, (Token) {
+        .kind = Token_Keli,
+        .start = "keli",
+        .length = 4
+    });
+
+    if (parser_match_then_advance(parser, Token_Left_Parenthesis)) {
+        uint8_t argument_count = parser_parse_arguments(parser, Token_Left_Parenthesis);
+        parser_load_variable_value_to_stack(parser, superclass);
+        // TODO: delete code bellow
+        // parser_load_variable_value_to_stack(parser, (Token) { 
+        //     .kind = Token_Riba, 
+        //     .start = "riba", 
+        //     .length = 4
+        // });
+        Compiler_CompileInstruction_2Bytes(
+            parser_get_current_bytecode(parser),
+            OpCode_Call_Super_Method,
+            method_location_index,
+            parser->token_previous.line_number
+        );
+        Compiler_CompileInstruction_1Byte(
+            parser_get_current_bytecode(parser),
+            argument_count,
+            parser->token_previous.line_number
+        );
+    }
+    else {
+        parser_load_variable_value_to_stack(parser, superclass);
+        // parser_load_variable_value_to_stack(parser, (Token) { 
+        //     .kind = Token_Riba, 
+        //     .start = "riba", 
+        //     .length = 4
+        // });
+        Compiler_CompileInstruction_2Bytes(
+            parser_get_current_bytecode(parser),
+            OpCode_Get_Super,
+            method_location_index,
+            parser->token_previous.line_number
+        );
+    }
+}
+
 static Expression* parser_parse_expression(Parser* parser, OperatorPrecedence operator_precedence_previous) {
     parser_advance(parser);
 
@@ -1442,11 +1528,31 @@ static Expression* parser_parse_expression(Parser* parser, OperatorPrecedence op
     }
     else if (parser->token_previous.kind == Token_Identifier)  {
         identifier_location_index = parser_find_identifier_location(parser, parser->token_previous, &identifier_location, NULL);
+
+        if (parser->token_current.kind != Token_Equal) {
+//          TODO: pass argument parser->function->depth
+            if (parser_is_identifier_a_superclass(parser->function, parser->token_previous)) {
+                parser_parse_superclass_method_call(parser);
+            }
+            else {
+                Parser_compile_variable_value_to_stack(parser, identifier_location, identifier_location_index);
+            }
+        }
+
+        // do {
+        //     if (parser->token_current.kind == Token_Equal) break;
+        //
+        //     if (parser_is_identifier_a_superclass(parser->function, parser->token_previous)) {
+        //         parser_parse_superclass_method_call(parser);
+        //     }
+        //     else {
+        //         Parser_compile_variable_value_to_stack(parser, identifier_location, identifier_location_index);
+        //     }
+        // } while(0);
+        
 //      If there is no assignment, then compile the Identifier as a Variable.
-        if (parser->token_current.kind != Token_Equal) 
-            Parser_compile_variable_value_to_stack(parser, identifier_location, identifier_location_index);
-//      TODO: check if Identifier is a Superclass. To see if its a superclass, lookup 
-//            in the current function stack locals for a Token with the same name.
+//      if (parser->token_current.kind != Token_Equal) 
+//          Parser_compile_variable_value_to_stack(parser, identifier_location, identifier_location_index);
     } 
     else if (parser->token_previous.kind == Token_Keli) {
         if (parser->first_class_declaration == NULL) {
@@ -1459,60 +1565,62 @@ static Expression* parser_parse_expression(Parser* parser, OperatorPrecedence op
         }
     }
     else if (parser->token_previous.kind == Token_Riba) {
-        if (parser->first_class_declaration == NULL) {
-            parser_error(parser, &parser->token_previous, "Can't use 'riba' outside of a class.");
-        }
-        else if (!parser->first_class_declaration->has_superclass) {
-            parser_error(parser, &parser->token_previous, "Can't use 'riba' in a class with no superclass.");
-        }
+        parser_parse_superclass_method_call(parser);
 
-        parser_consume(parser, Token_Dot, "Expect '.' after 'riba'.");
-        parser_consume(parser, Token_Identifier, "Expect superclass method name.");
-
-        int method_location = -1;
-        // TODO
-        // if location is on current Stack / Local -> print error 
-        // Identifier location index must be a method in a parent class
-        // TODO: rename to 'method_location_index'
-        int method_location_index = parser_find_identifier_location(parser, parser->token_previous, &method_location, NULL);
-        parser_load_variable_value_to_stack(parser, (Token) {
-            .kind = Token_Keli,
-            .start = "keli",
-            .length = 4
-        });
-
-        if (parser_match_then_advance(parser, Token_Left_Parenthesis)) {
-            uint8_t argument_count = parser_parse_arguments(parser, Token_Left_Parenthesis);
-            parser_load_variable_value_to_stack(parser, (Token) { 
-                .kind = Token_Riba, 
-                .start = "riba", 
-                .length = 4
-            });
-            Compiler_CompileInstruction_2Bytes(
-                parser_get_current_bytecode(parser),
-                OpCode_Call_Super_Method,
-                method_location_index,
-                parser->token_previous.line_number
-            );
-            Compiler_CompileInstruction_1Byte(
-                parser_get_current_bytecode(parser),
-                argument_count,
-                parser->token_previous.line_number
-            );
-        }
-        else {
-            parser_load_variable_value_to_stack(parser, (Token) { 
-                .kind = Token_Riba, 
-                .start = "riba", 
-                .length = 4
-            });
-            Compiler_CompileInstruction_2Bytes(
-                parser_get_current_bytecode(parser),
-                OpCode_Get_Super,
-                method_location_index,
-                parser->token_previous.line_number
-            );
-        }
+        // if (parser->first_class_declaration == NULL) {
+        //     parser_error(parser, &parser->token_previous, "Can't use 'riba' outside of a class.");
+        // }
+        // else if (!parser->first_class_declaration->has_superclass) {
+        //     parser_error(parser, &parser->token_previous, "Can't use 'riba' in a class with no superclass.");
+        // }
+        //
+        // parser_consume(parser, Token_Dot, "Expect '.' after 'riba'.");
+        // parser_consume(parser, Token_Identifier, "Expect superclass method name.");
+        //
+        // int method_location = -1;
+        // // TODO
+        // // if location is on current Stack / Local -> print error 
+        // // Identifier location index must be a method in a parent class
+        // // TODO: rename to 'method_location_index'
+        // int method_location_index = parser_find_identifier_location(parser, parser->token_previous, &method_location, NULL);
+        // parser_load_variable_value_to_stack(parser, (Token) {
+        //     .kind = Token_Keli,
+        //     .start = "keli",
+        //     .length = 4
+        // });
+        //
+        // if (parser_match_then_advance(parser, Token_Left_Parenthesis)) {
+        //     uint8_t argument_count = parser_parse_arguments(parser, Token_Left_Parenthesis);
+        //     parser_load_variable_value_to_stack(parser, (Token) { 
+        //         .kind = Token_Riba, 
+        //         .start = "riba", 
+        //         .length = 4
+        //     });
+        //     Compiler_CompileInstruction_2Bytes(
+        //         parser_get_current_bytecode(parser),
+        //         OpCode_Call_Super_Method,
+        //         method_location_index,
+        //         parser->token_previous.line_number
+        //     );
+        //     Compiler_CompileInstruction_1Byte(
+        //         parser_get_current_bytecode(parser),
+        //         argument_count,
+        //         parser->token_previous.line_number
+        //     );
+        // }
+        // else {
+        //     parser_load_variable_value_to_stack(parser, (Token) { 
+        //         .kind = Token_Riba, 
+        //         .start = "riba", 
+        //         .length = 4
+        //     });
+        //     Compiler_CompileInstruction_2Bytes(
+        //         parser_get_current_bytecode(parser),
+        //         OpCode_Get_Super,
+        //         method_location_index,
+        //         parser->token_previous.line_number
+        //     );
+        // }
     }
 
 //  Parsing Operators Section
