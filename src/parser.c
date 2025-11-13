@@ -13,6 +13,7 @@ static Statement* parser_parse_instruction_if(Parser* parser);
 static Statement* parser_instruction_while(Parser* parser);
 static Statement* parser_instruction_for(Parser* parser);
 static Statement* parser_instruction_break(Parser* parser);
+static Statement* parser_parse_instruction_debug(Parser* parser);
 static Statement* parser_instruction_continue(Parser* parser);
 static Statement* parser_instruction_return(Parser* parser);
 static Statement* parser_parse_declaration_class(Parser* parser);
@@ -145,6 +146,16 @@ static bool parser_match_then_advance(Parser* parser, TokenKind kind)
 static void parser_consume(Parser* parser, TokenKind kind, const char* error_message, ...) {
     va_list args;
     va_start(args, error_message);
+    
+    if (parser->token_current.kind == Token_Debugger_Break) {
+        parser_advance(parser);
+        __debugbreak();
+        Compiler_CompileInstruction_1Byte(
+            parser_get_current_bytecode(parser),
+            OpCode_Debugger_Break,
+            parser->token_previous.line_number
+        );
+    }
 
     if (parser->token_current.kind == kind) {
         parser_advance(parser);
@@ -239,16 +250,9 @@ static Statement* parser_parse_statement(Parser* parser, BlockType block_type) {
     if (parser_match_then_advance(parser, Token_Salta))       statement = parser_instruction_continue(parser);                else 
     if (parser_match_then_advance(parser, Token_Divolvi))     statement = parser_instruction_return(parser);                  else 
     if (parser_match_then_advance(parser, Token_Left_Brace))  statement = parser_parse_instruction_block(parser, block_type); else
-    if (parser_match_then_advance(parser, Token_Timenti))     statement = parser_instruction_while(parser);
+    if (parser_match_then_advance(parser, Token_Timenti))     statement = parser_instruction_while(parser);                   else
+    if (parser_match_then_advance(parser, Token_Debugger_Break)) statement = parser_parse_instruction_debug(parser);
     else                                                      statement = parser_parse_statement_expression(parser);
-
-    // TODO: delete code bellow
-    //
-    // if (parser_match_then_advance(parser, Token_Left_Brace)) {
-    //     parser_begin_scope(parser);
-    //     statement = parser_parse_instruction_block(parser, block_type);
-    //     parser_end_scope(parser);
-    // } else 
 
     if (parser->panic_mode)
         parser_synchronize(parser);
@@ -682,6 +686,22 @@ static Statement* parser_instruction_break(Parser* parser) {
     StackBreak_push(&parser->breakpoints, breakpoint);
 
     parser_consume(parser, Token_Semicolon, "Expected ';' after token 'sai'.");
+
+    Statement statement = { 0 };
+    statement.kind = StatementKind_Sai;
+    return statement_allocate(statement);
+}
+
+// TODO: parser_parse_intruction_debugger_break(PARSER|RUNTIME|BOTH);
+static Statement* parser_parse_instruction_debug(Parser* parser) {
+    // parser_consume(parser, Token_Debugger_Break, "");
+    __debugbreak();
+    Compiler_CompileInstruction_1Byte(
+        parser_get_current_bytecode(parser),
+        OpCode_Debugger_Break,
+        parser->token_previous.line_number
+    );
+    // parser_consume(parser, Token_Semicolon, "Expected ';' after token 'sai'.");
 
     Statement statement = { 0 };
     statement.kind = StatementKind_Sai;

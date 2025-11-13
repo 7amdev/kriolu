@@ -1,10 +1,11 @@
 klasi Forma {
   muda_posison(x, dx) {
     imprimi x + dx;
+    $break
   }
 }
 
-klasi Circulo < Forma {
+klasi Circulo < Forma $break {
   konstrutor(x, y, raiu) {
     keli.x = x;
     keli.y = y;

@@ -84,7 +84,13 @@ typedef enum {
     Token_Pa,
     Token_Ti,
 
-    Token_Comment
+    Token_Comment,
+    Token_Debugger,
+    Token_Debugger_Break,       // $break
+    Token_Debugger_Next,        // $next
+    Token_Debugger_Step,        // $step_into
+    Token_Debugger_Step_Out,    // $step_out
+    Token_Debugger_Continue     // $continue
 } TokenKind;
 
 typedef struct
@@ -222,7 +228,9 @@ enum {
     OpCode_Object_Get_Property,
     OpCode_Get_Super,
 
-    OpCode_Return
+    OpCode_Return,
+
+    OpCode_Debugger_Break
 };
 
 typedef struct

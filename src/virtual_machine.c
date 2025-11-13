@@ -19,6 +19,8 @@ static ObjectValue* VirtualMachine_create_heap_value(VirtualMachine* vm, Value* 
 static void VirtualMachine_move_value_from_stack_to_heap(VirtualMachine* vm, Value* value_address);
 static Value FunctionNative_clock(VirtualMachine* vm, int argument_count, Value* arguments);
 
+static bool Debugger_read_commands(VirtualMachine* vm, bool* d_execution_pause, bool* d_execution_resume,char** out_error_msg);
+
 // TODO: delete code bellow
 //
 // static inline bool Object_check_value_kind(Value value, ObjectKind object_kind);
@@ -65,6 +67,9 @@ void VirtualMachine_init(VirtualMachine* vm) {
 InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* script) {
     if (script == NULL) return Interpreter_Function_error;
 
+    bool debugger_execution_pause  = false;
+    bool debugger_execution_resume = false;
+
     Value value = value_make_object(script);
     stack_value_push(&vm->stack_value, value);
     ObjectClosure* closure = ObjectClosure_allocate(script, &vm->objects);
@@ -95,9 +100,9 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
 
     for (;;)
     {
-
+        
 #ifdef DEBUG_TRACE_EXECUTION
-        stack_value_trace(&vm->stack_value);
+        // stack_value_trace(&vm->stack_value);
         Bytecode_disassemble_instruction(
             &current_function_call->closure->function->bytecode,
             (int)(current_function_call->ip - current_function_call->closure->function->bytecode.instructions.items)
@@ -667,8 +672,29 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
 
             break;
         }
+        case OpCode_Debugger_Break:
+        {
+            debugger_execution_pause = true;
+            break;
         }
-    }
+        } // end switch-case
+
+#ifdef DEBUG_TRACE_EXECUTION
+        stack_value_trace(&vm->stack_value);
+#endif
+
+        if (!debugger_execution_resume && debugger_execution_pause) {
+            char* out_error_msg = NULL;
+            bool is_ok = Debugger_read_commands(
+                vm, 
+                &debugger_execution_pause, 
+                &debugger_execution_resume, 
+                &out_error_msg
+            );
+            if (!is_ok) 
+                printf("[ERROR] %s\n", out_error_msg);
+        }
+    } // end for-loop
 
 #undef READ_BYTE_THEN_INCREMENT
 #undef READ_2BYTE
@@ -676,6 +702,97 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
 #undef READ_CONSTANT
 #undef READ_CONSTANT_3BYTE
 #undef READ_STRING
+}
+
+static bool Debugger_is_whitespace(char c) {
+    if (c == ' ')  return true;
+    if (c == '\t') return true;
+    if (c == '\r') return true;
+    if (c == '\n') return true;
+    return false;
+}
+
+static void Debugger_trim_string(char* string, int string_length, char* out_string, int out_string_length) {
+    int start = 0;
+    while (Debugger_is_whitespace(string[start]) && start < string_length) start++;
+
+    int end = string_length - 1;
+    while (Debugger_is_whitespace(string[end]) && end > 0) end--;
+
+    int len = end - start;
+    int i = 0;
+    for (; i <= len; i++) {
+        if (i > out_string_length - 1) break;
+        out_string[i] = string[start + i];
+    }
+
+    out_string[i] = '\0';
+}
+
+static void VirtualMachine_print_call_stack(StackFunctionCall* calls) {
+    if (calls->top == 0) {
+        printf("Call Stack is empty.\n");
+        return;
+    }
+
+// TODO: loop reverselly and print the calls
+    printf("  Calls (%d) | ", calls->top);
+    for (int i = calls->top - 1; i >= 0; i--) {
+        ObjectString* fn_name = calls->items[i].closure->function->name;
+        printf("[ ");
+        printf("<fn '%s'>", fn_name == NULL ? "script" : fn_name->characters);
+        printf(" ]");
+    }
+    printf("\n");
+}
+
+static bool Debugger_read_commands(VirtualMachine* vm, bool* d_execution_pause, bool* d_execution_resume,char** out_error_msg) {
+    char input_line[1024]; 
+
+    for (;;) {
+        printf("\n");
+        printf("> ");
+        if (fgets(input_line, sizeof(input_line), stdin) == NULL) {
+            *out_error_msg = "Cannot read command.";
+            return false;
+        } 
+    
+        int input_line_length = (int)strlen(input_line);
+        int new_line_idx   = input_line_length - 1;
+        if (input_line[new_line_idx] == '\n') {
+            input_line[new_line_idx] = '\0';
+            input_line_length -= 1;
+        } 
+    
+        char input[50];
+        Debugger_trim_string(input_line, input_line_length, input, sizeof(input));
+
+        if (strcmp(input, "next") == 0) {
+            break;
+        }
+        else if (strcmp(input, "continue") == 0) {
+            if (*d_execution_resume == false) {
+                *d_execution_pause = false;
+            }
+            break;
+        }
+        else if (strcmp(input, "value_stack") == 0) {
+            stack_value_trace(&vm->stack_value);
+        }
+        else if (strcmp(input, "call_stack") == 0) {
+            VirtualMachine_print_call_stack(&vm->function_calls);
+        }
+        else if (strcmp(input, "resume") == 0) {
+            *d_execution_resume = true;
+            break;
+        }
+        else {
+            printf("[INFO] Command '%s' is invalid!\n", input_line);
+        }
+    }
+
+
+    return true;
 }
 
 void VirtualMachine_runtime_error(VirtualMachine* vm, const char* format, ...) {

@@ -1,6 +1,8 @@
 #include "kriolu.h"
 
 #define LEXER_MEMORY_POOL_MAX 25
+#define lexer_keyword_kind(token, keyword, check_start_position, return_kind) \
+    lexer_keyword_kind_custom(token, keyword, check_start_position, return_kind, Token_Identifier)
 
 typedef struct
 {
@@ -20,13 +22,14 @@ static Token lexer_read_string(Lexer* lexer);
 static bool lexer_is_eof(char c);
 static bool lexer_is_digit(char c);
 static bool lexer_is_letter_or_underscore(char c);
+static bool lexer_is_letter_uppercase(char c);
+static bool lexer_is_letter_lowercase(char c);
 static bool lexer_is_whitespace(char c);
 static bool lexer_is_comment(Lexer* lexer);
 static bool lexer_is_new_line(char c);
 static bool lexer_is_string(char c);
-// TODO: static bool lexer_is_uppercase_letter(char c);
-// TODO: static bool lexer_is_lowercase_letter(char c);
-static TokenKind lexer_keyword_kind(Token token, char const* keyword, int check_start_position, TokenKind return_kind);
+// static TokenKind lexer_keyword_kind(Token token, char const* keyword, int check_start_position, TokenKind return_kind);
+static TokenKind lexer_keyword_kind_custom(Token token, char const* keyword, int check_start_position, TokenKind return_kind, TokenKind return_kind_default);
 
 Lexer* lexer_create_static()
 {
@@ -212,6 +215,35 @@ Token lexer_scan(Lexer* lexer)
         return token;
     }
 
+    if (*lexer->current == '$') {
+        Token token = {0};
+        token.kind = Token_Debugger;
+        token.start = lexer->current;
+        token.line_number = lexer->line_number;
+        for (;;) {
+            lexer_advance(lexer);
+            if (lexer_is_letter_or_underscore(*lexer->current)) continue;
+            if (lexer_is_digit(*lexer->current)) continue;
+            break;
+        }
+        token.length = (int)(lexer->current - token.start);
+
+        if (token.start[1] == 'b') {
+            token.kind = lexer_keyword_kind_custom(token, "$break", 2, Token_Debugger_Break, Token_Debugger);
+        }
+        else if (token.start[1] == 'n') {
+            token.kind = lexer_keyword_kind_custom(token, "$next", 2, Token_Debugger_Next, Token_Debugger);
+        }
+        else if (token.start[1] == 's') {
+            token.kind = lexer_keyword_kind_custom(token, "$step_into", 2, Token_Debugger_Step, Token_Debugger);
+        }
+        else if (token.start[1] == 'c') {
+            token.kind = lexer_keyword_kind_custom(token, "$continue", 2, Token_Debugger_Continue, Token_Debugger);
+        }
+
+        return token;
+    }
+
     if (lexer_is_digit(*lexer->current))
     {
         while (lexer_is_digit(*lexer->current))
@@ -254,9 +286,11 @@ Token lexer_scan(Lexer* lexer)
         else if (*token.start == 'k') {
             if (token.start[1] == 'a') {
                 token.kind = lexer_keyword_kind(token, "ka", 1, Token_Ka);
-            } else if (token.start[1] == 'l') {
+            } 
+            else if (token.start[1] == 'l') {
                 token.kind = lexer_keyword_kind(token, "klasi", 2, Token_Klasi);
-            } else if (token.start[1] == 'e') {
+            } 
+            else if (token.start[1] == 'e') {
                 token.kind = lexer_keyword_kind(token, "keli", 2, Token_Keli);
             }
         }
@@ -269,9 +303,6 @@ Token lexer_scan(Lexer* lexer)
                     token.kind = lexer_keyword_kind(token, "si", 2, Token_Si);
                 }
             } 
-            // else if (token.start[1] == 'u') {
-            //     token.kind = lexer_keyword_kind(token, "super", 2, Token_Super);
-            // } 
             else if (token.start[1] == 'a') {
                 if (token.start[2] == 'l') {
                     token.kind = lexer_keyword_kind(token, "salta", 3, Token_Salta);
@@ -292,16 +323,21 @@ Token lexer_scan(Lexer* lexer)
             if (token.start[1] == 'i') {
                 if (token.start[2] == 'v') {
                     token.kind = lexer_keyword_kind(token, "divolvi", 3, Token_Divolvi);
-                } else {
+                } 
+                else {
                     token.kind = lexer_keyword_kind(token, "di", 2, Token_Di);
                 }
+            } 
+            else if (token.start[1] == 'e') {
+                token.kind = lexer_keyword_kind(token, "debug", 2, Token_Debugger_Break);
             }
         }
         else if (*token.start == 't') {
             if (token.start[1] == 'i') {
                 if (token.start[2] == 'm') {
                     token.kind = lexer_keyword_kind(token, "timenti", 3, Token_Timenti);
-                } else {
+                }
+                else {
                     token.kind = lexer_keyword_kind(token, "ti", 2, Token_Ti);
                 }
             }
@@ -694,37 +730,54 @@ static bool lexer_is_new_line(char c)
     //    return lexer->current[0] == '\n';
     // #endif
 
-    return c == '\n';
+    return (c == '\n');
 }
 
-static bool lexer_is_digit(char c)
-{
-    return c >= '0' && c <= '9';
+static bool lexer_is_digit(char c) {
+    return (c >= '0' && c <= '9');
 }
 
 static bool lexer_is_string(char c)
 {
-    return c == '"';
+    return (c == '"');
 }
 
-static bool lexer_is_letter_or_underscore(char c)
-{
-    return c == '_' ||
-        (c >= 'a' && c <= 'z') ||
-        (c >= 'A' && c <= 'Z');
+static bool lexer_is_letter_or_underscore(char c) {
+    if (c == '_')             return true;
+    if (c >= 'a' && c <= 'z') return true;
+    if (c >= 'A' && c <= 'Z') return true;
+
+    return false;
 }
 
-static TokenKind lexer_keyword_kind(Token token, char const* keyword, int check_start_position, TokenKind return_kind)
+static bool lexer_is_letter_uppercase(char c) {
+    if (c >= 'A' && c <= 'Z') 
+        return true;
+
+    return false;
+}
+
+static bool lexer_is_letter_lowercase(char c) {
+    if (c >= 'a' && c <= 'z') 
+        return true;
+
+    return false;
+}
+
+// static TokenKind lexer_keyword_kind(Token token, char const* keyword, int check_start_position, TokenKind return_kind)
+static TokenKind lexer_keyword_kind_custom(Token token, char const* keyword, int check_start_position, TokenKind return_kind, TokenKind return_kind_default)
 {
     int keyword_length = strlen(keyword);
 
     if (keyword_length != token.length) {
-        return Token_Identifier;
+        return return_kind_default;
+        // return Token_Identifier;
     }
 
     for (int i = check_start_position; i < keyword_length; i++) {
         if (token.start[i] != keyword[i])
-            return Token_Identifier;
+            return return_kind_default;
+            // return Token_Identifier;
     }
 
     return return_kind;

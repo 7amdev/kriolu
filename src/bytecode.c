@@ -374,6 +374,8 @@ int Bytecode_disassemble_instruction(Bytecode* bytecode, int offset)
     // 000005 +2    2 OPCODE_CONSTANT            0 'verdadi'
     // 000007 +1    | OPCODE_PRINT
 
+// TODO: if in compilation stage, then check flag $Alt_Execution_On_Every_Instruction
+
     SourceCode source_out = {0}; 
     if (Bytecode_search_source_code(bytecode, offset, &source_out)) {
         Bytecode_print_source_code(source_out, bytecode->lines.items[offset]);
@@ -472,6 +474,8 @@ int Bytecode_disassemble_instruction(Bytecode* bytecode, int offset)
         return Bytecode_debug_instruction_jump(bytecode, "OPCODE_LOOP", -1, (offset + 3));
     if (opcode == OpCode_Return)
         return Bytecode_debug_instruction_byte("OPCODE_RETURN", (offset + 1));
+    if (opcode == OpCode_Debugger_Break)
+        return Bytecode_debug_instruction_byte("OPCODE_$BREAK", (offset + 1));
 
     assert(false && "Unsupported OpCode. Handle the OpCode by adding a if statement.");
     printf("Unknown OpCode %d\n", opcode);
