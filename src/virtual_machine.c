@@ -243,7 +243,7 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
                 VirtualMachine_runtime_error(vm, "Undefined variable '%s'.", variable_name->characters);
                 return Interpreter_Runtime_Error;
             }
-
+//          TODO??: attach variable-name into value, if it's type is a instance
             stack_value_push(&vm->stack_value, value);
             break;
         }
@@ -257,6 +257,8 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
                 VirtualMachine_runtime_error(vm, "Undefined variable '%s'.", variable_name->characters);
                 return Interpreter_Runtime_Error;
             }
+//          TODO: if value is an instance, then attach the variable name to help proper 
+//                debugging.
             break;
         }
         case OpCode_Call_Function:
@@ -729,21 +731,78 @@ static void Debugger_trim_string(char* string, int string_length, char* out_stri
     out_string[i] = '\0';
 }
 
-static void VirtualMachine_print_call_stack(StackFunctionCall* calls) {
+static void VirtualMachine_print_call_stack(VirtualMachine* vm) {
+    StackFunctionCall* calls = &vm->function_calls;
+    StackValue* locals = &vm->stack_value;
+
     if (calls->top == 0) {
         printf("Call Stack is empty.\n");
         return;
     }
-
-// TODO: loop reverselly and print the calls
-    printf("  Calls (%d) | ", calls->top);
+ 
+    int _column_len = 25;
+    int column_len = _column_len;
+    const char* start_tag = "[ <fn '";
+    
+    printf("  Calls (%d):\n", calls->top);
     for (int i = calls->top - 1; i >= 0; i--) {
         ObjectString* fn_name = calls->items[i].closure->function->name;
-        printf("[ ");
-        printf("<fn '%s'>", fn_name == NULL ? "script" : fn_name->characters);
-        printf(" ]");
+        printf(start_tag);
+        column_len -= strlen(start_tag);
+
+        if (fn_name == NULL) {
+            const char* script_text = "script'>";
+
+            printf(script_text);
+            column_len -= strlen(script_text);
+            for (int j = 0; j < column_len; j++) printf(" ");
+        }
+        else {
+            const char* closing_tag = "'>";
+            int closing_tag_len = strlen(closing_tag);
+
+            if ((column_len - fn_name->length - closing_tag_len) < 0) {
+                const char* end_part = "...'>";
+                int end_part_len = strlen(end_part);
+
+                for (int j = 0; j < column_len - end_part_len; j++) {
+                    printf("%c", fn_name->characters[j]);
+                    column_len -= 1;
+                }
+                printf(end_part);
+                column_len -= end_part_len;
+                for (int j = 0; j < column_len; j++) printf(" ");
+                
+            }
+            else {
+                printf("%.*s", fn_name->length, fn_name->characters);
+                column_len -= fn_name->length;
+                printf(closing_tag);
+                column_len -= closing_tag_len;
+                for (int j = 0; j < column_len; j++) printf(" ");
+            }
+        } 
+        column_len = _column_len;
+        printf(" | ");
+
+//   function VirtualMachine_print_function_locals
+//   {
+        int frame_len = 0;
+        if (i == calls->top - 1) {
+            frame_len = locals->top - calls->items[i].frame_start; 
+        } 
+        else {
+            frame_len = calls->items[i+1].frame_start - calls->items[i].frame_start;
+        }
+        for (int j = 0; j < frame_len; j++) {
+            value_print(*(calls->items[i].frame_start + j));
+            if (j + 1 < frame_len)
+                printf(", ");
+        }
+//   } end function  
+
+        printf(" ]\n");
     }
-    printf("\n");
 }
 
 static bool Debugger_read_commands(VirtualMachine* vm, bool* d_execution_pause, bool* d_execution_resume,char** out_error_msg) {
@@ -780,7 +839,7 @@ static bool Debugger_read_commands(VirtualMachine* vm, bool* d_execution_pause, 
             stack_value_trace(&vm->stack_value);
         }
         else if (strcmp(input, "call_stack") == 0) {
-            VirtualMachine_print_call_stack(&vm->function_calls);
+            VirtualMachine_print_call_stack(vm);
         }
         else if (strcmp(input, "resume") == 0) {
             *d_execution_resume = true;
