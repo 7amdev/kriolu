@@ -25,7 +25,7 @@ static ObjectString* parser_intern_token(Token token, Object** object_head, Hash
 static int parser_save_identifier_into_bytecode(Bytecode* bytecode, ObjectString* identifier);
 static void parser_initialize_local_identifier(Parser* parser);
 static void parser_load_variable_value_to_stack(Parser* parser, Token variable_name);
-static ObjectFunction* parser_parse_function_paramenters_and_body(Parser* parser, FunctionKind function_kind);
+static ObjectFunction* parser_parse_function_paramenters_and_body(Parser* parser, FunctionKind function_kind, Token class_name);
 static Statement* parser_parse_statement_expression(Parser* parser); // TODO: rename to ???
 static Expression* parser_parse_expression(Parser* parser, OperatorPrecedence operator_precedence_previous);
 static Expression* parser_parse_literals(Parser* parser, bool can_assign);
@@ -51,7 +51,7 @@ static void parser_end_parsing(Parser* parser);
 static void parser_begin_scope(Parser* parser);
 static void parser_end_scope(Parser* parser);
 
-static void parser_init_function(Parser* parser, Function* function, FunctionKind function_kind);
+static void parser_init_function(Parser* parser, Function* function, FunctionKind function_kind, Token class_name);
 static ObjectFunction* parser_end_function(Parser* parser, Function* function);
 
 void parser_init(Parser* parser, const char* source_code, ParserInitParams params) {
@@ -86,6 +86,10 @@ void parser_init(Parser* parser, const char* source_code, ParserInitParams param
     StackBlock_init(&parser->blocks);
 
     Memory_register(NULL, NULL, parser);
+
+    parser->debugger_execution_pause  = false;
+    parser->debugger_execution_resume = false;
+    parser->debugger_functions = (DArrayFunction) {0};
 }
 
 ObjectFunction* parser_parse(Parser* parser, ArrayStatement** return_statements, HashTable* string_database, Object** object_head) {
@@ -93,7 +97,7 @@ ObjectFunction* parser_parse(Parser* parser, ArrayStatement** return_statements,
     ArrayStatement* statements = array_statement_allocate();
 
     parser_advance(parser);
-    parser_init_function(parser, &function, FunctionKind_Script);
+    parser_init_function(parser, &function, FunctionKind_Script, (Token){0});
 
     for (;;) {
         if (parser->token_current.kind == Token_Eof) break;
@@ -143,18 +147,127 @@ static bool parser_match_then_advance(Parser* parser, TokenKind kind)
     return true;
 }
 
+static bool Parser_read_commands(Parser* parser, char** out_error_msg) {
+    char input_line[1024]; 
+
+    printf("\n");
+    for (;;) {
+        DynamicArray_foreach(Function, &parser->debugger_functions, fn) {
+            if  (fn.item->object->name == NULL) {
+                printf("script");
+            } 
+            else if (fn.item->function_kind == FunctionKind_Method || fn.item->function_kind == FunctionKind_Method_Initializer) {
+                printf("kl_%.*s", fn.item->class_name.length, fn.item->class_name.start);
+                printf(" > fn_%.*s",fn.item->object->name->length, fn.item->object->name->characters);
+            }
+            else {
+                printf("%.*s",fn.item->object->name->length, fn.item->object->name->characters);
+            } 
+
+            if (fn.i < parser->debugger_functions.count - 1) printf(" > ");
+        }
+
+        // LinkedList_foreach(Function, parser->function, it) {
+        //     Function* fn = it.curr;
+        //     if  (fn->object->name == NULL) {
+        //         printf("script");
+        //     } 
+        //     else if (fn->function_kind == FunctionKind_Method || fn->function_kind == FunctionKind_Method_Initializer) {
+        //         printf("fn_%.*s",fn->object->name->length, fn->object->name->characters);
+        //         printf(" > kl_%.*s", fn->class_name.length, fn->class_name.start);
+        //     }
+        //     else {
+        //         printf("%.*s",fn->object->name->length, fn->object->name->characters);
+        //     } 
+        //
+        //     if (it.next)
+        //         printf(" > ");
+        // }
+
+        if ((*parser->function).next == NULL) {
+            LinkedList_foreach(ClassDeclaration, parser->first_class_declaration, it) {
+                ClassDeclaration* klass = it.curr;
+                printf(" > kl_%.*s", klass->name.length, klass->name.start);
+                if (it.next) printf(" > ");
+            }
+        } 
+
+        printf("> $");
+        if (fgets(input_line, sizeof(input_line), stdin) == NULL) {
+           *out_error_msg = "Cannot read command.";
+           return false;
+        }
+
+        int input_line_length = (int)strlen(input_line);
+        int new_line_idx   = input_line_length - 1;
+        if (input_line[new_line_idx] == '\n') {
+            input_line[new_line_idx] = '\0';
+            input_line_length -= 1;
+        } 
+
+        char input[50];
+        Debugger_trim_string(input_line, input_line_length, input, sizeof(input));
+
+        if (strcmp(input, "next") == 0) {
+            break;
+        }
+        else if (strcmp(input, "resume") == 0) {
+            parser->debugger_execution_resume = true;
+            break;
+        }
+        else if (strcmp(input, "continue") == 0) {
+            parser->debugger_execution_pause = false;
+            break;
+        }
+        else if (strcmp(input, "locals") == 0) { 
+            StackLocal* locals = &parser->function->locals;
+            printf("Stack: ");
+            for (int i = 0; i < locals->top; i++) {
+               Token token = locals->items[i].token;
+               printf("[ %d:", i);
+               printf("%.*s", token.length, token.start);
+               printf(" ]");
+            }
+            printf("\n");
+        }
+        else if (strcmp(input, "vm_stack") == 0) {
+//          TODO: shows the locals plus the caller(s) StackeValues
+            printf("Input: '%s'\n", input);
+        }
+        else if (strcmp(input, "closures") == 0) {
+//          TODO: display closed values inside the current function
+            printf("Input: '%s'\n", input);
+        }
+        else {
+            printf("[INFO] Command '%s' is invalid!\n", input);
+        }
+    }
+
+    printf("\n");
+    return true;
+}
+
 static void parser_consume(Parser* parser, TokenKind kind, const char* error_message, ...) {
     va_list args;
     va_start(args, error_message);
-    
+
+    char input_line[1024];
+
     if (parser->token_current.kind == Token_Debugger_Break) {
         parser_advance(parser);
-        __debugbreak();
         Compiler_CompileInstruction_1Byte(
             parser_get_current_bytecode(parser),
             OpCode_Debugger_Break,
             parser->token_previous.line_number
         );
+
+        if (parser->debugger_execution_resume == false) {
+            parser->debugger_execution_pause = true;
+
+            char *error_msg = NULL;
+            bool ok = Parser_read_commands(parser, &error_msg);
+            if (!ok) printf("[ERROR] %s\n", error_msg);
+        }
     }
 
     if (parser->token_current.kind == kind) {
@@ -228,31 +341,126 @@ static Bytecode* parser_get_current_bytecode(Parser* parser) {
     return &parser->function->object->bytecode;
 }
 
+static void Parser_debug_print_expression(Lexer lexer, const char* start) {
+    bool syntax_error = true;
+    
+    Token token = lexer_scan(&lexer);
+    for (;;) {
+        if (token.kind == Token_Mimoria)   break; // Error
+        if (token.kind == Token_Funson)    break; // Error
+        if (token.kind == Token_Mimoria)   break; // Error
+        if (token.kind == Token_Di)        break; // Error
+        if (token.kind == Token_Si)        break; // Error
+        if (token.kind == Token_Imprimi)   break; // Error
+        if (token.kind == Token_Semicolon) {
+            syntax_error = false;
+            break;
+        } 
+    
+        token = lexer_scan(&lexer);
+    }
+
+    int statement_len = (int)((token.start + token.length) - start);
+    if (syntax_error == 0) {
+        Bytecode_debug_print("%.*s\n", statement_len, start);
+        // printf("%.*s\n", statement_len, start);
+    } else {
+        printf("[Error] syntax error on line '%d'.\n", token.line_number);
+    }
+}
+
+static void Parser_debug_print_declaration(Lexer lexer, const char* start) {
+    int count_brackets = 0;
+    
+    Token token = lexer_scan(&lexer);
+    for (;;) {
+        if (token.kind == Token_Left_Brace) {
+            count_brackets += 1; 
+        }
+        else if (token.kind == Token_Right_Brace) {
+            count_brackets -= 1;
+            if (count_brackets == 0) break;
+        }
+
+        if (count_brackets == 1) {
+            if (token.kind == Token_Mimoria) break; // Error
+            if (token.kind == Token_Funson)  break; // Error
+            if (token.kind == Token_Mimoria) break; // Error
+            if (token.kind == Token_Di)      break; // Error
+            if (token.kind == Token_Si)      break; // Error
+            if (token.kind == Token_Imprimi) break; // Error
+        }
+    
+        token = lexer_scan(&lexer);
+    }
+
+    if (count_brackets == 0) {
+        int statement_len = (int)((token.start + token.length) - start);
+        printf("Statement: '");
+        printf("%.*s'\n", statement_len, start);
+    } else {
+        printf("[Error] syntax error on line '%d'.\n", token.line_number);
+    }
+}
+
 static Statement* parser_parse_statement(Parser* parser, BlockType block_type) {
-    // DECLARATIONS: introduces new identifiers
-    //   klassi, mimoria, funson
-    // INSTRUCTIONS: tells the computer to perform an action
-    //   imprimi, di, si, divolvi, timenti, block
-    // EXPRESSIONS: a calculation that produces a result
-    //   +, -, /, *, call '(', assignment '=', objectGet '.'
-    //   variableGet, literals
+//  DECLARATIONS: introduces new identifiers
+//    klassi, mimoria, funson
+//  INSTRUCTIONS: tells the computer to perform an action
+//    imprimi, di, si, divolvi, timenti, block
+//  EXPRESSIONS: a calculation that produces a result
+//    +, -, /, *, call '(', assignment '=', objectGet '.'
+//    variableGet, literals
 
     Statement* statement = { 0 };
+    const char* statement_start = parser->token_current.start;
+    int instruction_start_index = parser_get_current_bytecode(parser)->instructions.count;
 
-    if (parser_match_then_advance(parser, Token_Klasi))       statement = parser_parse_declaration_class(parser);          else 
-    if (parser_match_then_advance(parser, Token_Funson))      statement = parser_parse_declaration_function(parser);          else 
-    if (parser_match_then_advance(parser, Token_Mimoria))     statement = parser_parse_declaration_variable(parser);          else 
-    if (parser_match_then_advance(parser, Token_Imprimi))     statement = parser_parse_instruction_print(parser);             else 
-    if (parser_match_then_advance(parser, Token_Si))          statement = parser_parse_instruction_if(parser);                else 
-    if (parser_match_then_advance(parser, Token_Di))          statement = parser_instruction_for(parser);                     else 
-    if (parser_match_then_advance(parser, Token_Pa))          statement = parser_instruction_for(parser);                     else 
-    if (parser_match_then_advance(parser, Token_Sai))         statement = parser_instruction_break(parser);                   else 
-    if (parser_match_then_advance(parser, Token_Salta))       statement = parser_instruction_continue(parser);                else 
-    if (parser_match_then_advance(parser, Token_Divolvi))     statement = parser_instruction_return(parser);                  else 
-    if (parser_match_then_advance(parser, Token_Left_Brace))  statement = parser_parse_instruction_block(parser, block_type); else
-    if (parser_match_then_advance(parser, Token_Timenti))     statement = parser_instruction_while(parser);                   else
-    if (parser_match_then_advance(parser, Token_Debugger_Break)) statement = parser_parse_instruction_debug(parser);
-    else                                                      statement = parser_parse_statement_expression(parser);
+    if (parser_match_then_advance(parser, Token_Klasi)) {
+//  #ifdef DEBUG
+        Parser_debug_print_declaration(*parser->lexer, parser->token_previous.start);
+//  #endif
+        statement = parser_parse_declaration_class(parser); 
+    } 
+    else if (parser_match_then_advance(parser, Token_Funson)) {
+        statement = parser_parse_declaration_function(parser);
+    }
+    else if (parser_match_then_advance(parser, Token_Mimoria)) {
+//  #ifdef DEBUG
+        Parser_debug_print_expression(*parser->lexer, parser->token_previous.start);
+//  #endif
+        statement = parser_parse_declaration_variable(parser);
+    }
+    else if (parser_match_then_advance(parser, Token_Imprimi)) {
+//  #ifdef DEBUG
+        Parser_debug_print_expression(*parser->lexer, parser->token_previous.start);
+//  #endif
+        statement = parser_parse_instruction_print(parser);
+    }
+    else if (parser_match_then_advance(parser, Token_Si))             statement = parser_parse_instruction_if(parser);                
+    else if (parser_match_then_advance(parser, Token_Di))             statement = parser_instruction_for(parser);                     
+    else if (parser_match_then_advance(parser, Token_Pa))             statement = parser_instruction_for(parser);                     
+    else if (parser_match_then_advance(parser, Token_Sai))            statement = parser_instruction_break(parser);                   
+    else if (parser_match_then_advance(parser, Token_Salta))          statement = parser_instruction_continue(parser);                
+    else if (parser_match_then_advance(parser, Token_Divolvi)) {
+//  #ifdef DEBUG
+        Parser_debug_print_expression(*parser->lexer, parser->token_previous.start);
+//  #endif
+        statement = parser_instruction_return(parser);                  
+    }   
+    else if (parser_match_then_advance(parser, Token_Left_Brace))     statement = parser_parse_instruction_block(parser, block_type); 
+    else if (parser_match_then_advance(parser, Token_Timenti))        statement = parser_instruction_while(parser);                   
+    else if (parser_match_then_advance(parser, Token_Debugger_Break)) statement = parser_parse_instruction_debug(parser);
+    else {
+        Parser_debug_print_expression(*parser->lexer, parser->token_current.start);
+        statement = parser_parse_statement_expression(parser);
+    }
+
+    if (!parser->debugger_execution_resume && parser->debugger_execution_pause) {
+        char *error_msg = NULL;
+        bool ok = Parser_read_commands(parser, &error_msg);
+        if (!ok) printf("[ERROR] %s\n", error_msg);
+    }
 
     if (parser->panic_mode)
         parser_synchronize(parser);
@@ -695,7 +903,13 @@ static Statement* parser_instruction_break(Parser* parser) {
 // TODO: parser_parse_intruction_debugger_break(PARSER|RUNTIME|BOTH);
 static Statement* parser_parse_instruction_debug(Parser* parser) {
     // parser_consume(parser, Token_Debugger_Break, "");
-    __debugbreak();
+
+    if (parser->debugger_execution_resume == false) 
+        parser->debugger_execution_pause = true;
+
+//  TODO: delete code bellow
+//  __debugbreak();
+
     Compiler_CompileInstruction_1Byte(
         parser_get_current_bytecode(parser),
         OpCode_Debugger_Break,
@@ -970,6 +1184,7 @@ static Statement* parser_parse_declaration_class(Parser* parser) {
     }
 
     ClassDeclaration new_class = {0};
+    new_class.name = class_name;
     LinkedList_push(parser->first_class_declaration, &new_class);
 
     if (parser_match_then_advance(parser, Token_Less)) {
@@ -1016,20 +1231,23 @@ static Statement* parser_parse_declaration_class(Parser* parser) {
             parser_error(parser, &parser->token_previous, "Identifier 'salta' is a Token used by the Language.");
        
         parser_consume(parser, Token_Identifier, "Expect method name.");
+
+        Token method_name = parser->token_previous;
+        Bytecode_debug_print("<fn '%.*s()>'\n", method_name.length, method_name.start);
+        Bytecode_debug_increase_indentation();
+//      { 
         Bytecode* bytecode       = parser_get_current_bytecode(parser);
         ObjectString* identifier = parser_intern_token(parser->token_previous, parser->object_head, parser->string_database);
         uint8_t identifier_index = parser_save_identifier_into_bytecode(bytecode, identifier);
-        if (identifier_index == -1) 
-            parser_error(parser, &parser->token_current, "Too many constants.");
+        if (identifier_index == -1) parser_error(parser, &parser->token_current, "Too many constants.");
 
         FunctionKind function_kind = FunctionKind_Method;
         if (parser->token_previous.length == 10) 
-        if(memcmp(parser->token_previous.start, "konstrutor", 10) == 0)
-        {
+        if(memcmp(parser->token_previous.start, "konstrutor", 10) == 0) {
             function_kind = FunctionKind_Method_Initializer;
         } 
         
-        parser_parse_function_paramenters_and_body(parser, function_kind);
+        parser_parse_function_paramenters_and_body(parser, function_kind, class_name);
 
         Compiler_CompileInstruction_2Bytes(
             parser_get_current_bytecode(parser),
@@ -1037,7 +1255,9 @@ static Statement* parser_parse_declaration_class(Parser* parser) {
             identifier_index,
             parser->token_previous.line_number
         );
-
+//      }
+        Bytecode_debug_decrease_indentation();
+        Bytecode_debug_print("<fn '%.*s()>'\n", method_name.length, method_name.start);
     }
     parser_consume(parser, Token_Right_Brace, "Expected '}' after class body.");
 
@@ -1077,7 +1297,7 @@ static Statement* parser_parse_declaration_function(Parser* parser) {
         int function_name_index = parser_save_identifier_into_bytecode(bytecode, identifier);
         if (function_name_index == -1) parser_error(parser, &parser->token_current, "Too many constants.");
 
-        parser_parse_function_paramenters_and_body(parser, FunctionKind_Function);
+        parser_parse_function_paramenters_and_body(parser, FunctionKind_Function, (Token) {0});
         Compiler_CompileInstruction_2Bytes(
             parser_get_current_bytecode(parser),
             OpCode_Define_Global,
@@ -1101,7 +1321,8 @@ static Statement* parser_parse_declaration_function(Parser* parser) {
 
         parser_parse_function_paramenters_and_body(
             parser, 
-            FunctionKind_Function
+            FunctionKind_Function,
+            (Token){0}
         );
     }
 
@@ -1112,9 +1333,9 @@ static Statement* parser_parse_method_declaration(Parser* parser) {
     return NULL;
 }
 
-static ObjectFunction* parser_parse_function_paramenters_and_body(Parser* parser, FunctionKind function_kind) {
+static ObjectFunction* parser_parse_function_paramenters_and_body(Parser* parser, FunctionKind function_kind, Token class_name) {
     Function function;
-    parser_init_function(parser, &function, function_kind);
+    parser_init_function(parser, &function, function_kind, class_name);
 
 //  NOTE: Parsing function doesnt explecitly close the Scope 'parser_end_scope()', because
 //        in the 'Parser_end_function' will emit the Return instruction which at runtime will
@@ -2178,7 +2399,7 @@ static void parser_end_scope(Parser* parser) {
     }
 }
 
-static void parser_init_function(Parser* parser, Function* function, FunctionKind function_kind) {
+static void parser_init_function(Parser* parser, Function* function, FunctionKind function_kind, Token class_name) {
     ObjectFunction* object_fn = ObjectFunction_allocate(parser->object_head);
     if (function_kind != FunctionKind_Script) 
         object_fn->name = parser_intern_token(parser->token_previous, parser->object_head, parser->string_database);
@@ -2198,10 +2419,15 @@ static void parser_init_function(Parser* parser, Function* function, FunctionKin
     function->object        = NULL;
     function->object        = object_fn;
     function->depth         = 0;
+    function->class_name    = (Token) {0};
+    if (class_name.kind != Token_Nil) 
+        function->class_name = class_name;
+
     StackLocal_init(&function->locals);
     StackLocal_push(&function->locals, local);
     ArrayLocalMetadata_init(&function->variable_dependencies, 0);
     LinkedList_push(parser->function, function);
+    DynamicArray_push(&parser->debugger_functions, *function);
 }
 
 static ObjectFunction* parser_end_function(Parser* parser, Function* function) {
@@ -2213,6 +2439,7 @@ static ObjectFunction* parser_end_function(Parser* parser, Function* function) {
     //       stack value and it will be discaded by the caller function when returned.
     Function* popped_function = NULL;
     LinkedList_pop(parser->function, popped_function);
+    DynamicArray_pop(&parser->debugger_functions, popped_function);
 
 #ifdef DEBUG_COMPILER_BYTECODE
     if (!parser_has_error) {
@@ -2284,10 +2511,9 @@ int parser_resolve_variable_dependencies(Function* function, Token* name, Local*
     return parent_local_idx;
 }
 
-// todo: parser destroy implementation
 void Parser_free(Parser* parser) {
-    // NOTE: Do not free parseer->objects, because Virtual Machine will need it
-    //
-    // TODO: Missing Implementation
-    //
+// NOTE: Do not free parseer->objects, because Virtual Machine will need it
+//
+// TODO: Missing Implementation
+//
 }

@@ -6,6 +6,8 @@
 
 // Bytecode g_bytecode;
 
+int Bytecode_format_indent = 0;
+
 void Bytecode_init(Bytecode* bytecode) {
     array_instruction_init(&bytecode->instructions);
     ArrayValue_init(&bytecode->values);
@@ -185,6 +187,30 @@ bool Bytecode_patch_instruction_jump(Bytecode* bytecode, int operand_index, bool
     return false;
 }
 
+int Bytecode_debug_increase_indentation() {
+    Bytecode_format_indent += 2;
+
+    return Bytecode_format_indent;
+}
+
+int Bytecode_debug_decrease_indentation() {
+    if (Bytecode_format_indent == 0) return 0;
+
+    Bytecode_format_indent -= 2;
+
+    return Bytecode_format_indent;
+}
+
+void Bytecode_debug_print(const char* format, ...) {
+    FILE* stream = stdout;
+    va_list arguments;
+    va_start(arguments, format);
+
+    for (int i = 0; i < Bytecode_format_indent; i++) printf(" ");
+    vprintf(format, arguments);
+    va_end(arguments);
+}
+
 static int Bytecode_debug_instruction_byte(const char* opcode_text, int ret_offset_increment)
 {
     printf("%s\n", opcode_text);
@@ -283,7 +309,7 @@ static int Bytecode_debug_instruction_4bytes(Bytecode* bytecode, const char* opc
     Value value = bytecode->values.items[value_index];
 
     printf("%-45s %4d '", opcode_text, value_index);
-    value_print(value); // printf("%g", value);
+    value_print(value); 
     printf("'\n");
 
     return ret_offset_increment;
@@ -380,6 +406,9 @@ int Bytecode_disassemble_instruction(Bytecode* bytecode, int offset)
     if (Bytecode_search_source_code(bytecode, offset, &source_out)) {
         Bytecode_print_source_code(source_out, bytecode->lines.items[offset]);
     }
+    
+    for (int i = 0; i < Bytecode_format_indent; i++) 
+        printf(" ");
     
     printf("%06d ", offset);
     if (offset > 0 && bytecode->lines.items[offset] == bytecode->lines.items[offset - 1])

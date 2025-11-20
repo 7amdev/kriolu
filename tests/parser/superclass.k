@@ -1,4 +1,5 @@
 klasi Forma {
+  $break
   muda_posison(x, dx) {
     imprimi x + dx;
     $break

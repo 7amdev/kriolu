@@ -21,10 +21,6 @@ static Value FunctionNative_clock(VirtualMachine* vm, int argument_count, Value*
 
 static bool Debugger_read_commands(VirtualMachine* vm, bool* d_execution_pause, bool* d_execution_resume,char** out_error_msg);
 
-// TODO: delete code bellow
-//
-// static inline bool Object_check_value_kind(Value value, ObjectKind object_kind);
-
 //
 // Function Declarations
 //
@@ -696,6 +692,7 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
             if (!is_ok) 
                 printf("[ERROR] %s\n", out_error_msg);
         }
+        
     } // end for-loop
 
 #undef READ_BYTE_THEN_INCREMENT
@@ -714,7 +711,7 @@ static bool Debugger_is_whitespace(char c) {
     return false;
 }
 
-static void Debugger_trim_string(char* string, int string_length, char* out_string, int out_string_length) {
+void Debugger_trim_string(char* string, int string_length, char* out_string, int out_string_length) {
     int start = 0;
     while (Debugger_is_whitespace(string[start]) && start < string_length) start++;
 
@@ -810,7 +807,7 @@ static bool Debugger_read_commands(VirtualMachine* vm, bool* d_execution_pause, 
 
     for (;;) {
         printf("\n");
-        printf("> ");
+        printf("$ ");
         if (fgets(input_line, sizeof(input_line), stdin) == NULL) {
             *out_error_msg = "Cannot read command.";
             return false;
@@ -846,10 +843,9 @@ static bool Debugger_read_commands(VirtualMachine* vm, bool* d_execution_pause, 
             break;
         }
         else {
-            printf("[INFO] Command '%s' is invalid!\n", input_line);
+            printf("[INFO] Command '%s' is invalid!\n", input);
         }
     }
-
 
     return true;
 }

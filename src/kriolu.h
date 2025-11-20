@@ -370,6 +370,10 @@ void Bytecode_disassemble(Bytecode* bytecode, const char* name);
 int  Bytecode_disassemble_instruction(Bytecode* bytecode, int offset);
 void Bytecode_free(Bytecode* bytecode);
 
+int  Bytecode_debug_increase_indentation();
+int  Bytecode_debug_decrease_indentation();
+void Bytecode_debug_print(const char* format, ...);
+
 //
 // HashTable
 //
@@ -772,16 +776,18 @@ struct Function {
     FunctionKind function_kind;
     ObjectFunction* object;                     // NOTE: Runtime function data structure
     StackLocal locals;                          // NOTE: Variables declared inside a function; Emulates runtime StackValue 
+    Token class_name;
 
 //  TODO: rename to 'varibles_in_parent_scope' ???
     ArrayLocalMetadata variable_dependencies;   // NOTE: Varibale accessed that belongs to a parent function
-
     int depth;                                  // NOTE: Scope depth
 };
 
-void Function_init(Function* function, FunctionKind function_kind, Function** function_current, ObjectString* function_name, Object** object_head);
-ObjectFunction* Function_end(Function* function, Function** Function_current, bool parser_has_error, int line_number);
-int Function_resolve_variable_dependencies(Function* function, Token* name, Local** ret_local);
+// TODO: delete code bellow
+//
+// void Function_init(Function* function, FunctionKind function_kind, Function** function_current, ObjectString* function_name, Object** object_head);
+// ObjectFunction* Function_end(Function* function, Function** Function_current, bool parser_has_error, int line_number);
+// int Function_resolve_variable_dependencies(Function* function, Token* name, Local** ret_local);
 
 typedef struct StackFunction StackFunction;
 struct StackFunction {
@@ -877,7 +883,14 @@ typedef struct ClassDeclaration ClassDeclaration;
 struct ClassDeclaration {
     LinkedList(ClassDeclaration) next;
     bool has_superclass;
+    Token name;
 };
+
+typedef struct {
+    size_t count; 
+    size_t capacity; 
+    Function* items;
+} DArrayFunction; 
 
 typedef struct {
     Token token_current;
@@ -899,6 +912,10 @@ typedef struct {
 
     bool had_error;
     bool panic_mode;
+
+    bool debugger_execution_pause;
+    bool debugger_execution_resume;
+    DArrayFunction debugger_functions;
 } Parser;
 
 typedef struct {
@@ -1023,5 +1040,7 @@ struct VirtualMachine {
 void VirtualMachine_init(VirtualMachine* vm);
 InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* script);
 void VirtualMachine_free(VirtualMachine* vm);
+
+void Debugger_trim_string(char* string, int string_length, char* out_string, int out_string_length);
 
 #endif
