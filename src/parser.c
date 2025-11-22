@@ -150,21 +150,22 @@ static bool parser_match_then_advance(Parser* parser, TokenKind kind)
 static bool Parser_read_commands(Parser* parser, char** out_error_msg) {
     char input_line[1024]; 
 
-    printf("\n");
     for (;;) {
-        DynamicArray_foreach(Function, &parser->debugger_functions, fn) {
-            if  (fn.item->object->name == NULL) {
+        printf("\n");
+        DynamicArray_foreach(Function*, &parser->debugger_functions, it) {
+            Function* fn = *it.item;
+            if  (fn->object->name == NULL) {
                 printf("script");
             } 
-            else if (fn.item->function_kind == FunctionKind_Method || fn.item->function_kind == FunctionKind_Method_Initializer) {
-                printf("kl_%.*s", fn.item->class_name.length, fn.item->class_name.start);
-                printf(" > fn_%.*s",fn.item->object->name->length, fn.item->object->name->characters);
+            else if (fn->function_kind == FunctionKind_Method || fn->function_kind == FunctionKind_Method_Initializer) {
+                printf("kl_%.*s", fn->class_name.length, fn->class_name.start);
+                printf(" > fn_%.*s",fn->object->name->length, fn->object->name->characters);
             }
             else {
-                printf("%.*s",fn.item->object->name->length, fn.item->object->name->characters);
+                printf("%.*s",fn->object->name->length, fn->object->name->characters);
             } 
 
-            if (fn.i < parser->debugger_functions.count - 1) printf(" > ");
+            if (it.i < parser->debugger_functions.count - 1) printf(" > ");
         }
 
         // LinkedList_foreach(Function, parser->function, it) {
@@ -192,7 +193,8 @@ static bool Parser_read_commands(Parser* parser, char** out_error_msg) {
             }
         } 
 
-        printf("> $");
+        // printf("> $");
+        printf("> ");
         if (fgets(input_line, sizeof(input_line), stdin) == NULL) {
            *out_error_msg = "Cannot read command.";
            return false;
@@ -221,7 +223,14 @@ static bool Parser_read_commands(Parser* parser, char** out_error_msg) {
         }
         else if (strcmp(input, "locals") == 0) { 
             StackLocal* locals = &parser->function->locals;
-            printf("Stack: ");
+            ObjectString* fn_name = parser->function->object->name; 
+            if (fn_name != NULL) {
+                printf("fn_%.*s: ", parser->function->object->name->length, parser->function->object->name->characters);
+            }
+            else {
+                printf("script: ");
+            }
+
             for (int i = 0; i < locals->top; i++) {
                Token token = locals->items[i].token;
                printf("[ %d:", i);
@@ -230,11 +239,43 @@ static bool Parser_read_commands(Parser* parser, char** out_error_msg) {
             }
             printf("\n");
         }
-        else if (strcmp(input, "vm_stack") == 0) {
-//          TODO: shows the locals plus the caller(s) StackeValues
-            printf("Input: '%s'\n", input);
+        else if (strcmp(input, "stack@values") == 0) { // TODO: rename to 'stack@runtime'?
+            int index = 0;
+            for (int i = 0; i < parser->debugger_functions.count; i++) {
+                Function* fn = parser->debugger_functions.items[i];
+                ObjectString* fn_name = fn->object->name; 
+
+                if (fn_name != NULL) printf("fn_%.*s:\n  ", fn->object->name->length, fn->object->name->characters);
+                else                 printf("script:\n  ");
+
+                printf("[ ");
+                for (int i = 0; i < fn->locals.top; i++) {
+                    Token token = fn->locals.items[i].token;
+                    if (token.kind == Token_Nil) {
+                        printf("%d:", index);
+                        if (fn_name != NULL) 
+                            printf("fn_%.*s", fn->object->name->length, fn->object->name->characters);
+                    }
+                    else {
+                        printf("%d:", index);
+                        printf("%.*s", token.length, token.start);
+                    }
+                    if ((i + 1) < fn->locals.top) printf(" | ");
+
+                    index += 1;
+                }
+                printf(" ]\n");
+            }
         }
         else if (strcmp(input, "closures") == 0) {
+//          TODO: display closed values inside the current function
+            printf("Input: '%s'\n", input);
+        }
+        else if (strcmp(input, "globals") == 0) {
+//          TODO: display closed values inside the current function
+            printf("Input: '%s'\n", input);
+        }
+        else if (strcmp(input, "objets") == 0) {
 //          TODO: display closed values inside the current function
             printf("Input: '%s'\n", input);
         }
@@ -385,11 +426,43 @@ static void Parser_debug_print_declaration(Lexer lexer, const char* start) {
         if (count_brackets == 1) {
             if (token.kind == Token_Mimoria) break; // Error
             if (token.kind == Token_Funson)  break; // Error
-            if (token.kind == Token_Mimoria) break; // Error
             if (token.kind == Token_Di)      break; // Error
             if (token.kind == Token_Si)      break; // Error
             if (token.kind == Token_Imprimi) break; // Error
         }
+    
+        token = lexer_scan(&lexer);
+    }
+
+    if (count_brackets == 0) {
+        int statement_len = (int)((token.start + token.length) - start);
+        printf("Statement: '");
+        printf("%.*s'\n", statement_len, start);
+    } else {
+        printf("[Error] syntax error on line '%d'.\n", token.line_number);
+    }
+}
+
+static void Parser_debug_print_function(Lexer lexer, const char* start) {
+    int count_brackets = 0;
+    
+    Token token = lexer_scan(&lexer);
+    for (;;) {
+        if (token.kind == Token_Left_Brace) {
+            count_brackets += 1; 
+        }
+        else if (token.kind == Token_Right_Brace) {
+            count_brackets -= 1;
+            if (count_brackets == 0) break;
+        }
+
+        // if (count_brackets == 1) {
+        //     if (token.kind == Token_Mimoria) break; // Error
+        //     if (token.kind == Token_Funson)  break; // Error
+        //     if (token.kind == Token_Di)      break; // Error
+        //     if (token.kind == Token_Si)      break; // Error
+        //     if (token.kind == Token_Imprimi) break; // Error
+        // }
     
         token = lexer_scan(&lexer);
     }
@@ -412,6 +485,12 @@ static Statement* parser_parse_statement(Parser* parser, BlockType block_type) {
 //    +, -, /, *, call '(', assignment '=', objectGet '.'
 //    variableGet, literals
 
+    if (!parser->debugger_execution_resume && parser->debugger_execution_pause) {
+        char *error_msg = NULL;
+        bool ok = Parser_read_commands(parser, &error_msg);
+        if (!ok) printf("[ERROR] %s\n", error_msg);
+    }
+    
     Statement* statement = { 0 };
     const char* statement_start = parser->token_current.start;
     int instruction_start_index = parser_get_current_bytecode(parser)->instructions.count;
@@ -423,6 +502,9 @@ static Statement* parser_parse_statement(Parser* parser, BlockType block_type) {
         statement = parser_parse_declaration_class(parser); 
     } 
     else if (parser_match_then_advance(parser, Token_Funson)) {
+//  #ifdef DEBUG
+        Parser_debug_print_function(*parser->lexer, parser->token_previous.start);
+//  #endif
         statement = parser_parse_declaration_function(parser);
     }
     else if (parser_match_then_advance(parser, Token_Mimoria)) {
@@ -456,11 +538,11 @@ static Statement* parser_parse_statement(Parser* parser, BlockType block_type) {
         statement = parser_parse_statement_expression(parser);
     }
 
-    if (!parser->debugger_execution_resume && parser->debugger_execution_pause) {
-        char *error_msg = NULL;
-        bool ok = Parser_read_commands(parser, &error_msg);
-        if (!ok) printf("[ERROR] %s\n", error_msg);
-    }
+    // if (!parser->debugger_execution_resume && parser->debugger_execution_pause) {
+    //     char *error_msg = NULL;
+    //     bool ok = Parser_read_commands(parser, &error_msg);
+    //     if (!ok) printf("[ERROR] %s\n", error_msg);
+    // }
 
     if (parser->panic_mode)
         parser_synchronize(parser);
@@ -568,8 +650,10 @@ static Statement* parser_parse_instruction_block(Parser* parser, BlockType block
         Statement* statement = parser_parse_statement(parser, block_type);
         if (statement == NULL) continue;
 
+//      TODO: Add Parser_read_commands();
+
         array_statement_insert(bloco, *statement);
-        // TODO: free statement
+//      TODO: free statement
     }
 
     parser_consume(parser, Token_Right_Brace, "Expect '}' after block.");
@@ -2427,7 +2511,7 @@ static void parser_init_function(Parser* parser, Function* function, FunctionKin
     StackLocal_push(&function->locals, local);
     ArrayLocalMetadata_init(&function->variable_dependencies, 0);
     LinkedList_push(parser->function, function);
-    DynamicArray_push(&parser->debugger_functions, *function);
+    DynamicArray_push(&parser->debugger_functions, function);
 }
 
 static ObjectFunction* parser_end_function(Parser* parser, Function* function) {
@@ -2439,7 +2523,9 @@ static ObjectFunction* parser_end_function(Parser* parser, Function* function) {
     //       stack value and it will be discaded by the caller function when returned.
     Function* popped_function = NULL;
     LinkedList_pop(parser->function, popped_function);
-    DynamicArray_pop(&parser->debugger_functions, popped_function);
+
+    Function** ret_fn = NULL;
+    DynamicArray_pop(&parser->debugger_functions, ret_fn);
 
 #ifdef DEBUG_COMPILER_BYTECODE
     if (!parser_has_error) {

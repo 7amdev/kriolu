@@ -1,3 +1,21 @@
+funson vetor_2(x, y) {
+  $break
+  mimoria d = 5;
+
+  funson objetu(msg) {
+    funson soma(other) { 
+      divolvi other("x") + x;
+    }
+
+    si (msg == "x") divolvi x;
+    si (msg == "x") divolvi y;
+
+    imprimi "[ERROR] opson ka ezisti";
+  }
+
+  divolvi objetu;
+}
+
 klasi Forma {
   $break
   muda_posison(x, dx) {

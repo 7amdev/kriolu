@@ -889,7 +889,7 @@ struct ClassDeclaration {
 typedef struct {
     size_t count; 
     size_t capacity; 
-    Function* items;
+    Function** items;
 } DArrayFunction; 
 
 typedef struct {
