@@ -327,6 +327,8 @@ void ArrayValue_free(ArrayValue* values);
 // Bytecode
 //
 
+typedef struct ArrayOutsider ArrayOutsider;
+
 typedef struct {
     const char* source_start;
     size_t      source_length;
@@ -350,7 +352,7 @@ typedef struct {
 #define Compiler_CompileInstruction_2Bytes(bytecode, opcode, operand, line) Bytecode_insert_instruction_2bytes(bytecode, opcode, operand, line, DEBUG_TRACE_INSTRUCTION)
 #define Compiler_CompileInstruction_3Bytes(bytecode, opcode, op1, op2, line) Bytecode_insert_instruction_3bytes(bytecode, opcode, op1, op2, line, DEBUG_TRACE_INSTRUCTION)
 #define Compiler_CompileInstruction_Constant(bytecode, value, line) Bytecode_insert_instruction_constant(bytecode, value, line, DEBUG_TRACE_INSTRUCTION)
-#define Compiler_CompileInstruction_Closure(bytecode, value, line) Bytecode_insert_instruction_closure(bytecode, value, line, DEBUG_TRACE_INSTRUCTION)
+#define Compiler_CompileInstruction_Closure(bytecode, value, outsiders, line) Bytecode_insert_instruction_closure(bytecode, value, outsiders, line, DEBUG_TRACE_INSTRUCTION)
 #define Compiler_CompileInstruction_Jump(bytecode, opcode, line) Bytecode_insert_instruction_jump(bytecode, opcode, line, DEBUG_TRACE_INSTRUCTION)
 #define Compiler_CompileInstruction_Loop(bytecode, start_index, line) Bytecode_emit_instruction_loop(bytecode, start_index, line, DEBUG_TRACE_INSTRUCTION)
 #define Compiler_CompileValue(bytecode, value) ArrayValue_insert(&bytecode->values, value)
@@ -361,7 +363,7 @@ int  Bytecode_insert_instruction_1byte(Bytecode* bytecode, OpCode opcode, int li
 int  Bytecode_insert_instruction_2bytes(Bytecode* bytecode, OpCode opcode, uint8_t operand, int line_number, bool debug_trace_on);
 int  Bytecode_insert_instruction_3bytes(Bytecode* bytecode, OpCode opcode, uint8_t operand_1, uint8_t operand_2, int line_number, bool debug_trace_on);
 int  Bytecode_insert_instruction_constant(Bytecode* bytecode, Value value, int line_number, bool debug_trace_on);
-void Bytecode_insert_instruction_closure(Bytecode* bytecode, Value value, int line_number, bool debug_trace_on);
+void Bytecode_insert_instruction_closure(Bytecode* bytecode, Value value, ArrayOutsider* outsiders, int line_number, bool debug_trace_on);
 int  Bytecode_insert_instruction_jump(Bytecode* bytecode, OpCode opcode, int line, bool debug_trace_on);
 void Bytecode_emit_instruction_loop(Bytecode* bytecode, int jump_to_index, int line_number, bool debug_trace_on);
 bool Bytecode_patch_instruction_jump(Bytecode* bytecode, int operand_index, bool debug_trace_on);
@@ -466,8 +468,8 @@ typedef struct {
 
     Bytecode bytecode;
     ObjectString* name;
-    int arity; // Number of parameters
-    int variable_dependencies_count;
+    int arity;              // Number of parameters
+    int outsiders_count;    // old_value: variable_dependencies_count;
 } ObjectFunction;
 
 typedef Value FunctionNative(VirtualMachine* vm, int argument_count, Value* arguments);
@@ -759,28 +761,26 @@ typedef enum {
 typedef struct {
     uint8_t index;
     LocalLocation location;
-} LocalMetadata;
-
-typedef struct {
-    LocalMetadata items[UINT8_COUNT];
+} Outsider;
+    
+struct ArrayOutsider {
+    Outsider items[UINT8_COUNT];
     int count;
-} ArrayLocalMetadata;
+};
 
-void ArrayLocalMetadata_init(ArrayLocalMetadata* local_metadata, int count);
-int  ArrayLocalMetadata_add(ArrayLocalMetadata* local_metadata, uint8_t index, LocalLocation location, int* variable_dependencies_count);
+void ArrayOutsider_init(ArrayOutsider* local_metadata, int count);
+int  ArrayOutsider_add(ArrayOutsider* local_metadata, uint8_t index, LocalLocation location, int* variable_dependencies_count);
 
 typedef struct Function Function;
 struct Function {
     LinkedList(Function) next;
 
     FunctionKind function_kind;
-    ObjectFunction* object;                     // NOTE: Runtime function data structure
-    StackLocal locals;                          // NOTE: Variables declared inside a function; Emulates runtime StackValue 
+    ObjectFunction* object;         // NOTE: Runtime function data structure
+    StackLocal locals;              // NOTE: Variables declared inside a function; Emulates runtime StackValue 
+    ArrayOutsider outsiders;        // old_value: 'variable_dependencies' | NOTE: Varibale accessed that belongs to a parent function
     Token class_name;
-
-//  TODO: rename to 'varibles_in_parent_scope' ???
-    ArrayLocalMetadata variable_dependencies;   // NOTE: Varibale accessed that belongs to a parent function
-    int depth;                                  // NOTE: Scope depth
+    int depth;                      // NOTE: Scope depth
 };
 
 // TODO: delete code bellow
@@ -917,6 +917,40 @@ typedef struct {
     bool debugger_execution_resume;
     DArrayFunction debugger_functions;
 } Parser;
+
+
+static const char* command_next      = "next";
+static const char* command_resume    = "resume";
+static const char* command_continue  = "continue";
+static const char* command_locals    = "locals";
+static const char* command_variables = "variables";
+static const char* command_closures  = "closures";
+static const char* command_globals   = "globlas";
+static const char* command_objects   = "objects";
+
+typedef enum {
+    ParserCommandKind_Next = 0,
+    ParserCommandKind_Resume,
+    ParserCommandKind_Continue,
+    ParserCommandKind_Locals,
+    ParserCommandKind_Stack,
+    ParserCommandKind_Closures,
+    ParserCommandKind_Globals,
+    ParserCommandKind_Objects,
+
+    ParserCommandKind_Count,
+} ParserCommandKind;
+
+static const char* Parser_commands[] = {
+    [ParserCommandKind_Next]     = "next",
+    [ParserCommandKind_Resume]   = "resume",
+    [ParserCommandKind_Continue] = "continue",
+    [ParserCommandKind_Locals]   = "locals",
+    [ParserCommandKind_Stack]    = "stack",
+    [ParserCommandKind_Closures] = "closures",
+    [ParserCommandKind_Globals]  = "globlas",
+    [ParserCommandKind_Objects]  = "objects",
+};
 
 typedef struct {
     Lexer*     lexer;

@@ -129,7 +129,7 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
             ObjectFunction* function = value_as_function_object(READ_CONSTANT());
             ObjectClosure* closure = ObjectClosure_allocate(function, &vm->objects);
             stack_value_push(&vm->stack_value, value_make_object(closure));
-            for (int i = 0; i < closure->function->variable_dependencies_count; i++) {
+            for (int i = 0; i < closure->function->outsiders_count; i++) {
                 uint8_t local_location       = READ_BYTE_THEN_INCREMENT();
                 uint8_t local_location_index = READ_BYTE_THEN_INCREMENT();
                 if (local_location == LocalLocation_In_Parent_Stack) {
@@ -153,7 +153,7 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
             ObjectFunction* function = value_as_function_object(READ_CONSTANT_3BYTE());
             ObjectClosure* closure = ObjectClosure_allocate(function, &vm->objects);
             stack_value_push(&vm->stack_value, value_make_object(closure));
-            for (int i = 0; i < closure->function->variable_dependencies_count; i++) {
+            for (int i = 0; i < closure->function->outsiders_count; i++) {
                 uint8_t local_location = READ_BYTE_THEN_INCREMENT(); // TODO: rename to 'local_location'
                 uint8_t local_location_index = READ_BYTE_THEN_INCREMENT();
                 if (local_location == LocalLocation_In_Parent_Stack) { // TODO: change line to 'if(local_location == LocalLocation_In_Parent_Stack) {...}'
@@ -200,6 +200,7 @@ InterpreterResult VirtualMachine_interpret(VirtualMachine* vm, ObjectFunction* s
             break;
         }
         case OpCode_Stack_Move_Value_To_Heap: {
+//          Note: this instruction is emitted at the 'Parser_end_scope()'.
             VirtualMachine_move_value_from_stack_to_heap(vm, vm->stack_value.top - 1);
             stack_value_pop(&vm->stack_value);
             break;

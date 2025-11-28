@@ -113,8 +113,9 @@ int Bytecode_insert_instruction_constant(Bytecode* bytecode, Value value, int li
     );
 }
 
-void Bytecode_insert_instruction_closure(Bytecode* bytecode, Value value, int line_number, bool debug_trace_on) {
+void Bytecode_insert_instruction_closure(Bytecode* bytecode, Value value, ArrayOutsider* outsiders, int line_number, bool debug_trace_on) {
     int value_index = ArrayValue_insert(&bytecode->values, value);
+    int opcode_index = bytecode->instructions.count;
     assert(value_index > -1);
 
     if (value_index < 256) {
@@ -123,8 +124,31 @@ void Bytecode_insert_instruction_closure(Bytecode* bytecode, Value value, int li
             OpCode_Stack_Push_Closure,        // OpCode
             (uint8_t)value_index,  // Operand
             line_number,
-            DEBUG_TRACE_INSTRUCTION
+            false   // DEBUG_TRACE_INSTRUCTION
         );
+
+        // for (int i = 0; i < object_fn->outsiders_count; i++) {
+        for (int i = 0; i < outsiders->count; i++) {
+            // Compile 1(one) Byte Instruction
+            //
+            Bytecode_insert_instruction_1byte(
+                bytecode,
+                outsiders->items[i].location,
+                line_number,
+                false
+            );
+    
+            // Compile 1(one) Byte Instruction
+            //
+            Bytecode_insert_instruction_1byte(
+                bytecode,
+                (uint8_t)outsiders->items[i].index,
+                line_number,
+                false
+            );
+        }
+
+        if (debug_trace_on) Bytecode_disassemble_instruction(bytecode, opcode_index);
 
         return;
     }
@@ -259,10 +283,18 @@ static int Bytecode_debug_instruction_closure(Bytecode* bytecode, const char* op
     printf("'\n");
 
     ObjectFunction* function = value_as_function_object(value);
-    for (int i = 0; i < function->variable_dependencies_count; i++) {
+    for (int i = 0; i < function->outsiders_count; i++) {
         int local_location = bytecode->instructions.items[ret_offset_increment++];
         int index = bytecode->instructions.items[ret_offset_increment++];
-        printf("%04d      | %2s %-7s %d\n", ret_offset_increment - 2, "", local_location ? "stack" : "heap", index);
+
+        printf("%04d      | %2s ", ret_offset_increment - 2, "");
+        if (local_location == LocalLocation_In_Parent_Stack) {
+            printf("%d) New heap-value from parent's stack index '%d'.\n", i + 1,  index);
+        }
+        else {
+            printf("%d) Import parent's heap-values at index '%d'.\n", i + 1, index);
+        }
+        // printf("%04d      | %2s %-7s %d\n", ret_offset_increment - 2, "", local_location ? "stack" : "heap", index);
     }
 
     return ret_offset_increment;

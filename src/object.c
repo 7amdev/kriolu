@@ -75,7 +75,7 @@ ObjectFunction* ObjectFunction_allocate(Object** object_head) {
 
     object_fn->arity = 0;
     object_fn->name = NULL;
-    object_fn->variable_dependencies_count = 0;
+    object_fn->outsiders_count = 0;
     Bytecode_init(&object_fn->bytecode);
 
     return object_fn;
@@ -92,7 +92,7 @@ ObjectValue* ObjectValue_allocate(Object** object_head, Value* value_address) {
 }
 
 ObjectClosure* ObjectClosure_allocate(ObjectFunction* function, Object** object_head) {
-    int item_count = function->variable_dependencies_count;
+    int item_count = function->outsiders_count;
     ObjectValue** items = NULL;
     if (item_count > 0) {
        items = Memory_Allocate_Count(ObjectValue*, item_count);

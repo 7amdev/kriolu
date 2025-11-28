@@ -149,6 +149,7 @@ static bool parser_match_then_advance(Parser* parser, TokenKind kind)
 
 static bool Parser_read_commands(Parser* parser, char** out_error_msg) {
     char input_line[1024]; 
+    Lexer lexer = {0};
 
     for (;;) {
         printf("\n");
@@ -193,7 +194,6 @@ static bool Parser_read_commands(Parser* parser, char** out_error_msg) {
             }
         } 
 
-        // printf("> $");
         printf("> ");
         if (fgets(input_line, sizeof(input_line), stdin) == NULL) {
            *out_error_msg = "Cannot read command.";
@@ -210,73 +210,235 @@ static bool Parser_read_commands(Parser* parser, char** out_error_msg) {
         char input[50];
         Debugger_trim_string(input_line, input_line_length, input, sizeof(input));
 
-        if (strcmp(input, "next") == 0) {
+        lexer_init(&lexer, input);
+        Token command = lexer_scan(&lexer);
+
+        if (memcmp(command.start, command_next, strlen(command_next)) == 0) {
             break;
         }
-        else if (strcmp(input, "resume") == 0) {
+//      TODO: else if(command == "instructions") {}
+        else if (memcmp(command.start, command_resume, strlen(command_resume)) == 0) {
             parser->debugger_execution_resume = true;
             break;
         }
-        else if (strcmp(input, "continue") == 0) {
+        else if (memcmp(command.start, command_continue, strlen(command_continue)) == 0) {
             parser->debugger_execution_pause = false;
             break;
         }
-        else if (strcmp(input, "locals") == 0) { 
-            StackLocal* locals = &parser->function->locals;
-            ObjectString* fn_name = parser->function->object->name; 
-            if (fn_name != NULL) {
-                printf("fn_%.*s: ", parser->function->object->name->length, parser->function->object->name->characters);
-            }
-            else {
-                printf("script: ");
+        else if (memcmp(command.start, command_variables, strlen(command_variables)) == 0) {
+            Token command_filter = lexer_scan(&lexer);
+
+            if (*command_filter.start == '-') {
+                command_filter = lexer_scan(&lexer);
             }
 
-            for (int i = 0; i < locals->top; i++) {
-               Token token = locals->items[i].token;
-               printf("[ %d:", i);
-               printf("%.*s", token.length, token.start);
-               printf(" ]");
-            }
-            printf("\n");
-        }
-        else if (strcmp(input, "stack@values") == 0) { // TODO: rename to 'stack@runtime'?
-            int index = 0;
-            for (int i = 0; i < parser->debugger_functions.count; i++) {
-                Function* fn = parser->debugger_functions.items[i];
-                ObjectString* fn_name = fn->object->name; 
+            if (command_filter.kind == Token_Eof) {
+                StackLocal* locals = &parser->function->locals;
+                ObjectString* fn_name = parser->function->object->name; 
+                if (fn_name != NULL) {
+                    printf("fn_%.*s:\n", fn_name->length, fn_name->characters);
+                }
+                else {
+                    printf("script: ");
+                }
 
-                if (fn_name != NULL) printf("fn_%.*s:\n  ", fn->object->name->length, fn->object->name->characters);
-                else                 printf("script:\n  ");
-
-                printf("[ ");
-                for (int i = 0; i < fn->locals.top; i++) {
-                    Token token = fn->locals.items[i].token;
+                printf("    locals    [ ");
+                for (int i = 0; i < locals->top; i++) {
+                    Token token = locals->items[i].token;
                     if (token.kind == Token_Nil) {
-                        printf("%d:", index);
-                        if (fn_name != NULL) 
-                            printf("fn_%.*s", fn->object->name->length, fn->object->name->characters);
+                        printf("%d:", i);
+                        printf("fn_%.*s", fn_name->length, fn_name->characters);
                     }
                     else {
-                        printf("%d:", index);
+                        printf("%d:", i);
                         printf("%.*s", token.length, token.start);
                     }
-                    if ((i + 1) < fn->locals.top) printf(" | ");
-
-                    index += 1;
+                    if (i + 1 < locals->top) printf(" | ");
                 }
-                printf(" ]\n");
+                
+                printf(" ]");
+                printf("\n");
+
+                printf("    outsiders [\n");
+                ArrayOutsider* outsiders = &parser->function->outsiders;
+                for (int i = 0; i < outsiders->count; i++) {
+                    Function* fn = parser->function;
+                    Outsider* outsider = &outsiders->items[i];
+                    printf("      %d -> ", i);
+                    for (;;) {
+                        ObjectString* fn_name = fn->next->object->name;
+                        if (outsider->location == LocalLocation_In_Parent_Stack) {
+                            Local* local = &fn->next->locals.items[outsider->index];
+                            printf(
+                                "fn_%.*s.locals.%.*s",
+                                fn_name->length, fn_name->characters, 
+                                local->token.length, local->token.start
+                            );
+
+                            break;
+                        }
+                        else {
+                            printf(
+                                "fn_%.*s.outsiders[%d] -> ", 
+                                fn_name->length, fn_name->characters, 
+                                outsider->index
+                            );
+                        }
+                        
+                        fn = fn->next; if (fn->next == NULL) break;
+                        outsider = &fn->outsiders.items[outsider->index];
+                    }
+
+                    printf(",\n");
+                }
+                printf("    ]");
+                printf("\n\n");
+            }
+            else if (*command_filter.start == 'l') {
+                StackLocal* locals = &parser->function->locals;
+                ObjectString* fn_name = parser->function->object->name; 
+                if (fn_name != NULL) {
+                    printf("fn_%.*s:\n", fn_name->length, fn_name->characters);
+                }
+                else {
+                    printf("script:\n");
+                }
+
+                printf("    locals    [ ");
+                for (int i = 0; i < locals->top; i++) {
+                    Token token = locals->items[i].token;
+                    if (token.kind == Token_Nil) {
+                        printf("%d:", i);
+                        printf("fn_%.*s", fn_name->length, fn_name->characters);
+                    }
+                    else {
+                        printf("%d:", i);
+                        printf("%.*s", token.length, token.start);
+                    }
+                    if (i + 1 < locals->top) printf(" | ");
+                }
+                
+                printf(" ]");
+                printf("\n");
+
+            }
+            else if (*command_filter.start == 'o') {
+                StackLocal* locals = &parser->function->locals;
+                ObjectString* fn_name = parser->function->object->name; 
+                if (fn_name != NULL) {
+                    printf("fn_%.*s:\n", fn_name->length, fn_name->characters);
+                }
+                else {
+                    printf("script:\n");
+                }
+
+                printf("    outsiders [\n");
+                ArrayOutsider* outsiders = &parser->function->outsiders;
+                for (int i = 0; i < outsiders->count; i++) {
+                    Function* fn = parser->function;
+                    Outsider* outsider = &outsiders->items[i];
+                    printf("      %d -> ", i);
+                    for (;;) {
+                        ObjectString* fn_name = fn->next->object->name;
+                        if (outsider->location == LocalLocation_In_Parent_Stack) {
+                            Local* local = &fn->next->locals.items[outsider->index];
+                            printf(
+                                "fn_%.*s.locals.%.*s",
+                                fn_name->length, fn_name->characters, 
+                                local->token.length, local->token.start
+                            );
+
+                            break;
+                        }
+                        else {
+                            printf(
+                                "fn_%.*s.outsiders[%d] -> ", 
+                                fn_name->length, fn_name->characters, 
+                                outsider->index
+                            );
+                        }
+                        
+                        fn = fn->next; if (fn->next == NULL) break;
+                        outsider = &fn->outsiders.items[outsider->index];
+                    }
+
+                    printf(",\n");
+                }
+                printf("    ]\n");
+            }
+            else if (*command_filter.start == 'r') {
+                int index = 0;
+                for (int i = 0; i < parser->debugger_functions.count; i++) {
+                    Function* fn_prev = (i > 0 ? parser->debugger_functions.items[i - 1] : NULL);
+                    Function* fn = parser->debugger_functions.items[i];
+                    ObjectString* fn_name = fn->object->name; 
+                    
+                    if (fn_name != NULL) printf("fn_%.*s:\n  ", fn->object->name->length, fn->object->name->characters);
+                    else                 printf("script:\n  ");
+
+                    printf(" locals    [ ");
+                    for (int i = 0; i < fn->locals.top; i++) {
+                        Token token = fn->locals.items[i].token;
+                        if (token.kind == Token_Nil) {
+                            printf("%d:", index);
+                            if (fn_name != NULL) 
+                                printf("fn_%.*s", fn->object->name->length, fn->object->name->characters);
+                        }
+                        else {
+                            printf("%d:", index);
+                            printf("%.*s", token.length, token.start);
+                            if (fn->locals.items[i].action == LocalAction_Move_Heap) 
+                                printf("*");
+                        }
+                        if ((i + 1) < fn->locals.top) printf(" | ");
+
+                        index += 1;
+                    }
+                    printf(" ]\n");
+
+                    if (fn->outsiders.count > 0) printf("   outsiders [\n");
+                    for (int i = 0; i < fn->outsiders.count; i++) {
+                        Outsider* outsider = &fn->outsiders.items[i];
+                        if (outsider->location == LocalLocation_In_Parent_Stack) {
+                            if (fn_prev != NULL) 
+                                printf(
+                                    "      %d -> fn_%.*s.locals.%.*s", 
+                                    i, fn_prev->object->name->length, fn_prev->object->name->characters, 
+                                    fn_prev->locals.items[outsider->index].token.length, 
+                                    fn_prev->locals.items[outsider->index].token.start
+                                );
+                            else 
+                                printf("TBD");
+                        }
+                        else {
+                            printf(
+                                "      %d -> fn_%.*s.outsiders[%d]", 
+                                i, fn_prev->object->name->length, fn_prev->object->name->characters, 
+                                fn->outsiders.items[outsider->index].index
+                            );
+                        }
+
+                        if ((i + 1) < fn->outsiders.count) printf(",\n");
+                        else printf("\n");
+                    }
+
+                    if (fn->outsiders.count > 0) printf("   ]\n");
+                }
+            }
+            else {
+                printf("[ERROR] Invalid option: -%.*s\n", command_filter.length, command_filter.start);
+                printf("        Usage:\n");
+                printf("          variabels -[l|o|r]\n");
+                printf("             -(l)ocals\n");
+                printf("             -(o)utdisers\n");
+                printf("             -(r)untime\n");
             }
         }
-        else if (strcmp(input, "closures") == 0) {
-//          TODO: display closed values inside the current function
+        else if (memcmp(command.start, command_globals, strlen(command_globals)) == 0) {
             printf("Input: '%s'\n", input);
         }
-        else if (strcmp(input, "globals") == 0) {
-//          TODO: display closed values inside the current function
-            printf("Input: '%s'\n", input);
-        }
-        else if (strcmp(input, "objets") == 0) {
-//          TODO: display closed values inside the current function
+        else if (memcmp(command.start, command_objects, strlen(command_objects)) == 0) {
+//          TODO: display parser->ojects Linked-list
             printf("Input: '%s'\n", input);
         }
         else {
@@ -519,6 +681,7 @@ static Statement* parser_parse_statement(Parser* parser, BlockType block_type) {
 //  #endif
         statement = parser_parse_instruction_print(parser);
     }
+//  TODO: include the statements bellow into debugger.
     else if (parser_match_then_advance(parser, Token_Si))             statement = parser_parse_instruction_if(parser);                
     else if (parser_match_then_advance(parser, Token_Di))             statement = parser_instruction_for(parser);                     
     else if (parser_match_then_advance(parser, Token_Pa))             statement = parser_instruction_for(parser);                     
@@ -532,17 +695,12 @@ static Statement* parser_parse_statement(Parser* parser, BlockType block_type) {
     }   
     else if (parser_match_then_advance(parser, Token_Left_Brace))     statement = parser_parse_instruction_block(parser, block_type); 
     else if (parser_match_then_advance(parser, Token_Timenti))        statement = parser_instruction_while(parser);                   
+//  TODO: in break statement, consume ';' character.
     else if (parser_match_then_advance(parser, Token_Debugger_Break)) statement = parser_parse_instruction_debug(parser);
     else {
         Parser_debug_print_expression(*parser->lexer, parser->token_current.start);
         statement = parser_parse_statement_expression(parser);
     }
-
-    // if (!parser->debugger_execution_resume && parser->debugger_execution_pause) {
-    //     char *error_msg = NULL;
-    //     bool ok = Parser_read_commands(parser, &error_msg);
-    //     if (!ok) printf("[ERROR] %s\n", error_msg);
-    // }
 
     if (parser->panic_mode)
         parser_synchronize(parser);
@@ -1419,10 +1577,11 @@ static Statement* parser_parse_method_declaration(Parser* parser) {
 
 static ObjectFunction* parser_parse_function_paramenters_and_body(Parser* parser, FunctionKind function_kind, Token class_name) {
     Function function;
+    Token function_name = parser->token_previous;
     parser_init_function(parser, &function, function_kind, class_name);
 
 //  NOTE: Parsing function doesnt explecitly close the Scope 'parser_end_scope()', because
-//        in the 'Parser_end_function' will emit the Return instruction which at runtime will
+//        the 'Parser_end_function' will emit the Return instruction which at runtime will
 //        do the exact task parser_end_scope would do and some more. 
     parser_begin_scope(parser);
 
@@ -1468,38 +1627,26 @@ static ObjectFunction* parser_parse_function_paramenters_and_body(Parser* parser
 
     Statement* statement_block = parser_parse_instruction_block(parser, BlockType_Function);
 
+    Bytecode_debug_print("------ Ending function '%.*s()' -------\n", function_name.length, function_name.start);
     ObjectFunction* object_fn = parser_end_function(parser, &function);
 
+    if (!parser->debugger_execution_resume && parser->debugger_execution_pause) {
+        char *error_msg = NULL;
+        bool ok = Parser_read_commands(parser, &error_msg);
+        if (!ok) printf("[ERROR] %s\n", error_msg);
+    }
+    
     Memory_transaction_push(value_make_object(object_fn));
     {
         Compiler_CompileInstruction_Closure(
             parser_get_current_bytecode(parser),
             value_make_object(object_fn),
+            &function.outsiders,
             parser->token_previous.line_number
         );
-    
-        for (int i = 0; i < object_fn->variable_dependencies_count; i++) {
-            // Compile 1(one) Byte Instruction
-            //
-            Bytecode_insert_instruction_1byte(
-                parser_get_current_bytecode(parser),
-                function.variable_dependencies.items[i].location,
-                parser->token_previous.line_number,
-                false
-            );
-    
-            // Compile 1(one) Byte Instruction
-            //
-            Bytecode_insert_instruction_1byte(
-                parser_get_current_bytecode(parser),
-                (uint8_t)function.variable_dependencies.items[i].index,
-                parser->token_previous.line_number,
-                false
-            );
-        }
     } 
     Memory_transaction_pop();
-
+    
     return object_fn;
 }
 
@@ -2467,7 +2614,7 @@ static void parser_end_scope(Parser* parser) {
         if (StackLocal_peek(locals, 0)->action == LocalAction_Move_Heap) {
             Compiler_CompileInstruction_1Byte(
                 parser_get_current_bytecode(parser),
-                OpCode_Stack_Move_Value_To_Heap,              // TODO: rename to 'OpCode_Stack_Move_Value_To_Heap'
+                OpCode_Stack_Move_Value_To_Heap,              
                 parser->token_previous.line_number
             );
         } 
@@ -2509,7 +2656,7 @@ static void parser_init_function(Parser* parser, Function* function, FunctionKin
 
     StackLocal_init(&function->locals);
     StackLocal_push(&function->locals, local);
-    ArrayLocalMetadata_init(&function->variable_dependencies, 0);
+    ArrayOutsider_init(&function->outsiders, 0);
     LinkedList_push(parser->function, function);
     DynamicArray_push(&parser->debugger_functions, function);
 }
@@ -2557,7 +2704,11 @@ int parser_resolve_variable_dependencies(Function* function, Token* name, Local*
         if (current_function == NULL) break;
 
         local_found_idx = StackLocal_get_local_index_by_token(&current_function->locals, name, NULL);
-        if (local_found_idx != -1) break; // if found token, break ot of thhe loop
+        if (local_found_idx != -1) {
+            current_function->locals.items[local_found_idx].action = LocalAction_Move_Heap;
+            *ret_local = &current_function->locals.items[local_found_idx];
+            break;
+        }
 
         StackFunction_push(&stack_function, current_function);
 
@@ -2571,8 +2722,8 @@ int parser_resolve_variable_dependencies(Function* function, Token* name, Local*
     //
     if (local_found_idx == -1) return -1;
 
-    current_function->locals.items[local_found_idx].action = LocalAction_Move_Heap;
-    *ret_local = &current_function->locals.items[local_found_idx];
+    // current_function->locals.items[local_found_idx].action = LocalAction_Move_Heap;
+    // *ret_local = &current_function->locals.items[local_found_idx];
 
     int parent_local_idx = local_found_idx;
     bool is_top_item = true;
@@ -2580,14 +2731,14 @@ int parser_resolve_variable_dependencies(Function* function, Token* name, Local*
         if (StackFunction_is_empty(&stack_function)) break;
 
         current_function = StackFunction_peek(&stack_function, 0);
-        parent_local_idx = ArrayLocalMetadata_add(
-            &current_function->variable_dependencies,
+        parent_local_idx = ArrayOutsider_add(
+            &current_function->outsiders,
             (uint8_t)parent_local_idx,
             (is_top_item 
                 ? LocalLocation_In_Parent_Stack 
                 : LocalLocation_In_Parent_Heap_Values
             ),
-            &current_function->object->variable_dependencies_count
+            &current_function->object->outsiders_count
         );
 
         if (is_top_item) is_top_item = false;

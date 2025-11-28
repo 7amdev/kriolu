@@ -3,12 +3,22 @@ funson vetor_2(x, y) {
   mimoria d = 5;
 
   funson objetu(msg) {
+    mimoria dd = x + 10;
     funson soma(other) { 
-      divolvi other("x") + x;
+      mimoria sum = other("x") + x + y + dd;
+
+      funson diff() {
+        mimoria df = x - y;
+        $break
+        divolvi df;
+      }
+
+      divolvi sum;
     }
 
-    si (msg == "x") divolvi x;
-    si (msg == "x") divolvi y;
+    si (msg == "x")    divolvi x;
+    si (msg == "x")    divolvi y;
+    si (msg == "soma") divolvi soma;
 
     imprimi "[ERROR] opson ka ezisti";
   }
